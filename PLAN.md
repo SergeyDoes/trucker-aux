@@ -193,13 +193,14 @@ Done: 137 unit tests pass; checked in a sandbox (a type change renames, "+ Pair"
 
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
+- Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
 - Built-in cable check (tone + `glitch.js` detector).
 - Stale telemetry: when the game crashes (or another process keeps the memory alive), `sdkActive` can stay 1 with a frozen pose. The frame watch from E2.9 (`createFrameWatch`, renderTime still for 1 s) already tells it; still to do: a neutral listener in that case.
 - Optional: cabin reverb (`ConvolverNode`), muting by speed.
 
 ### E4 — packaging
 - electron-builder portable build (data folder next to the exe).
-- `docs/audio-setup.md`: VB-Cable (Max Latency 7168; Internal SR, both cable sides and the headphones at one rate), stereo headphones without virtual surround, player routed to `CABLE Input`, `scs-telemetry.dll` in `<game>\bin\win_x64\plugins\`.
+- `docs/audio-setup.md`: a virtual audio device (VB-Cable, VAC, Steam Streaming Speakers); both cable sides and the headphones at one rate; VB-Cable: Max Latency 7168, Internal SR at that rate; VAC trial mixes a "trial" voice in; Steam may reinstall or hold its driver (Remote Play); stereo headphones without virtual surround, player routed to the cable's input, `scs-telemetry.dll` in `<game>\bin\win_x64\plugins\`.
 
 ## Repository layout
 

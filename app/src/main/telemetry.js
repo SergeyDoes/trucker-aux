@@ -1,4 +1,6 @@
-import koffi from 'koffi';
+// The game's shared memory exists only on Windows; elsewhere the app runs without a game
+// and does not load the native module at all.
+const koffi = process.platform === 'win32' ? (await import('koffi')).default : null;
 
 export const MMF_NAME = 'Local\\SCSTelemetry';
 const MMF_SIZE = 32 * 1024;
@@ -109,6 +111,7 @@ function api() {
 // Only opens existing memory: if the app created it before the game,
 // the plugin might not get write access.
 export function openTelemetry() {
+  if (!koffi) return null;
   const { OpenFileMappingW, MapViewOfFile, RtlMoveMemory } = api();
   const mapping = OpenFileMappingW(FILE_MAP_READ, 0, MMF_NAME);
   if (!mapping) return null;
