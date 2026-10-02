@@ -1,0 +1,1318 @@
+{
+  "version": 2,
+  "default": {
+    "name": "Default layout",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Door L",
+        "position": [
+          -0.8,
+          -0.45,
+          -0.27
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Door R",
+        "position": [
+          0.8,
+          -0.45,
+          -0.27
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s1"
+      }
+    ]
+  },
+  "trucks": {
+    "vehicle.ford.f150_23": {
+      "name": "Ford F150 2023",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.88,
+          -0.73,
+          -1.3
+        ],
+        "max": [
+          0.88,
+          0.48,
+          1.16
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.71,
+            -0.46,
+            -0.42
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.71,
+            -0.46,
+            -0.42
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.7,
+            0.02,
+            -0.62
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.7,
+            0.02,
+            -0.62
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.68,
+            -0.43,
+            0.41
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.68,
+            -0.43,
+            0.41
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s5"
+        },
+        {
+          "id": "s7",
+          "name": "Central",
+          "position": [
+            0,
+            -0.11,
+            -0.69
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": null
+        },
+        {
+          "id": "s8",
+          "name": "Subwoofer",
+          "position": [
+            0,
+            -0.54,
+            0.8
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": null
+        }
+      ]
+    },
+    "vehicle.intnational.9900i": {
+      "name": "International 9900i",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -1.15,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          1.15,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s4",
+          "name": "Speaker L",
+          "position": [
+            -0.73,
+            0.2,
+            -0.7
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s5"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker R",
+          "position": [
+            0.73,
+            0.2,
+            -0.7
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s4"
+        }
+      ]
+    },
+    "vehicle.ford.mustang_67": {
+      "name": "Ford Mustang 1967",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -1.15,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          1.15,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.55,
+            -0.42,
+            -0.51
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.55,
+            -0.42,
+            -0.51
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3",
+          "position": [
+            0,
+            -0.03,
+            -0.6
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "full",
+          "pair": null
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 4 L",
+          "position": [
+            -0.55,
+            -0.22,
+            0.45
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s5"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 4 R",
+          "position": [
+            0.55,
+            -0.22,
+            0.45
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s4"
+        }
+      ]
+    },
+    "custom.1": {
+      "name": "Test",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -1.15,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          1.15,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.94,
+            -0.63,
+            -0.74
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.94,
+            -0.63,
+            -0.74
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.58,
+            -0.17,
+            -0.84
+          ],
+          "channel": "M",
+          "gainDb": -8.5,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.58,
+            -0.17,
+            -0.84
+          ],
+          "channel": "M",
+          "gainDb": -8.5,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.98,
+            -0.63,
+            0.29
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.98,
+            -0.63,
+            0.29
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s5"
+        }
+      ]
+    },
+    "vehicle.kenworth.w900@3.6": {
+      "name": "Kenworth W900, hook 3.6 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.74,
+          -1.15,
+          -0.73
+        ],
+        "max": [
+          0.74,
+          0.95,
+          1.18
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.64,
+            -0.6,
+            -0.5
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.64,
+            -0.6,
+            -0.5
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.55,
+            0.23,
+            -0.61
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.55,
+            0.23,
+            -0.61
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5",
+          "position": [
+            0,
+            -0.69,
+            0.61
+          ],
+          "channel": "M",
+          "gainDb": 4.5,
+          "type": "sub",
+          "pair": null
+        }
+      ]
+    },
+    "vehicle.peterbilt.389@2.6": {
+      "name": "Peterbilt 389, hook 2.6 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -1.15,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          1.15,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.66,
+            -0.43,
+            -0.38
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.66,
+            -0.43,
+            -0.38
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.72,
+            0.4,
+            -0.21
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.72,
+            0.4,
+            -0.21
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5",
+          "position": [
+            0.34,
+            -0.54,
+            -0.23
+          ],
+          "channel": "M",
+          "gainDb": 6,
+          "type": "sub",
+          "pair": null
+        }
+      ]
+    },
+    "vehicle.freightliner.cascadia2019@2.0": {
+      "name": "Freightliner Cascadia 2019",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.96,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          0.96,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.9,
+            -0.51,
+            -0.53
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.9,
+            -0.51,
+            -0.53
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.91,
+            0,
+            -0.57
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.91,
+            0,
+            -0.57
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.76,
+            -0.15,
+            0.44
+          ],
+          "channel": "L",
+          "gainDb": -21.5,
+          "type": "full",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.76,
+            -0.15,
+            0.44
+          ],
+          "channel": "R",
+          "gainDb": -5,
+          "type": "full",
+          "pair": "s5"
+        },
+        {
+          "id": "s7",
+          "name": "Speaker 7",
+          "position": [
+            -0.42,
+            -0.35,
+            0.26
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": null
+        }
+      ]
+    },
+    "vehicle.kenworth.t680@1.3": {
+      "name": "Kenworth T680 2014, hook 1.3 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.92,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          0.92,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.79,
+            -0.6,
+            -0.46
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.79,
+            -0.6,
+            -0.46
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.72,
+            -0.03,
+            -0.58
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.72,
+            -0.03,
+            -0.58
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.75,
+            -0.75,
+            -0.01
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.75,
+            -0.75,
+            -0.01
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s5"
+        }
+      ]
+    },
+    "vehicle.westernstar.49x@1.5": {
+      "name": "Western Star 49X, hook 1.5 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.88,
+          -1.15,
+          -1.3
+        ],
+        "max": [
+          0.88,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Tweeter L",
+          "position": [
+            -0.72,
+            -0.1,
+            -0.54
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Tweeter R",
+          "position": [
+            0.72,
+            -0.1,
+            -0.54
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Door L",
+          "position": [
+            -0.84,
+            -0.36,
+            -0.4
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Door R",
+          "position": [
+            0.84,
+            -0.36,
+            -0.4
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.68,
+            -0.44,
+            0.06
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.68,
+            -0.44,
+            0.06
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s5"
+        }
+      ]
+    },
+    "vehicle.kenworth.t680@2.7": {
+      "name": "Kenworth T680 2014, hook 2.7 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.83,
+          -1.15,
+          -0.63
+        ],
+        "max": [
+          0.83,
+          0.95,
+          1.28
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.79,
+            -0.6,
+            -0.46
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.79,
+            -0.6,
+            -0.46
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.72,
+            -0.03,
+            -0.58
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.72,
+            -0.03,
+            -0.58
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.69,
+            0.39,
+            0.15
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.69,
+            0.39,
+            0.15
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s5"
+        },
+        {
+          "id": "s7",
+          "name": "Speaker 7",
+          "position": [
+            -0.34,
+            -0.65,
+            0.59
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": null
+        }
+      ]
+    },
+    "vehicle.westernstar.49x@2.5": {
+      "name": "Western Star 49X, hook 2.5 m",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.88,
+          -1.15,
+          -0.63
+        ],
+        "max": [
+          0.88,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Tweeter L",
+          "position": [
+            -0.73,
+            -0.1,
+            -0.46
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Tweeter R",
+          "position": [
+            0.73,
+            -0.1,
+            -0.46
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "tweeter",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Door L",
+          "position": [
+            -0.83,
+            -0.36,
+            -0.32
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Door R",
+          "position": [
+            0.83,
+            -0.36,
+            -0.32
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.66,
+            -0.15,
+            0.38
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.66,
+            -0.15,
+            0.38
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "mid",
+          "pair": "s5"
+        },
+        {
+          "id": "s7",
+          "name": "Speaker 7",
+          "position": [
+            -0.29,
+            -0.55,
+            0.26
+          ],
+          "channel": "M",
+          "gainDb": 0,
+          "type": "sub",
+          "pair": null
+        },
+        {
+          "id": "s8",
+          "name": "Speaker 8 L",
+          "position": [
+            -0.51,
+            0.42,
+            0.29
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s9"
+        },
+        {
+          "id": "s9",
+          "name": "Speaker 8 R",
+          "position": [
+            0.51,
+            0.42,
+            0.29
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s8"
+        }
+      ]
+    },
+    "vehicle.ford.victoria_06": {
+      "name": "Ford Crown Victoria",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.64,
+          -0.51,
+          -0.81
+        ],
+        "max": [
+          0.64,
+          0.5,
+          1
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.52,
+            -0.26,
+            -0.47
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.52,
+            -0.26,
+            -0.47
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.22,
+            -0.05,
+            0.56
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.22,
+            -0.05,
+            0.56
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s3"
+        }
+      ]
+    },
+    "vehicle.volvo.vnl2025@1.7": {
+      "name": "Volvo VNL 440",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.84,
+          -0.92,
+          -0.81
+        ],
+        "max": [
+          0.84,
+          0.95,
+          0.9
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.72,
+            -0.28,
+            -0.26
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.72,
+            -0.28,
+            -0.26
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "midbass",
+          "pair": "s1"
+        },
+        {
+          "id": "s3",
+          "name": "Speaker 3 L",
+          "position": [
+            -0.53,
+            -0.1,
+            -0.69
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s4"
+        },
+        {
+          "id": "s4",
+          "name": "Speaker 3 R",
+          "position": [
+            0.53,
+            -0.1,
+            -0.69
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s3"
+        },
+        {
+          "id": "s5",
+          "name": "Speaker 5 L",
+          "position": [
+            -0.74,
+            0.1,
+            0.74
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s6"
+        },
+        {
+          "id": "s6",
+          "name": "Speaker 5 R",
+          "position": [
+            0.74,
+            0.1,
+            0.74
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "full",
+          "pair": "s5"
+        }
+      ]
+    },
+    "vehicle.ford.bronco_24": {
+      "name": "Ford Bronco 2024",
+      "width": 1,
+      "bounds": {
+        "min": [
+          -0.83,
+          -0.92,
+          -0.81
+        ],
+        "max": [
+          0.83,
+          0.95,
+          0.6
+        ]
+      },
+      "speakers": [
+        {
+          "id": "s1",
+          "name": "Door L",
+          "position": [
+            -0.5,
+            -0.45,
+            -0.35
+          ],
+          "channel": "L",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s2"
+        },
+        {
+          "id": "s2",
+          "name": "Door R",
+          "position": [
+            0.5,
+            -0.45,
+            -0.35
+          ],
+          "channel": "R",
+          "gainDb": 0,
+          "type": "small",
+          "pair": "s1"
+        }
+      ]
+    }
+  },
+  "assignments": {
+    "vehicle.freightliner.cascadia2024@2.0": "vehicle.freightliner.cascadia2019@2.0"
+  }
+}

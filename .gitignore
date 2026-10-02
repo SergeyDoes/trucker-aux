@@ -1,0 +1,8 @@
+# Python
+__pycache__/
+*.pyc
+
+# App data: only the example presets are published (settings, backups and the
+# Chromium profile stay local).
+app/data/*
+!app/data/layouts.json

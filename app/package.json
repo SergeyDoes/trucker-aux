@@ -1,0 +1,19 @@
+{
+  "name": "trucker-aux",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "test:engine": "electron scripts/engine-check.js"
+  },
+  "dependencies": {
+    "koffi": "^3.3.2",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1"
+  }
+}

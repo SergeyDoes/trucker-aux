@@ -1,10 +1,10 @@
-"""Читает общую память scs-sdk-plugin (Local\\SCSTelemetry) и печатает head.offset.
+"""Reads the scs-sdk-plugin shared memory (Local\\SCSTelemetry) and prints head.offset.
 
-Разведка M1: крутим камеру мышью, переключаем камеры, ставим паузу и смотрим,
-какие поля как меняются. Нужен собранный scs-telemetry.dll
-в <game>\\bin\\win_x64\\plugins\\.
+M1 reconnaissance: turn the camera with the mouse, switch cameras, pause, and watch
+which fields change and how. Needs a built scs-telemetry.dll
+in <game>\\bin\\win_x64\\plugins\\.
 
-    py tools/shm_probe.py                 # 10 строк в секунду
+    py tools/shm_probe.py                 # 10 lines per second
     py tools/shm_probe.py --hz 30 --csv docs/probe.csv
 """
 import argparse
@@ -20,12 +20,12 @@ MMF_NAME = "Local\\SCSTelemetry"
 MMF_SIZE = 32 * 1024
 FILE_MAP_READ = 0x0004
 
-# Смещения из scs-telemetry-common.hpp, посчитаны через offsetof (MSVC x64).
+# Offsets from scs-telemetry-common.hpp, computed with offsetof (MSVC x64).
 OFF_PAUSED = 4
-OFF_RENDER_TIME = 24          # u64, обновляется каждый кадр
-OFF_CABIN_OFFSET = 2000       # 6 float: x y z heading pitch roll
-OFF_HEAD_OFFSET = 2024        # 6 float: x y z heading pitch roll
-OFF_TRUCK_ROTATION = 2224     # 3 double: heading pitch roll (мир)
+OFF_RENDER_TIME = 24          # u64, updated every frame
+OFF_CABIN_OFFSET = 2000       # 6 floats: x y z heading pitch roll
+OFF_HEAD_OFFSET = 2024        # 6 floats: x y z heading pitch roll
+OFF_TRUCK_ROTATION = 2224     # 3 doubles: heading pitch roll (world)
 OFF_TRUCK_BRAND = 2364
 OFF_TRUCK_NAME = 2492
 STR_SIZE = 64
@@ -38,8 +38,8 @@ k32.MapViewOfFile.restype = ctypes.c_void_p
 
 
 def open_view():
-    # Только открываем существующую память: если создать её самим раньше игры,
-    # плагин может не получить доступ на запись.
+    # Only opens existing memory: if we created it before the game,
+    # the plugin might not get write access.
     printed = False
     while True:
         handle = k32.OpenFileMappingW(FILE_MAP_READ, False, MMF_NAME)
@@ -48,7 +48,7 @@ def open_view():
             if view:
                 return view
         if not printed:
-            print(f"жду {MMF_NAME} (игра с плагином не запущена)...", file=sys.stderr)
+            print(f"waiting for {MMF_NAME} (the game with the plugin is not running)...", file=sys.stderr)
             printed = True
         time.sleep(1.0)
 
@@ -62,19 +62,19 @@ def read_str(view, offset):
 
 
 def deg(turns):
-    """Обороты SCS -> градусы в диапазоне -180..180 (heading приходит в [0,1))."""
+    """SCS turns -> degrees in -180..180 (heading arrives in [0,1))."""
     return (turns * 360.0 + 180.0) % 360.0 - 180.0
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--hz", type=float, default=10.0, help="частота вывода")
-    parser.add_argument("--csv", help="дописывать значения в CSV")
+    parser.add_argument("--hz", type=float, default=10.0, help="output rate")
+    parser.add_argument("--csv", help="append the values to a CSV file")
     args = parser.parse_args()
 
     view = open_view()
     truck = f"{read_str(view, OFF_TRUCK_BRAND)} {read_str(view, OFF_TRUCK_NAME)}".strip()
-    print(f"подключено, тягач: {truck or '?'}")
+    print(f"connected, truck: {truck or '?'}")
 
     writer = None
     if args.csv:
@@ -93,7 +93,7 @@ def main():
         _, _, _, ch, cp, cr = read(view, OFF_CABIN_OFFSET, "6f")
         (th, _, _) = read(view, OFF_TRUCK_ROTATION, "3d")
 
-        # '·' — кадр не сменился с прошлой строки (игра стоит в меню или свёрнута).
+        # '·' means the frame did not change since the previous line (game in a menu or minimized).
         frame = "·" if render_time == last_render else " "
         last_render = render_time
 
