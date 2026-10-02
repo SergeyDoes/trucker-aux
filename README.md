@@ -60,7 +60,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Virtual Audio Device, any of the following will work:
     - [Free] [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)
     - [Paid] [Virtual Audio Cable](https://vac.muzychenko.net/en/)
-    - [Free] Steam Streaming Microphone&Speakers (Installs automatically when turning on Remote Play option)
+    - [Free] Steam Streaming Microphone&Speakers (Installs automatically when trying to start a Remote Play stream)
   
   - Plain stereo headphones. Virtual surround (DTS Headphone:X, Windows Sonic, Dolby Atmos) would virtualize the binaural output a second time and may sound weird
 - **Setup**:
