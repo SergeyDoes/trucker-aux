@@ -30,7 +30,8 @@ Today the speakers are two hard-coded points (`app/src/shared/layout.js`, `DEFAU
   - `layouts.json` — layouts;
   - `settings.json` — devices, source and when to mute;
   - `profile/` — Chromium user data, set via `app.setPath('userData', …)` before `ready`, so nothing is written to `%APPDATA%`.
-- `profile/` is git-ignored; `layouts.json` and `settings.json` may be committed.
+- The data folder is git-ignored: your presets, settings and the Chromium profile stay local.
+- Next to the data folder, `presets/` holds the preset collection (below): `app/presets/` in development, `presets/` next to the executable when packaged. It is committed: that is how presets are shared.
 
 **`layouts.json`**
 ```jsonc
@@ -49,7 +50,7 @@ Layout = {
 }
 Speaker = {
   "id": "s1",                              // unique within the layout
-  "name": "Door L",
+  "name": "Full range L",
   "position": [x, y, z],                   // metres, SCS axes: X right, Y up, Z back
   "channel": "L",                          // "L" | "R" | "M" (mono, (L+R)/2)
   "gainDb": 0,
@@ -64,10 +65,12 @@ The driver's head sits at X = `−truck.centerX` (`headRestX`): −47.7 cm in th
 
 **Default layout** (a cab 2.3 m wide):
 - bounds: min `[-1.15, -1.15, -1.30]`, max `[1.15, 0.95, 0.60]`;
-- "Door L": `[-1.12, -0.60, -0.35]`, channel L, full range;
-- "Door R": its mirror image, `[1.12, -0.60, -0.35]`, channel R, paired with Door L.
+- "Full range L", in the left door: `[-1.12, -0.60, -0.35]`, channel L, full range;
+- "Full range R": its mirror image, `[1.12, -0.60, -0.35]`, channel R, paired with the left one.
 
 The right door is farther from the driver, as in a real cab, so it sounds quieter and narrower.
+
+**Speaker names.** The app names speakers after their type (`TYPE_NAMES`, layout.js): "Full range L" and "Full range R" for "+ Pair", "Full range" for "+ Speaker", numbered when taken ("Midbass L 2"; the two sides of a pair share the number). Such a standard name follows the type: a speaker turned into a midbass becomes "Midbass L" (`nameForType`), and so do the names of older versions ("Door L", "Speaker 3 R", "Speaker 5"). A name typed by hand never changes.
 
 **Normalization on load.**
 - Missing fields get defaults.
@@ -170,6 +173,55 @@ The Web-Audio-free logic is pure and unit-tested:
 - **Delete:** truck and custom presets, with a confirmation. `auto` then falls back to the default.
 - **Truck changes while in `auto`:** `setLayout` with the new playing layout.
 
+### Preset collection
+
+Presets shared between people: one JSON file per preset in `presets/` (subfolders too). The app only reads these files; your own presets and edits stay in `layouts.json`.
+
+**File format.**
+```json
+{
+  "truckerAuxPreset": 1,
+  "name": "Kenworth T680 2014, sleeper",
+  "vehicle": "vehicle.kenworth.t680@2.7",
+  "vehicleName": "Kenworth T680 2014",
+  "author": "SergeyDoes",
+  "layout": { "width": 1, "bounds": { "min": [-1.15, -1, -1], "max": [1.15, 1, 1] }, "speakers": [] }
+}
+```
+- `truckerAuxPreset`: the format version, 1 (coordinates as in store version 2).
+- `vehicle`: a model key (`<truck id>`) or a chassis key (`<truck id>@<hook>`), as in `layouts.json`; never a plate (plates are personal, and random in quick jobs). Without it the preset is only picked by hand.
+- `vehicleName`, `author`: optional, shown in the list.
+- `layout`: as in `layouts.json` (`normalizeLayout`); its name is the file's `name`, else the file name.
+
+**Keys.** A collection preset's key is `file:<path inside presets/, with />`, e.g. `file:kenworth/t680-sleeper.json`. The renderer keeps the collection in `store.collection` (`{ [key]: { file, name, vehicle, vehicleName, author, layout } }`); it is never saved to `layouts.json`. `assignments` may point at `file:` keys; they are kept when the file is missing and simply do not apply.
+
+**Auto**, narrowest first, your own before the collection:
+1. a preset bound to this vehicle, this vehicle's own;
+2. a preset bound to this chassis, this chassis's own;
+3. the model's own;
+4. the collection: this chassis (`collectionChassis`), then the model (`collectionModel`);
+5. your own preset for another chassis of the model (`sibling`), then the collection's (`collectionSibling`);
+6. the default layout.
+Several files for the same key: the first by key (file path) plays; the others are in the list.
+A copy of a shared file (on the first edit of a picked file, or with New preset) counts the collection's names as taken, so it reads "… copy".
+
+**Editing** never changes a file:
+- Auto playing a collection preset: the first edit makes this chassis's own copy (as for a model preset shared by all chassis); Auto plays it from then on.
+- A collection preset picked in the list: the first edit makes a "New preset" style copy under Custom (`adoptPicked`) and switches to it.
+- Collection presets cannot be renamed or deleted in the app.
+
+**The list and the card.**
+- The list gets a "Collection" group: the presets by name, with " — author" when there is one. Auto reads "Auto — <name> (collection)".
+- The card: Plays <name>; Applies to "all <vehicle> on this chassis, from the collection" (or "all chassis of …", "another chassis of …"); a note "From the collection: <file>. Editing makes your own copy for this chassis first."; the buttons as for a wider preset ("Own preset for this chassis", "Only this vehicle").
+- Picked in the list: Applies to says the file's own scope; the note says editing makes your own copy; "Use it in" binds it.
+
+**Export.** A button next to New / Delete preset writes the preset that plays to `presets/<name>.json` (" (2)" and so on when taken), then shows it in Explorer:
+- `vehicle`: its key for a model or chassis preset; for this vehicle's own preset (by plate), its chassis (`variantKey`); a custom preset or the default layout gets none;
+- `vehicleName`: the model's title; no `author` (add it by hand);
+- disabled for a collection preset (it is a file already).
+
+**Loading.** Main reads the folder at start (with `store:load`) and again 300 ms after it changes (`fs.watch`, recursive), and sends `collection` to the window. A file that is not JSON or not a preset is skipped with a warning naming it; it is never moved or changed (it is not ours). A missing folder is created empty.
+
 ## Devices
 
 - **Input list:** all audio inputs. Default: the first whose label contains `CABLE Output`, otherwise the system default.
@@ -193,8 +245,8 @@ Window 1280×800, resizable, English strings.
 │ Preset [Auto — International 9900i ▾] [🗑]│                   ├───────────┤
 │ Width ━━●━━ 1.00                          │ Side view (left)  │ Bounds, cm│
 │ Speakers                        [+][+pair]│ (SVG)             │ W H D     │
-│  ● Door L    S M                          │                   │ offset    │
-│ Door L: channel [L▾] type [Full▾]         │                   │           │
+│  ● Full range L  S M                      │                   │ offset    │
+│ Full range L: channel [L▾] type [Full▾]   │                   │           │
 │  level ━━●━ −3 dB  pair ⛓  X Y Z (cm) [×] │                   │           │
 │ ⚠ warnings                                │                   │           │
 └──────────────────────────────────────────┴───────────────────┴───────────┘
@@ -202,7 +254,7 @@ Window 1280×800, resizable, English strings.
 
 **Panel:**
 - status (truck, yaw / pitch, or `Game not running`);
-- device lists, source, "Mute when", "Pause behavior" (Always active / Always muted / Active vehicle); a "Game camera" fieldset set as in the game: Into turns [x] [100] %, In reverse [Off / On / Inverted], Blinkers [x] Look toward them; preset selector with a delete button, stereo width slider with a hint (0 mono, 1 as recorded, 2 extra wide; mono speakers are not affected);
+- device lists, source, "Mute when", "Pause behavior" (Always active / Always muted / Active vehicle); a "Game camera" fieldset set as in the game: Into turns [x] [100] %, In reverse [Off / On / Inverted], Blinkers [x] Look toward them; preset selector with New preset, Delete preset and Export (disabled for a shared file, whose name cannot be edited either), stereo width slider with a hint (0 mono, 1 as recorded, 2 extra wide; mono speakers are not affected);
 - speaker list with S (solo) and M (mute);
 - selected speaker properties: name, channel, type, level, pair link / unlink, X / Y / Z in cm (editable), delete;
 - warnings.
@@ -258,7 +310,8 @@ Shown as a warning bar in the panel; the app never crashes on them:
   - store read / write, atomic write, broken-file handling (temporary folders);
   - data-folder resolution;
   - telemetry parsing of the truck key, plate, steering and gear;
-  - `musicSilenced` (including the pause behaviours); `turnLook` (paused, the percent, reverse off / on / inverted, blinkers, hazard lights), `createEase`, `withTurnLook`.
+  - `musicSilenced` (including the pause behaviours); `turnLook` (paused, the percent, reverse off / on / inverted, blinkers, hazard lights), `createEase`, `withTurnLook`;
+  - the preset collection: parsing files and their warnings, the export data and file name, Auto with shared files, editing (own copies, `adoptPicked`), bindings to files, the card and the Collection group; reading the folder (subfolders, bad files left alone), writing under a free name and watching (temporary folders).
 - **Engine test (`npm run test:engine`):** Electron runs an `OfflineAudioContext` in a hidden window and exits 0 / 1:
   - L / R separation and head rotation in dB;
   - small full range / tweeter / midrange / midbass / sub filtering;

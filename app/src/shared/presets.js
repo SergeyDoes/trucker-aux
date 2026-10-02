@@ -7,10 +7,12 @@
 //   this truck    "<truck id>#<plate>", or a preset bound to the plate by hand;
 //   this chassis  "<truck id>@<fifth wheel>", or a preset bound to the chassis by hand;
 //   the model     "<truck id>": all its chassis;
-//   then another chassis of the model, then the default layout.
+//   then the collection's for this chassis and the model (shared files, collection.js),
+//   then another chassis of the model (yours, then the collection's), then the default.
 // The game reports neither the cab nor the chassis; the fifth wheel sits further back
 // on a longer chassis, so its position (to 10 cm) names the chassis (telemetry.js).
 import { uniqueName } from './layout.js';
+import { collectionLabel, isCollectionKey, presetFile, presetFileName } from './collection.js';
 
 export function variantKey(truck) {
   return truck.variant ? `${truck.key}@${truck.variant}` : truck.key;
@@ -20,12 +22,22 @@ export function plateKey(truck) {
   return truck.plate ? `${truck.key}#${truck.plate}` : null;
 }
 
+// A preset's layout: your own (store.trucks) or a shared file's (store.collection, from
+// collection.js, never saved). Null when it is gone.
+function presetLayout(store, key) {
+  if (!key) return null;
+  return (isCollectionKey(key) ? store.collection?.[key]?.layout : store.trucks[key]) ?? null;
+}
+
+const kindOf = (key) => (isCollectionKey(key) ? 'collection' : 'truck');
+
 // The preset Auto plays in a truck and its scope: truckBound, truck, chassisBound,
-// chassis, model, sibling (another chassis). Null: the default layout.
+// chassis, model, collectionChassis, collectionModel, sibling (another chassis),
+// collectionSibling. Null: the default layout. Several files for one key: the first by path.
 export function autoPreset(store, truck) {
   const boundTo = (key) => {
     const target = key && store.assignments?.[key];
-    return target && store.trucks[target] ? target : null;
+    return target && presetLayout(store, target) ? target : null;
   };
   const plate = plateKey(truck);
   const chassis = variantKey(truck);
@@ -34,23 +46,32 @@ export function autoPreset(store, truck) {
   if (boundTo(chassis)) return { key: boundTo(chassis), how: 'chassisBound' };
   if (truck.variant && store.trucks[chassis]) return { key: chassis, how: 'chassis' };
   if (store.trucks[truck.key]) return { key: truck.key, how: 'model' };
-  const sibling = Object.keys(store.trucks).sort().find((key) => key.startsWith(`${truck.key}@`));
-  return sibling ? { key: sibling, how: 'sibling' } : null;
+  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const file = (match) => files.find((e) => match(e.vehicle))?.key;
+  const ofChassis = truck.variant && file((v) => v === chassis);
+  if (ofChassis) return { key: ofChassis, how: 'collectionChassis' };
+  const ofModel = file((v) => v === truck.key);
+  if (ofModel) return { key: ofModel, how: 'collectionModel' };
+  const isSibling = (key) => key.startsWith(`${truck.key}@`);
+  const sibling = Object.keys(store.trucks).sort().find(isSibling);
+  if (sibling) return { key: sibling, how: 'sibling' };
+  const ofSibling = file(isSibling);
+  return ofSibling ? { key: ofSibling, how: 'collectionSibling' } : null;
 }
 
 // Whether Auto's edits go to what plays. A chassis playing the model's preset (shared by
-// all chassis), another chassis's or the default first gets its own copy.
+// all chassis), another chassis's, a shared file or the default first gets its own copy.
 function ownsEdits(auto, truck) {
-  if (!auto || auto.how === 'sibling') return false;
+  if (!auto || auto.how === 'sibling' || isCollectionKey(auto.key)) return false;
   return auto.how !== 'model' || !truck.variant;
 }
 
 export function resolvePlaying(store, selection, truck) {
-  if (selection.mode === 'truck' && store.trucks[selection.key]) {
-    return { kind: 'truck', key: selection.key, layout: store.trucks[selection.key] };
+  if (selection.mode === 'truck' && presetLayout(store, selection.key)) {
+    return { kind: kindOf(selection.key), key: selection.key, layout: presetLayout(store, selection.key) };
   }
   const auto = selection.mode === 'auto' && truck ? autoPreset(store, truck) : null;
-  if (auto) return { kind: 'truck', key: auto.key, layout: store.trucks[auto.key] };
+  if (auto) return { kind: kindOf(auto.key), key: auto.key, layout: presetLayout(store, auto.key) };
   return { kind: 'default', key: null, layout: store.default };
 }
 
@@ -80,6 +101,7 @@ export function routeEdit(store, selection, truck) {
 export function editLayout(store, selection, truck, edit) {
   const routed = routeEdit(store, selection, truck);
   const { key, kind } = routed.target;
+  if (isCollectionKey(key)) return store; // files are never changed: adoptPicked copies first
   const current = kind === 'truck' ? routed.store.trucks[key] : routed.store.default;
   const next = edit(current);
   return kind === 'truck'
@@ -113,9 +135,22 @@ export function createPreset(store, layout) {
   let n = 1;
   while (store.trucks[`${CUSTOM}${n}`]) n++;
   const key = `${CUSTOM}${n}`;
-  const taken = new Set([store.default.name, ...Object.values(store.trucks).map((l) => l.name)]);
+  const taken = new Set([
+    store.default.name,
+    ...Object.values(store.trucks).map((l) => l.name),
+    ...Object.values(store.collection ?? {}).map((e) => e.name), // a copy of a shared file reads "… copy"
+  ]);
   const preset = { ...structuredClone(layout), name: uniqueName(layout.name, taken) };
   return { store: { ...store, trucks: { ...store.trucks, [key]: preset } }, key };
+}
+
+// A shared file picked in the list is never changed: before the first edit it becomes a
+// Custom copy ("New preset"), chosen instead. Anything else is left as it is.
+export function adoptPicked(store, selection) {
+  const entry = selection.mode === 'truck' && isCollectionKey(selection.key) ? store.collection?.[selection.key] : null;
+  if (!entry) return { store, selection };
+  const created = createPreset(store, entry.layout);
+  return { store: created.store, selection: { mode: 'truck', key: created.key } };
 }
 
 export function deletePreset(store, key) {
@@ -172,17 +207,26 @@ function truckLabel({ plate, layout, suffix }) {
 // A preset as people read it: "International 9900i · hook 3.2 m", "… · vehicle WP-83695",
 // otherwise its name.
 function displayName(store, key, groups = truckGroups(store)) {
+  if (isCollectionKey(key)) return collectionLabel(store.collection[key]);
   const group = groups.get(truckOf(key));
   if (group && variantOf(key)) return `${group.title} · hook ${variantOf(key)} m`;
   if (group && plateOf(key)) return `${group.title} · vehicle ${plateOf(key)}`;
   return store.trucks[key].name;
 }
 
-// What a preset picked in the list applies to by itself.
-function scopeOfKey(store, key) {
+// What a preset picked in the list applies to by itself. A shared file names its vehicle,
+// else the vehicle in the game or your preset for that model does.
+function scopeOfKey(store, key, truck) {
   if (!key) return EVERY;
   if (isCustomKey(key)) return 'only where it is chosen';
   const groups = truckGroups(store);
+  if (isCollectionKey(key)) {
+    const { vehicle, vehicleName } = store.collection[key];
+    if (!vehicle) return 'only where it is chosen';
+    const model = truckOf(vehicle);
+    const name = vehicleName ?? (truck?.key === model ? truck.name : groups.get(model)?.title ?? model);
+    return variantOf(vehicle) ? `${name} on the hook ${variantOf(vehicle)} m chassis` : `all ${name}`;
+  }
   const group = groups.get(truckOf(key));
   if (plateOf(key)) return `only vehicle ${plateOf(key)}`;
   if (variantOf(key)) return `${group.title} on the hook ${variantOf(key)} m chassis`;
@@ -198,7 +242,7 @@ export function truckStatus(store, selection, truck) {
   const playing = resolvePlaying(store, selection, truck);
   const base = {
     truck: truck ? [truck.name, truck.variant && `hook ${truck.variant} m`, truck.plate].filter(Boolean).join(' · ') : 'no vehicle in the game',
-    plays: playing.kind === 'truck' ? displayName(store, playing.key) : 'Default layout',
+    plays: playing.kind === 'default' ? 'Default layout' : displayName(store, playing.key),
     appliesTo: EVERY,
     note: null,
     buttonsLabel: '',
@@ -210,15 +254,16 @@ export function truckStatus(store, selection, truck) {
   const onlyThisTruck = byPlate ? [{ action: 'own-truck', label: 'Only this vehicle' }] : [];
 
   if (selection.mode !== 'auto') {
-    const buttons = truck && playing.kind === 'truck' ? [
+    const buttons = truck && playing.kind !== 'default' ? [
       ...(byPlate ? [{ action: 'bind-truck', label: 'this vehicle only' }] : []),
       { action: 'bind-chassis', label: chassisScope(truck) },
     ] : [];
+    const file = playing.kind === 'collection' ? store.collection[playing.key].file : null;
     return {
       ...base,
       plays: `${base.plays} (picked in the list)`,
-      appliesTo: scopeOfKey(store, playing.key),
-      note: note('Editing changes this preset.', buttons.length && lent),
+      appliesTo: scopeOfKey(store, playing.key, truck),
+      note: note(file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', buttons.length && lent),
       buttonsLabel: buttons.length ? 'Use it in' : '',
       buttons,
     };
@@ -244,14 +289,22 @@ export function truckStatus(store, selection, truck) {
       break;
     default:
   }
-  // Something wider plays: the model's preset for all chassis, another chassis's, the default.
-  let appliesTo = EVERY;
-  if (auto?.how === 'model') appliesTo = `all chassis of ${truck.name}`;
-  if (auto?.how === 'sibling') appliesTo = `another chassis of ${truck.name}`;
+  // Something wider plays: the model's preset for all chassis, another chassis's, a shared
+  // file, the default.
+  const allChassis = truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`;
+  const APPLIES = {
+    model: allChassis,
+    sibling: `another chassis of ${truck.name}`,
+    collectionChassis: `${chassisScope(truck)}, from the collection`,
+    collectionModel: `${allChassis}, from the collection`,
+    collectionSibling: `another chassis of ${truck.name}, from the collection`,
+  };
+  const file = auto && isCollectionKey(auto.key) ? store.collection[auto.key].file : null;
+  const copy = truck.variant ? 'copy for this chassis' : `preset for ${truck.name}`;
   return {
     ...base,
-    appliesTo,
-    note: note(`Editing makes ${truck.variant ? 'a copy for this chassis' : `a preset for ${truck.name}`} first.`, lent),
+    appliesTo: APPLIES[auto?.how] ?? EVERY,
+    note: note(file ? `From the collection: ${file}. Editing makes your own ${copy} first.` : `Editing makes a ${copy} first.`, lent),
     buttons: [
       { action: 'own-chassis', label: truck.variant ? 'Own preset for this chassis' : `Own preset for ${truck.name}` },
       ...onlyThisTruck,
@@ -266,12 +319,16 @@ const AUTO_NOTE = {
   chassis: () => '',
   model: (truck) => (truck.variant ? ' (all chassis)' : ''),
   sibling: () => ' (other chassis)',
+  collectionChassis: () => ' (collection)',
+  collectionModel: () => ' (collection)',
+  collectionSibling: () => ' (collection)',
 };
 
 // The preset list: Auto, the default layout, then the models by name. A model with one
 // preset is one entry; with several it is a group: "All chassis", each chassis, single
-// trucks. Presets made with "New preset" are grouped under Custom. Entries in a group
-// carry `full`, their text while selected, as a closed list hides the group.
+// trucks. Presets made with "New preset" are grouped under Custom, shared files under
+// Collection. Entries in a group carry `full`, their text while selected, as a closed list
+// hides the group.
 export function presetOptions(store, truck) {
   const groups = truckGroups(store);
   let auto = 'Auto — no game';
@@ -301,12 +358,34 @@ export function presetOptions(store, truck) {
     .filter(([key]) => isCustomKey(key))
     .map(([key, layout]) => ({ value: `truck:${key}`, label: layout.name }))
     .sort((a, b) => a.label.localeCompare(b.label));
+  const files = Object.values(store.collection ?? {})
+    .map((entry) => ({ value: `truck:${entry.key}`, label: collectionLabel(entry) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
   return [
     { value: 'auto', label: auto },
     { value: 'default', label: 'Default layout' },
     ...trucks,
     ...(custom.length ? [{ group: 'Custom', options: custom }] : []),
+    ...(files.length ? [{ group: 'Collection', options: files }] : []),
   ];
+}
+
+// The preset that plays as a file to share (collection.js): { fileName, data }, or null
+// for a shared file, which is one already. vehicle: a model or chassis preset's own key;
+// this vehicle's own preset (by plate) is shared for its chassis, so the plate stays
+// private; a custom preset and the default layout are for no vehicle.
+export function exportPreset(store, key, truck) {
+  if (isCollectionKey(key)) return null;
+  const layout = key ? store.trucks[key] : store.default;
+  if (!layout) return null;
+  let vehicle = null;
+  if (key && !isCustomKey(key)) {
+    if (!plateOf(key)) vehicle = key;
+    else vehicle = truck && plateKey(truck) === key ? variantKey(truck) : truckOf(key);
+  }
+  const model = vehicle && truckOf(vehicle);
+  const vehicleName = model ? (truck?.key === model ? truck.name : truckGroups(store).get(model)?.title ?? null) : null;
+  return { fileName: presetFileName(layout.name), data: presetFile({ name: layout.name, vehicle, vehicleName, layout }) };
 }
 
 export function selectionValue(selection) {

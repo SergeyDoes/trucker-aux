@@ -1,0 +1,101 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Ford Bronco 2024",
+  "vehicle": "vehicle.ford.bronco_24",
+  "vehicleName": "Ford Bronco 2024",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        1.43
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Dash Corner L",
+        "position": [
+          -0.5,
+          -0.14,
+          -0.66
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Dash Corner R",
+        "position": [
+          0.5,
+          -0.14,
+          -0.66
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Midbass L",
+        "position": [
+          -0.44,
+          -0.6,
+          -0.54
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Midbass R",
+        "position": [
+          0.44,
+          -0.6,
+          -0.54
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.47,
+          0.14,
+          1.15
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.47,
+          0.14,
+          1.15
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      }
+    ]
+  }
+}

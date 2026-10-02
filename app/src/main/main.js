@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron';
+import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings } from './store.js';
 import { openTelemetry } from './telemetry.js';
+import { presetsDirFor, readCollection, watchCollection, writePresetFile } from './collection.js';
+import { presetFileName } from '../shared/collection.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
@@ -18,9 +20,19 @@ const dataDir = resolveDataDir({
 });
 app.setPath('userData', path.join(dataDir, 'profile'));
 
-ipcMain.handle('store:load', () => loadData(dataDir));
+// Shared presets, one file each (collection.js): read with the store, again when the
+// folder changes; Export writes a new file there and shows it in Explorer.
+const presetsDir = presetsDirFor(dataDir);
+
+ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir) }));
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
+ipcMain.handle('collection:export', (_event, fileName, data) => {
+  // The name is made safe again here: a file goes into presets/ and nowhere else.
+  const result = writePresetFile(presetsDir, presetFileName(String(fileName).replace(/\.json$/i, '')), data);
+  if (result.file) shell.showItemInFolder(result.file);
+  return result;
+});
 
 function startPoseFeed(win) {
   let telemetry = null;
@@ -45,6 +57,10 @@ function createWindow() {
   });
   win.loadFile(path.join(here, '../renderer/index.html'));
   startPoseFeed(win);
+  const stopWatching = watchCollection(presetsDir, () => {
+    if (!win.isDestroyed()) win.webContents.send('collection', readCollection(presetsDir));
+  });
+  win.on('closed', stopWatching);
 }
 
 app.whenReady().then(() => {

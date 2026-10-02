@@ -55,6 +55,9 @@ Player ─► CABLE Input (VB-Cable)                 Game audio ─────�
   - a card under the preset list shows what plays, what it applies to and what can be
     changed;
   - presets made by hand stay where you pick them.
+- **Shared presets:** drop a preset file into `app/presets/` and it shows up under
+  Collection. Auto plays it in that vehicle unless you have your own preset. **Export**
+  saves yours as a file to share. See [app/presets/README.md](app/presets/README.md).
 - **Real head position:** the driver sits left of the vehicle's centre line by what the
   game reports. The game's seat adjustment moves the listener too.
 - **Loudness matching:** a preset with many speakers is not louder than the default two
@@ -126,10 +129,13 @@ Player ─► CABLE Input (VB-Cable)                 Game audio ─────�
   - Delete removes them, Esc clears the selection;
   - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate.
 - **Data** is kept next to the app, not in `%APPDATA%`:
-  - `app/data/layouts.json`: the presets. The file in the repository is the author's
-    set, as an example;
+  - `app/data/layouts.json`: your presets;
   - `app/data/settings.json`: devices and options;
-  - `app/data/profile/`: Chromium's profile.
+  - `app/data/profile/`: Chromium's profile;
+  - `app/presets/`: the shared preset collection, read only. Export writes new files
+    there. The repository ships the author's presets there: Ford F150, Bronco, Mustang
+    and Crown Victoria, Freightliner Cascadia, International 9900i, Kenworth T680 and
+    W900, Peterbilt 389, Volvo VNL, Western Star 49X.
 
 ## Development
 
@@ -151,6 +157,7 @@ app/                        Electron app
   src/renderer/             audio engine, views, 3D overview, panel
   test/                     unit tests
   scripts/                  engine check
+  presets/                  shared presets, one JSON file each
 third_party/scs-sdk-plugin  RenCloud's telemetry plugin (submodule)
 tools/                      Python helpers
 docs/                       findings from the game, specs and plans

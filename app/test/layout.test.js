@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_SPEAKERS, STORE_VERSION, addPair, addSpeaker, centerOn, copySpeakers, defaultLayout, linkPair, mirrorPosition,
+  MAX_SPEAKERS, STORE_VERSION, TYPE_NAMES, addPair, addSpeaker, centerOn, copySpeakers, defaultLayout, linkPair, mirrorPosition,
   moveSpeakers, normalizeLayout, normalizeStore, pasteSpeakers, patchSpeakers, removeSpeaker, removeSpeakers,
   setCoordinate, setBoundsEdge, setWidth, shiftGains, snap, unlinkPair, updateSpeaker,
 } from '../src/shared/layout.js';
@@ -175,7 +175,32 @@ test('setWidth clamps to 0..2; snap rounds to centimetres', () => {
   assert.equal(snap(0.126), 0.13);
 });
 
-// Door L (s1) and Door R (s2) are a mirrored pair; s3 is a lone speaker.
+test('speakers are named after their type; a standard name follows a type change, a name of your own stays', () => {
+  assert.deepEqual(defaultLayout().speakers.map((s) => s.name), ['Full range L', 'Full range R']);
+  const pair = addPair(defaultLayout());
+  assert.deepEqual(pair.layout.speakers.slice(2).map((s) => s.name), ['Full range L 2', 'Full range R 2']);
+  assert.equal(addSpeaker(defaultLayout()).layout.speakers[2].name, 'Full range');
+  // A pair shares its number, even when only one side is taken.
+  const oneTaken = updateSpeaker(defaultLayout(), 's1', { type: 'midbass' });
+  assert.deepEqual(addPair(oneTaken).layout.speakers.slice(2).map((s) => s.name), ['Full range L 2', 'Full range R 2']);
+  const midbass = patchSpeakers(pair.layout, pair.ids, { type: 'midbass' });
+  assert.deepEqual(midbass.speakers.map((s) => s.name), ['Full range L', 'Full range R', 'Midbass L', 'Midbass R']);
+  // Names the app gave before count as standard too, numbered when taken.
+  const older = normalizeLayout({ speakers: [
+    { id: 'a', name: 'Door L' }, { id: 'b', name: 'Speaker 3 R' }, { id: 'c', name: 'Speaker 5' },
+    { id: 'd', name: 'Central' }, { id: 'e', name: 'Speaker L' }, { id: 'f', name: 'Midbass L copy' },
+  ] });
+  const typed = patchSpeakers(older, ['a', 'b', 'c', 'd', 'e', 'f'], { type: 'tweeter' });
+  assert.deepEqual(typed.speakers.map((s) => s.name), ['Tweeter L', 'Tweeter R', 'Tweeter', 'Central', 'Tweeter L 2', 'Midbass L copy']);
+  // A name given with the type wins; the same type, or a name that already says it, stays.
+  assert.equal(updateSpeaker(defaultLayout(), 's1', { type: 'sub', name: 'Bass' }).speakers[0].name, 'Bass');
+  assert.equal(updateSpeaker(defaultLayout(), 's1', { type: 'full' }).speakers[0].name, 'Full range L');
+  const mismatched = normalizeLayout({ speakers: [{ id: 'a', name: 'Midbass L 2', type: 'full' }] });
+  assert.equal(updateSpeaker(mismatched, 'a', { type: 'midbass' }).speakers[0].name, 'Midbass L 2');
+  assert.equal(TYPE_NAMES.small, 'Small full range');
+});
+
+// s1 and s2 (the doors of the default layout) are a mirrored pair; s3 is a lone speaker.
 const withCenter = () => {
   const { layout } = addSpeaker(defaultLayout());
   return updateSpeaker(layout, 's3', { position: [0.3, 0, -1], gainDb: -6, type: 'tweeter' });
@@ -214,10 +239,10 @@ test('copy and paste in the same layout: new ids and names, 10 cm back, the copi
   const once = pasteSpeakers(layout, clip);
   assert.deepEqual(once.ids, ['s4', 's5']);
   const [l, r] = once.layout.speakers.slice(3);
-  assert.deepEqual([l.name, l.position, l.pair], ['Door L copy', [-1.12, -0.6, -0.25], 's5']);
-  assert.deepEqual([r.name, r.position, r.pair], ['Door R copy', [1.12, -0.6, -0.25], 's4']);
+  assert.deepEqual([l.name, l.position, l.pair], ['Full range L copy', [-1.12, -0.6, -0.25], 's5']);
+  assert.deepEqual([r.name, r.position, r.pair], ['Full range R copy', [1.12, -0.6, -0.25], 's4']);
   const twice = pasteSpeakers(once.layout, clip);
-  assert.deepEqual(twice.layout.speakers.slice(5).map((s) => [s.name, s.position[2]]), [['Door L copy 2', -0.15], ['Door R copy 2', -0.15]]);
+  assert.deepEqual(twice.layout.speakers.slice(5).map((s) => [s.name, s.position[2]]), [['Full range L copy 2', -0.15], ['Full range R copy 2', -0.15]]);
 });
 
 test('paste into another layout lands in place; lone halves are unpaired', () => {
@@ -225,7 +250,7 @@ test('paste into another layout lands in place; lone halves are unpaired', () =>
   const target = { ...defaultLayout(), speakers: [] };
   const { layout, ids } = pasteSpeakers(target, clip);
   assert.deepEqual(ids, ['s1', 's2', 's3']);
-  assert.deepEqual(layout.speakers.map((s) => s.name), ['Door L', 'Door R', 'Speaker 3']);
+  assert.deepEqual(layout.speakers.map((s) => s.name), ['Full range L', 'Full range R', 'Tweeter']);
   assert.deepEqual(pos(layout), { s1: [-1.12, -0.6, -0.35], s2: [1.12, -0.6, -0.35], s3: [0.3, 0, -1] });
   const half = pasteSpeakers(target, copySpeakers(withCenter(), ['s2']));
   assert.equal(half.layout.speakers[0].pair, null);

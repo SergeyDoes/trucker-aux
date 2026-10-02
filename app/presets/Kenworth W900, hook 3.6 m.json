@@ -1,0 +1,88 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Kenworth W900, hook 3.6 m",
+  "vehicle": "vehicle.kenworth.w900@3.6",
+  "vehicleName": "Kenworth W900",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.74,
+        -1.15,
+        -0.73
+      ],
+      "max": [
+        0.74,
+        0.95,
+        1.18
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.64,
+          -0.6,
+          -0.5
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.64,
+          -0.6,
+          -0.5
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Tweeter L",
+        "position": [
+          -0.55,
+          0.23,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R",
+        "position": [
+          0.55,
+          0.23,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Subwoofer",
+        "position": [
+          0,
+          -0.69,
+          0.61
+        ],
+        "channel": "M",
+        "gainDb": 4.5,
+        "type": "sub",
+        "pair": null
+      }
+    ]
+  }
+}

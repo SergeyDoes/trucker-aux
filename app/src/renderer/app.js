@@ -11,9 +11,10 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  bindPreset, createPreset, deletePreset, editLayout, isCustomKey, ownPreset, parseSelection, plateKey,
-  presetOptions, resolvePlaying, selectionValue, truckStatus, unbind, variantKey,
+  adoptPicked, bindPreset, createPreset, deletePreset, editLayout, exportPreset, isCustomKey, ownPreset, parseSelection,
+  plateKey, presetOptions, resolvePlaying, selectionValue, truckStatus, unbind, variantKey,
 } from '../shared/presets.js';
+import { isCollectionKey } from '../shared/collection.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -29,7 +30,9 @@ const STATUS_PERIOD_MS = 100;
 
 const loaded = await window.aux.load();
 const state = {
-  store: loaded.store,
+  // The shared presets ride along in store.collection (presets.js); they are never saved.
+  store: { ...loaded.store, collection: loaded.collection.collection },
+  collectionWarnings: loaded.collection.warnings, // files in presets/ that are not presets
   settings: loaded.settings,
   selection: { mode: 'auto' },
   truck: null,
@@ -122,7 +125,8 @@ let saveTimer = null;
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
-    const warning = await window.aux.saveLayouts(state.store);
+    const { collection, ...own } = state.store;
+    const warning = await window.aux.saveLayouts(own);
     state.storeWarnings = warning ? [warning] : [];
     render();
   }, SAVE_DELAY_MS);
@@ -139,6 +143,8 @@ async function saveSettings() {
 // Every change to a layout goes through here: routing (with auto-created truck
 // presets), the engine and saving.
 function edit(change) {
+  // A shared file picked in the list is never changed: it becomes your own copy first.
+  ({ store: state.store, selection: state.selection } = adoptPicked(state.store, state.selection));
   state.store = editLayout(state.store, state.selection, state.truck, change);
   syncEngine();
   scheduleSave();
@@ -318,6 +324,14 @@ const actions = {
     scheduleSave();
     render();
   },
+  // Writes what plays as a file in presets/ to share it; main shows it in Explorer.
+  async exportPreset() {
+    const shared = exportPreset(state.store, playing().key, state.truck);
+    if (!shared) return;
+    const { warning } = await window.aux.exportPreset(shared.fileName, shared.data);
+    state.storeWarnings = warning ? [warning] : [];
+    render();
+  },
   deleteCurrentPreset() {
     const current = playing();
     if (current.kind !== 'truck') return;
@@ -458,7 +472,7 @@ function render() {
   // Speakers you do not hear (muted, or another one soloed) are drawn grey.
   const silentIds = layout.speakers.filter((s) => isSilenced(s, state.solo, state.muted)).map((s) => s.id);
   panel.update({
-    warnings: [...state.storeWarnings, ...state.audioWarnings],
+    warnings: [...state.storeWarnings, ...state.collectionWarnings, ...state.audioWarnings],
     inputs: state.devices.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'communications'),
     outputs: state.devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'communications'),
     inputId: state.inputId,
@@ -471,8 +485,9 @@ function render() {
     presets: presetOptions(state.store, state.truck),
     card: truckStatus(state.store, state.selection, state.truck),
     preset: selectionValue(state.selection),
-    canDelete: current.kind === 'truck',
-    presetName: current.kind === 'truck' ? layout.name : 'Default layout',
+    canDelete: current.kind === 'truck', // the default layout and shared files stay
+    canExport: current.kind !== 'collection', // a shared file is one already
+    presetName: current.kind === 'default' ? 'Default layout' : layout.name,
     width: layout.width,
     matchLoudness: state.settings.matchLoudness,
     loudnessDb: state.loudnessDb,
@@ -512,6 +527,20 @@ function statusText() {
 let lastStatus = 0;
 const frameWatch = createFrameWatch();
 const easeBlinker = createEase();
+// presets/ changed: new, edited or removed shared files. A picked file that is gone
+// leaves the choice to Auto.
+window.aux.onCollection(({ collection, warnings }) => {
+  const before = playing().key;
+  state.store = { ...state.store, collection };
+  state.collectionWarnings = warnings;
+  if (state.selection.mode === 'truck' && isCollectionKey(state.selection.key) && !collection[state.selection.key]) {
+    state.selection = { mode: 'auto' };
+  }
+  if (playing().key !== before) resetSession();
+  syncEngine();
+  render();
+});
+
 window.aux.onPose((pose) => {
   state.pose = pose;
   state.inWorld = Boolean(pose?.sdkActive) && frameWatch(pose.renderTime, performance.now());

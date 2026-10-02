@@ -9,6 +9,10 @@ export const MAX_SPEAKERS = 16;
 export const STORE_VERSION = 2;
 export const CHANNELS = ['L', 'R', 'M'];
 export const TYPES = ['full', 'small', 'tweeter', 'mid', 'midbass', 'sub']; // full-range ones, then high to low
+// The types' names, as the panel lists them; speakers the app adds are named after them.
+export const TYPE_NAMES = {
+  full: 'Full range', small: 'Small full range', tweeter: 'Tweeter', mid: 'Midrange', midbass: 'Midbass', sub: 'Subwoofer',
+};
 const COORD_LIMIT = 5;
 const GAIN_MIN = -60;
 const GAIN_MAX = 12;
@@ -35,10 +39,35 @@ export function defaultLayout() {
     width: 1,
     bounds: { min: [-1.15, -1.15, -1.3], max: [1.15, 0.95, 0.6] },
     speakers: [
-      { id: 's1', name: 'Door L', position: [-1.12, -0.6, -0.35], channel: 'L', gainDb: 0, type: 'full', pair: 's2' },
-      { id: 's2', name: 'Door R', position: [1.12, -0.6, -0.35], channel: 'R', gainDb: 0, type: 'full', pair: 's1' },
+      { id: 's1', name: 'Full range L', position: [-1.12, -0.6, -0.35], channel: 'L', gainDb: 0, type: 'full', pair: 's2' },
+      { id: 's2', name: 'Full range R', position: [1.12, -0.6, -0.35], channel: 'R', gainDb: 0, type: 'full', pair: 's1' },
     ],
   };
+}
+
+// Names the app gives: a type's name with an optional side and number ("Midbass L",
+// "Subwoofer", "Tweeter R 2"), and those of older versions ("Door L", "Speaker 3 R").
+// They follow the speaker's type; a name of your own never changes.
+const STANDARD_NAME = new RegExp(`^(Door|Speaker(?: \\d+)?|${Object.values(TYPE_NAMES).join('|')})(?: ([LR]))?(?: \\d+)?$`);
+
+// A type's names for speakers on these sides ([null], ['L'], ['L', 'R']): "Midbass L",
+// or "Midbass L 2" and so on when taken; the sides of a pair share one number.
+function typeNames(type, sides, taken) {
+  const base = (side) => (side ? `${TYPE_NAMES[type]} ${side}` : TYPE_NAMES[type]);
+  const numbered = (n) => sides.map((side) => (n === 1 ? base(side) : `${base(side)} ${n}`));
+  let n = 1;
+  while (numbered(n).some((name) => taken.has(name))) n++;
+  return numbered(n);
+}
+
+const typeName = (type, side, taken) => typeNames(type, [side], taken)[0];
+
+// The name a speaker should have for its type: a standard name that does not say the type
+// becomes the type's name, keeping its side; any other name stays.
+export function nameForType(speaker, taken) {
+  const match = speaker.name.match(STANDARD_NAME);
+  if (!match || match[1] === TYPE_NAMES[speaker.type]) return speaker.name;
+  return typeName(speaker.type, match[2] ?? null, taken);
 }
 
 const boundsCenterX = (bounds) => (bounds.min[0] + bounds.max[0]) / 2;
@@ -118,7 +147,8 @@ export function normalizeStore(raw) {
   const assignments = {};
   if (src.assignments && typeof src.assignments === 'object') {
     for (const [variant, key] of Object.entries(src.assignments)) {
-      if (variant && typeof key === 'string' && trucks[key]) assignments[variant] = key;
+      // A shared file's key ("file:…", collection.js) is kept: the folder is read separately.
+      if (variant && typeof key === 'string' && (trucks[key] || key.startsWith('file:'))) assignments[variant] = key;
     }
   }
   return {
@@ -167,11 +197,15 @@ export function centerOn(layout, centerX) {
   };
 }
 
-// Applies a patch to one speaker; a moved speaker drags its mirrored partner along.
+// Applies a patch to one speaker; a moved speaker drags its mirrored partner along, and a
+// standard name follows a new type ("Midbass L" becomes "Tweeter L").
 export function updateSpeaker(layout, id, patch) {
   const current = layout.speakers.find((s) => s.id === id);
   if (!current) return layout;
-  const next = cleanSpeaker({ ...current, ...patch, pair: current.pair }, id, current.name);
+  let next = cleanSpeaker({ ...current, ...patch, pair: current.pair }, id, current.name);
+  if (patch.name === undefined && next.type !== current.type) {
+    next = { ...next, name: nameForType(next, new Set(layout.speakers.filter((s) => s.id !== id).map((s) => s.name))) };
+  }
   const moved = patch.position !== undefined;
   return withSpeakers(layout, layout.speakers.map((s) => {
     if (s.id === id) return next;
@@ -283,11 +317,8 @@ export function pasteSpeakers(layout, clip) {
 export function addSpeaker(layout) {
   if (layout.speakers.length >= MAX_SPEAKERS) return { layout, id: null };
   const id = freeId(new Set(layout.speakers.map((s) => s.id)));
-  const speaker = cleanSpeaker(
-    { name: `Speaker ${layout.speakers.length + 1}`, position: [0, -0.35, -0.9], channel: 'M' },
-    id,
-    'Speaker',
-  );
+  const name = typeName('full', null, new Set(layout.speakers.map((s) => s.name)));
+  const speaker = cleanSpeaker({ name, position: [0, -0.35, -0.9], channel: 'M' }, id, name);
   return { layout: withSpeakers(layout, [...layout.speakers, speaker]), id };
 }
 
@@ -297,17 +328,13 @@ export function addPair(layout) {
   const left = freeId(used);
   used.add(left);
   const right = freeId(used);
-  const n = layout.speakers.length + 1;
+  const [leftName, rightName] = typeNames('full', ['L', 'R'], new Set(layout.speakers.map((s) => s.name)));
   const leftPosition = [snap(layout.bounds.min[0] + 0.03), -0.6, -0.35];
   return {
     layout: withSpeakers(layout, [
       ...layout.speakers,
-      cleanSpeaker({ name: `Speaker ${n} L`, position: leftPosition, channel: 'L', pair: right }, left, 'Speaker L'),
-      cleanSpeaker(
-        { name: `Speaker ${n} R`, position: mirrorPosition(leftPosition), channel: 'R', pair: left },
-        right,
-        'Speaker R',
-      ),
+      cleanSpeaker({ name: leftName, position: leftPosition, channel: 'L', pair: right }, left, leftName),
+      cleanSpeaker({ name: rightName, position: mirrorPosition(leftPosition), channel: 'R', pair: left }, right, rightName),
     ]),
     ids: [left, right],
   };

@@ -1,0 +1,88 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Ford Mustang 1967",
+  "vehicle": "vehicle.ford.mustang_67",
+  "vehicleName": "Ford Mustang 1967",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.15,
+        -1.15,
+        -1.3
+      ],
+      "max": [
+        1.15,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Small full range L",
+        "position": [
+          -0.55,
+          -0.42,
+          -0.51
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Small full range R",
+        "position": [
+          0.55,
+          -0.42,
+          -0.51
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Full range",
+        "position": [
+          0,
+          -0.03,
+          -0.6
+        ],
+        "channel": "M",
+        "gainDb": 0,
+        "type": "full",
+        "pair": null
+      },
+      {
+        "id": "s4",
+        "name": "Small full range L 2",
+        "position": [
+          -0.55,
+          -0.22,
+          0.45
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s5"
+      },
+      {
+        "id": "s5",
+        "name": "Small full range R 2",
+        "position": [
+          0.55,
+          -0.22,
+          0.45
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      }
+    ]
+  }
+}

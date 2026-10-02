@@ -1,6 +1,6 @@
 // The control panel on the left. Built once; update(view) refreshes values in place
 // so a field the user is typing into keeps its focus.
-import { TYPES } from '../shared/layout.js';
+import { TYPES, TYPE_NAMES } from '../shared/layout.js';
 import { bandText } from '../shared/dsp.js';
 import { speakerIcon } from './marks.js';
 
@@ -9,9 +9,6 @@ const CHANNEL_OPTIONS = [
   { value: 'R', label: 'Right' },
   { value: 'M', label: 'Mono (L+R)' },
 ];
-const TYPE_NAMES = {
-  full: 'Full range', small: 'Small full range', tweeter: 'Tweeter', mid: 'Midrange', midbass: 'Midbass', sub: 'Subwoofer',
-};
 const TYPE_OPTIONS = TYPES.map((value) => {
   const band = bandText(value);
   return { value, label: band ? `${TYPE_NAMES[value]}, ${band}` : TYPE_NAMES[value] };
@@ -131,6 +128,9 @@ export function createPanel(root, actions) {
     title: 'Copy the current layout into a new preset and switch to it. Auto never picks it: choose it in the list.',
   });
   const deletePreset = el('button', { textContent: 'Delete preset' });
+  // Shared presets: one file each in presets/, listed under Collection (collection.js).
+  const exportButton = el('button', { textContent: 'Export' });
+  const EXPORT_TITLE = 'Save this preset as a file in the presets folder to share it. Files in that folder show up under Collection.';
   const width = el('input', {
     type: 'range', min: 0, max: 2, step: 0.05, title: 'How different the left and right channels are before they reach the speakers',
   });
@@ -224,7 +224,7 @@ export function createPanel(root, actions) {
       row('Preset', preset),
       truckCard,
       row('Name', presetName),
-      el('div', { className: 'inline buttons' }, [newPreset, deletePreset]),
+      el('div', { className: 'inline buttons' }, [newPreset, deletePreset, exportButton]),
       row('Stereo width', el('div', { className: 'inline' }, [width, widthValue])),
       el('p', { className: 'hint', textContent: '0 mono · 1 as recorded · 2 extra wide. Mono speakers are not affected.' }),
       el('label', {
@@ -256,6 +256,7 @@ export function createPanel(root, actions) {
   };
   preset.onchange = () => actions.selectPreset(preset.value);
   deletePreset.onclick = () => actions.deleteCurrentPreset();
+  exportButton.onclick = () => actions.exportPreset();
   newPreset.onclick = () => {
     actions.newPreset();
     presetName.focus();
@@ -345,6 +346,8 @@ export function createPanel(root, actions) {
     cardButtons.hidden = !card.buttons.length;
     cardButtonsLabel.hidden = !card.buttons.length;
     deletePreset.disabled = !view.canDelete;
+    exportButton.disabled = !view.canExport;
+    exportButton.title = view.canExport ? EXPORT_TITLE : 'This preset is a file in the collection already.';
     presetName.disabled = !view.canDelete; // the default layout keeps its name
     setValue(presetName, view.presetName);
     setValue(width, view.width);

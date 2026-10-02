@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  autoPreset, bindPreset, createPreset, deletePreset, editLayout, isCustomKey, ownPreset, parseSelection, plateKey,
-  presetOptions, resolvePlaying, selectionValue, truckStatus, unbind, variantKey,
+  adoptPicked, autoPreset, bindPreset, createPreset, deletePreset, editLayout, exportPreset, isCustomKey, ownPreset,
+  parseSelection, plateKey, presetOptions, resolvePlaying, selectionValue, truckStatus, unbind, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
+import { parsePresetFile } from '../src/shared/collection.js';
 
 const TRUCK = { key: 'vehicle.international.9900i', name: 'International 9900i' };
 const OTHER = { key: 'vehicle.peterbilt.579', name: 'Peterbilt 579' };
@@ -301,4 +302,115 @@ test('preset options and selection values', () => {
   for (const selection of [{ mode: 'auto' }, { mode: 'default' }, { mode: 'truck', key: TRUCK.key }]) {
     assert.deepEqual(parseSelection(selectionValue(selection)), selection);
   }
+});
+
+// The preset collection: shared files in presets/ (collection.js), kept in store.collection.
+const shared = (file, vehicle, extra = {}) => parsePresetFile({
+  truckerAuxPreset: 1, name: file.replace('.json', ''), vehicle, layout: { width: 0.8 }, ...extra,
+}, file).entry;
+const withCollection = (store, ...entries) => ({ ...store, collection: Object.fromEntries(entries.map((e) => [e.key, e])) });
+const SLEEPER_FILE = shared('sleeper.json', 'vehicle.international.9900i@3.2');
+const MODEL_FILE = shared('model.json', 'vehicle.international.9900i');
+
+test('collection: Auto plays it after your own presets: this chassis, the model, then another chassis', () => {
+  const store = withCollection(normalizeStore({}), SLEEPER_FILE, MODEL_FILE);
+  assert.deepEqual(autoPreset(store, SLEEPER), { key: 'file:sleeper.json', how: 'collectionChassis' });
+  assert.deepEqual(autoPreset(store, SHORT), { key: 'file:model.json', how: 'collectionModel' });
+  assert.deepEqual(resolvePlaying(store, AUTO, SLEEPER), { kind: 'collection', key: 'file:sleeper.json', layout: SLEEPER_FILE.layout });
+  assert.deepEqual(autoPreset(withCollection(normalizeStore({}), SLEEPER_FILE), SHORT), { key: 'file:sleeper.json', how: 'collectionSibling' });
+  // Your own presets come first, even the model's for all chassis.
+  assert.deepEqual(autoPreset(withCollection(withPreset(), SLEEPER_FILE), SLEEPER), { key: TRUCK.key, how: 'model' });
+  // The collection's preset for this chassis beats your own for another chassis; yours beats
+  // the collection's for another chassis.
+  const ownShort = editLayout(normalizeStore({}), AUTO, SHORT, widen);
+  assert.equal(autoPreset(withCollection(ownShort, SLEEPER_FILE), SLEEPER).how, 'collectionChassis');
+  assert.deepEqual(autoPreset(withCollection(ownShort, shared('long.json', 'vehicle.international.9900i@4.0')), SLEEPER), {
+    key: variantKey(SHORT), how: 'sibling',
+  });
+  // Several files for one chassis: the first by path; another vehicle's files never play.
+  const two = withCollection(normalizeStore({}), shared('b.json', variantKey(SLEEPER)), shared('a.json', variantKey(SLEEPER)));
+  assert.equal(autoPreset(two, SLEEPER).key, 'file:a.json');
+  assert.equal(autoPreset(store, OTHER), null);
+  // Picked in the list.
+  assert.equal(resolvePlaying(store, PICK('file:model.json'), null).kind, 'collection');
+  assert.equal(resolvePlaying(store, PICK('file:gone.json'), null).kind, 'default');
+});
+
+test('collection: editing never changes a file', () => {
+  const store = withCollection(normalizeStore({}), SLEEPER_FILE);
+  // Auto: the first edit makes this chassis's own copy, which plays from then on.
+  const edited = editLayout(store, AUTO, SLEEPER, widen);
+  assert.equal(edited.trucks[variantKey(SLEEPER)].width, 1.5);
+  assert.equal(edited.trucks[variantKey(SLEEPER)].name, 'International 9900i, hook 3.2 m');
+  assert.equal(edited.collection['file:sleeper.json'].layout.width, 0.8);
+  assert.equal(autoPreset(edited, SLEEPER).how, 'chassis');
+  // Picked in the list: a Custom copy, chosen instead.
+  const adopted = adoptPicked(store, PICK('file:sleeper.json'));
+  assert.ok(isCustomKey(adopted.selection.key));
+  assert.equal(adopted.store.trucks[adopted.selection.key].name, 'sleeper copy');
+  assert.equal(adopted.store.trucks[adopted.selection.key].width, 0.8);
+  assert.deepEqual(adoptPicked(store, AUTO), { store, selection: AUTO });
+  assert.deepEqual(adoptPicked(store, PICK(TRUCK.key)), { store, selection: PICK(TRUCK.key) });
+  // An edit routed to a file is dropped.
+  assert.equal(editLayout(store, PICK('file:sleeper.json'), SLEEPER, widen), store);
+});
+
+test('collection: a binding may point at a file and is kept while the file is missing', () => {
+  const bound = bindPreset(withCollection(normalizeStore({}), MODEL_FILE), OWNED, 'truck', 'file:model.json');
+  assert.deepEqual(autoPreset(bound, OWNED), { key: 'file:model.json', how: 'truckBound' });
+  const reloaded = normalizeStore({ assignments: bound.assignments });
+  assert.deepEqual(reloaded.assignments, { [plateKey(OWNED)]: 'file:model.json' });
+  assert.equal(autoPreset(reloaded, OWNED), null);
+});
+
+test('collection: the card and the list', () => {
+  const store = withCollection(normalizeStore({}), shared('t.json', variantKey(SLEEPER), { name: 'Sleeper cab', author: 'Alex' }), MODEL_FILE);
+  assert.deepEqual(card(truckStatus(store, AUTO, SLEEPER), 'plays', 'appliesTo', 'note', 'buttons'), {
+    plays: 'Sleeper cab — Alex',
+    appliesTo: 'all International 9900i on this chassis, from the collection',
+    note: 'From the collection: t.json. Editing makes your own copy for this chassis first.',
+    buttons: [{ action: 'own-chassis', label: 'Own preset for this chassis' }],
+  });
+  assert.equal(truckStatus(store, AUTO, SHORT).appliesTo, 'all chassis of International 9900i, from the collection');
+  assert.deepEqual(card(truckStatus(store, AUTO, TRUCK), 'appliesTo', 'note', 'buttons'), {
+    appliesTo: 'all International 9900i, from the collection',
+    note: 'From the collection: model.json. Editing makes your own preset for International 9900i first.',
+    buttons: [{ action: 'own-chassis', label: 'Own preset for International 9900i' }],
+  });
+  assert.deepEqual(card(truckStatus(store, PICK('file:t.json'), SLEEPER), 'plays', 'appliesTo', 'note', 'buttonsLabel'), {
+    plays: 'Sleeper cab — Alex (picked in the list)',
+    appliesTo: 'International 9900i on the hook 3.2 m chassis',
+    note: 'From the collection: t.json. Editing makes your own copy first.',
+    buttonsLabel: 'Use it in',
+  });
+  assert.equal(truckStatus(withCollection(normalizeStore({}), shared('any.json', null)), PICK('file:any.json'), null).appliesTo, 'only where it is chosen');
+  const options = presetOptions(store, SLEEPER);
+  assert.equal(options[0].label, 'Auto — Sleeper cab — Alex (collection)');
+  assert.deepEqual(options.at(-1), {
+    group: 'Collection',
+    options: [{ value: 'truck:file:model.json', label: 'model' }, { value: 'truck:file:t.json', label: 'Sleeper cab — Alex' }],
+  });
+  assert.deepEqual(parseSelection('truck:file:t.json'), PICK('file:t.json'));
+});
+
+test('exportPreset: the preset that plays as a file to share', () => {
+  const store = editLayout(withPreset(), AUTO, SLEEPER, widen); // the model's and the sleeper's own
+  const chassis = exportPreset(store, variantKey(SLEEPER), SLEEPER);
+  assert.equal(chassis.fileName, 'International 9900i, hook 3.2 m.json');
+  assert.deepEqual({ ...chassis.data, layout: null }, {
+    truckerAuxPreset: 1, name: 'International 9900i, hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i', layout: null,
+  });
+  assert.equal(chassis.data.layout.width, 1.5);
+  assert.equal(exportPreset(store, TRUCK.key, null).data.vehicle, TRUCK.key);
+  assert.equal(exportPreset(store, TRUCK.key, null).data.vehicleName, 'International 9900i');
+  // This vehicle's own preset is shared for its chassis: the plate stays private.
+  const plated = ownPreset(store, OWNED, 'truck');
+  assert.equal(exportPreset(plated, plateKey(OWNED), OWNED).data.vehicle, variantKey(OWNED));
+  assert.equal(exportPreset(plated, plateKey(OWNED), null).data.vehicle, TRUCK.key);
+  // A custom preset and the default layout are for no vehicle; a file is a file already.
+  const custom = createPreset(store, store.default);
+  assert.equal('vehicle' in exportPreset(custom.store, custom.key, SLEEPER).data, false);
+  assert.equal(exportPreset(store, null, SLEEPER).data.name, 'Default layout');
+  assert.equal('vehicle' in exportPreset(store, null, SLEEPER).data, false);
+  assert.equal(exportPreset(withCollection(store, MODEL_FILE), 'file:model.json', SLEEPER), null);
 });

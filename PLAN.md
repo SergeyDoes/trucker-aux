@@ -174,6 +174,23 @@ Done: 121 unit tests and 17 engine checks pass; checked in a sandbox against the
 - DLCs add cars, so the UI says "vehicle": the card's "Vehicle", "Only this vehicle", "this vehicle only", "every vehicle without its own preset", "Vehicle WP-83695" in the list, "Vehicle axis", "Unknown vehicle". The code and `layouts.json` keep `truck`.
 - The Bounds panel says the bounds do not change the sound, they only frame the views; "Vehicle axis" moved just inside the front wall, clear of the wall's name.
 
+### E2.15 — preset collection ✓
+Done: 136 unit tests pass; checked in a sandbox with `tools/fake_shm.py --truck vehicle.mack.anthem --hook 2.4`: a shared file played in Auto, "Own preset for this chassis" made a copy, Export wrote `Mack anthem, hook 2.4 m.json` (no plate) and it appeared under Collection, a picked file became "… copy" under Custom on the first edit while the file stayed as it was, a dropped-in file showed up without a restart, `layouts.json` got no collection.
+- The author's 13 vehicle presets are exported to `app/presets/` and ship from there; `app/data/` is git-ignored as a whole, so the example `layouts.json` left the repository. Before that, the speakers' standard names were changed to their types (E2.16), and the Cascadia preset shared by the 2019 and the 2024 lost its year ("Freightliner Cascadia").
+
+Presets shared between people as files in `presets/` (spec: "Preset collection"). Tasks:
+1. `shared/collection.js`: parse a preset file, the export data and file name; tests.
+2. `main/collection.js`: read the folder (subfolders, warnings for bad files), watch it, write an exported file under a free name; tests in temporary folders.
+3. `shared/presets.js`: collection keys in `resolvePlaying`, Auto (own first, then the collection's chassis, model, sibling), edits making own copies (`adoptPicked` for a picked file), the card, the "Collection" group in the list; `normalizeStore` keeps `file:` assignments; tests.
+4. Main / preload / renderer: the collection in `store:load` and a `collection` event, never saved to `layouts.json`; an Export button that shows the file in Explorer; collection warnings in the panel.
+5. Sandbox check: export, the file appears in the list, Auto plays it in a vehicle without its own preset; README and spec.
+
+### E2.16 — speakers named after their type ✓
+Done: 137 unit tests pass; checked in a sandbox (a type change renames, "+ Pair" names by type).
+- Speakers were "Door L/R" and "Speaker N L/R" wherever they were, and most were not in the doors. The app now names them after their type (`TYPE_NAMES` moved from the panel to layout.js): "Full range L/R" in the default layout and for "+ Pair", "Full range" for "+ Speaker", numbered when taken, with one number for both sides of a pair.
+- A standard name (a type's name, "Door L", "Speaker 3 R", "Speaker 5") follows the type when it changes (`nameForType` in `updateSpeaker`); a name typed by hand stays.
+- The author's presets were renamed the same way, 76 speakers in all ("Midbass L", "Tweeter R", "Subwoofer", "Small full range L 2" for the Mustang's second small pair); copies of `layouts.json` from before are in `app/data/layouts.backup-2026-10-02-before-renames.json` and `…-before-type-names.json`.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Built-in cable check (tone + `glitch.js` detector).
@@ -193,7 +210,8 @@ app/                       Electron app (ESM, except preload)
   src/renderer/            audio graph, devices, panel
   test/                    node --test
   scripts/                 engine check, pose-dump
-  data/                    layouts.json, settings.json, profile/ (Chromium, git-ignored)
+  data/                    layouts.json, settings.json, profile/ (Chromium); all git-ignored
+  presets/                 the shared preset collection, one JSON file each
 third_party/scs-sdk-plugin SDK headers + shared-memory plugin
 tools/
   shm_probe.py             R0: reads head.offset

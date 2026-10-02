@@ -1,0 +1,140 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Western Star 49X, hook 2.5 m",
+  "vehicle": "vehicle.westernstar.49x@2.5",
+  "vehicleName": "Western Star 49X",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.88,
+        -1.15,
+        -0.63
+      ],
+      "max": [
+        0.88,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.73,
+          -0.1,
+          -0.46
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.73,
+          -0.1,
+          -0.46
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Midbass L",
+        "position": [
+          -0.83,
+          -0.36,
+          -0.32
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Midbass R",
+        "position": [
+          0.83,
+          -0.36,
+          -0.32
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Midrange L",
+        "position": [
+          -0.66,
+          -0.15,
+          0.38
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midrange R",
+        "position": [
+          0.66,
+          -0.15,
+          0.38
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s5"
+      },
+      {
+        "id": "s7",
+        "name": "Subwoofer",
+        "position": [
+          -0.29,
+          -0.55,
+          0.26
+        ],
+        "channel": "M",
+        "gainDb": 0,
+        "type": "sub",
+        "pair": null
+      },
+      {
+        "id": "s8",
+        "name": "Small full range L",
+        "position": [
+          -0.51,
+          0.42,
+          0.29
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s9"
+      },
+      {
+        "id": "s9",
+        "name": "Small full range R",
+        "position": [
+          0.51,
+          0.42,
+          0.29
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s8"
+      }
+    ]
+  }
+}

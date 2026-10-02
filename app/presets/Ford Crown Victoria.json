@@ -1,0 +1,75 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Ford Crown Victoria",
+  "vehicle": "vehicle.ford.victoria_06",
+  "vehicleName": "Ford Crown Victoria",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.64,
+        -0.51,
+        -0.81
+      ],
+      "max": [
+        0.64,
+        0.5,
+        1
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Small full range L",
+        "position": [
+          -0.52,
+          -0.26,
+          -0.47
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Small full range R",
+        "position": [
+          0.52,
+          -0.26,
+          -0.47
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Full range L",
+        "position": [
+          -0.22,
+          -0.05,
+          0.56
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Full range R",
+        "position": [
+          0.22,
+          -0.05,
+          0.56
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s3"
+      }
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Volvo VNL 440",
+  "vehicle": "vehicle.volvo.vnl2025@1.7",
+  "vehicleName": "Volvo VNL 440",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.84,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.84,
+        0.95,
+        0.9
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.72,
+          -0.28,
+          -0.26
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.72,
+          -0.28,
+          -0.26
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.53,
+          -0.1,
+          -0.69
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R",
+        "position": [
+          0.53,
+          -0.1,
+          -0.69
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.74,
+          0.1,
+          0.74
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.74,
+          0.1,
+          0.74
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      }
+    ]
+  }
+}
