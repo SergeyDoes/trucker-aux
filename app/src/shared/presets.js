@@ -220,7 +220,7 @@ export function adoptNewModel(store, truck) {
   return {
     ...store,
     // Labelled "new" so it stands out in the key tree until you give it a label of your own.
-    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck), label: NEW_LABEL } },
+    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck), label: NEW_LABEL, labelColor: 'green' } },
     assignments: { ...store.assignments, [truck.key]: key },
   };
 }
@@ -620,7 +620,7 @@ const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 // A model whose game is not known yet (not driven since presets got scopes) sits under
 // "Game not known yet (drive a vehicle once)"; that folder is no scope (pseudo).
 // Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
-//   own        { key, name, file, label } the preset or file at this key, or null
+//   own        { key, name, file, label, labelColor } the preset or file at this key, or null
 //   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
 //   current    on the chain of the vehicle in the game; plays: the key whose preset plays in
 //              Auto; picked: the key picked in the map (selection mode 'scope')
@@ -631,10 +631,10 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
   const ownAt = (scope) => {
     const key = store.assignments[scope];
-    const label = (k) => presetLayout(store, k)?.label ?? null;
-    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key), label: label(key) };
+    const tag = (layout) => ({ label: layout?.label ?? null, labelColor: layout?.labelColor ?? 'blue' });
+    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key), ...tag(presetLayout(store, key)) };
     const file = files.find((e) => e.vehicle === scope);
-    return file ? { key: file.key, name: file.name, file: true, label: file.layout.label ?? null } : null;
+    return file ? { key: file.key, name: file.name, file: true, ...tag(file.layout) } : null;
   };
   // Every key to show: the vehicles driven with their chassis and plates, scopes with
   // presets or files, and the vehicle in the game.
@@ -704,7 +704,8 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   return {
     root: finish(root, null),
     unassigned: Object.keys(store.presets).filter((k) => !used.has(k))
-      .map((key) => ({ key, name: store.presets[key].name, label: store.presets[key].label ?? null })).sort((a, b) => a.name.localeCompare(b.name)),
+      .map((key) => ({ key, name: store.presets[key].name, label: store.presets[key].label ?? null, labelColor: store.presets[key].labelColor ?? 'blue' }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     files: Object.values(store.collection ?? {}).filter((e) => !e.vehicle && !used.has(e.key))
       .map((e) => ({ key: e.key, name: collectionLabel(e) })).sort((a, b) => a.name.localeCompare(b.name)),
   };

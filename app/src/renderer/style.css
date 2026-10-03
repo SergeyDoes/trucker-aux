@@ -122,6 +122,14 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-row.own .reg-name { font-weight: 700; }
 .reg-value { color: var(--dim); font-size: 12px; }
 .reg-badge { font-size: 10px; padding: 0 5px; border-radius: 8px; background: #2f6fde22; color: var(--left); }
-.reg-row.file .reg-badge { background: #8882; color: var(--dim); font-style: italic; }
+.reg-row.file .reg-badge { font-style: italic; }
+.reg-row.file .reg-badge:not([class*="tag-"]) { background: #8882; color: var(--dim); }
+/* Label colours (LABEL_COLORS); blue is the default. */
+.tag-gray { background: #8883; color: var(--dim); }
+.tag-blue { background: #2f6fde22; color: var(--left); }
+.tag-orange { background: #d08c0026; color: var(--front); }
+.tag-green { background: #2f9e5a26; color: var(--mono); }
+.tag-red { background: #d9463b22; color: var(--right); }
+select.label-color { width: 84px; flex: none; }
 .reg-mark { margin-left: auto; padding-left: 8px; color: var(--front); }
 .reg-row.current .reg-name { text-decoration: underline dotted var(--front); }

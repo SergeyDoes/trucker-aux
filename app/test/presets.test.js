@@ -529,7 +529,7 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(sleeper.children[0].inherited, { key: 'p.2', name: 'Sleeper', from: 'hook 3.2 m' });
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
-  assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null }]);
+  assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null, labelColor: 'blue' }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
   // A model not driven goes up only to all vehicles: its game is not known.
   const anthem = map.root.children.at(-1).children[0];
@@ -610,6 +610,7 @@ test('adoptNewModel: a model seen without a key of its own gets a copy of what i
   assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
   assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
   assert.equal(at(adopted, TRUCK.key).label, 'new'); // stands out in the tree until labelled
+  assert.equal(at(adopted, TRUCK.key).labelColor, 'green');
   assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
   assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
   assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
@@ -651,7 +652,8 @@ test('the map shows a preset\'s label beside its keys', () => {
   const model = (function find(n) { return n.scope === TRUCK.key ? n : n.children.map(find).find(Boolean); })(map.root);
   assert.equal(model.own.label, 'Day cab');
   assert.equal(map.root.own.label, null);
-  assert.deepEqual(map.unassigned, [{ key: 'p.3', name: 'Spare', label: 'Test' }]);
+  assert.deepEqual(map.unassigned, [{ key: 'p.3', name: 'Spare', label: 'Test', labelColor: 'blue' }]);
+  assert.equal(model.own.labelColor, 'blue');
   // A shared file carries its label too, and Export writes it.
   assert.equal(exportPreset(store, 'p.2', null).data.layout.label, 'Day cab');
 });

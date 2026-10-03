@@ -345,3 +345,10 @@ test('normalizeLayout keeps a short label, trimmed to 16 characters, and leaves 
   assert.equal('label' in normalizeLayout({ label: '  ' }), false);
   assert.equal('label' in normalizeLayout({}), false);
 });
+
+test('normalizeLayout keeps a label colour from the list, blue left out as the default', () => {
+  assert.equal(normalizeLayout({ label: 'X', labelColor: 'red' }).labelColor, 'red');
+  assert.equal('labelColor' in normalizeLayout({ label: 'X', labelColor: 'blue' }), false);
+  assert.equal('labelColor' in normalizeLayout({ label: 'X', labelColor: 'pink' }), false);
+  assert.equal('labelColor' in normalizeLayout({ labelColor: 'red' }), false); // no label, no colour
+});

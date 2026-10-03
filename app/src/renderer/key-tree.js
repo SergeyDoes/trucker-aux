@@ -164,7 +164,7 @@ export function createKeyTree(root, actions) {
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label }),
-      ...(badge ? [el('span', { className: 'reg-badge', textContent: badge })] : []),
+      ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : ''}`, textContent: badge })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
@@ -208,7 +208,7 @@ export function createKeyTree(root, actions) {
   // (not a shared file: those are files), right-click for its menu.
   function unusedItem(p, file) {
     const name = el('span', { textContent: p.name });
-    const tag = p.label ? [el('span', { className: 'reg-badge', textContent: p.label })] : [];
+    const tag = p.label ? [el('span', { className: `reg-badge tag-${p.labelColor ?? 'blue'}`, textContent: p.label })] : [];
     const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? 'A shared file for no vehicle' : 'Click to play; drag onto a key' }, [name, ...tag]);
     dragSource(item, { from: null, key: p.key, file });
     const rename = () => {

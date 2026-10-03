@@ -6,6 +6,8 @@
 
 export const MAX_SPEAKERS = 16;
 export const LABEL_MAX = 16; // characters of a preset's label
+// A label's colour; blue when none is stored.
+export const LABEL_COLORS = ['gray', 'blue', 'orange', 'green', 'red'];
 // 1: X started at the driver's head. 2: X starts at the truck's axis. 3: presets apart from
 // their scopes (normalizeStore).
 export const STORE_VERSION = 3;
@@ -130,6 +132,7 @@ export function normalizeLayout(raw, fallbackName = 'Default layout') {
   return {
     name: text(src.name) || fallbackName,
     ...(label ? { label } : {}), // a short tag shown beside its keys in the preset map
+    ...(label && LABEL_COLORS.includes(src.labelColor) && src.labelColor !== 'blue' ? { labelColor: src.labelColor } : {}),
     width: clamp(isNum(src.width) ? src.width : 1, 0, 2),
     bounds,
     speakers: fixPairs(speakers),

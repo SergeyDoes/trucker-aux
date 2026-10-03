@@ -3,7 +3,7 @@ import { createPanel } from './panel.js';
 import { createViews } from './views.js';
 import { listDevices, openInput, probeOutput } from './audio-io.js';
 import {
-  LABEL_MAX, MAX_SPEAKERS, addPair, addSpeaker, copySpeakers, linkPair, moveSpeakers, pasteSpeakers, patchSpeakers,
+  LABEL_COLORS, LABEL_MAX, MAX_SPEAKERS, addPair, addSpeaker, copySpeakers, linkPair, moveSpeakers, pasteSpeakers, patchSpeakers,
   defaultLayout, removeSpeakers, setCoordinate, setBoundsEdge, setWidth, shiftGains, unlinkPair,
 } from '../shared/layout.js';
 import { nudge } from '../shared/view.js';
@@ -182,6 +182,19 @@ function stepHistory(from, to) {
     state.picked = pruneSelection(state.picked, order());
   }
   syncEngine();
+  scheduleSave();
+  render();
+}
+
+// The name, label and colour of what plays change on that very preset: unlike the speakers,
+// they never make a copy for this chassis or key first (a key picked in the map that only
+// inherits has no preset of its own to name, so it goes the usual way).
+function editPlayingMeta(change) {
+  const { key, kind } = playing();
+  const own = state.selection.mode !== 'scope' || state.store.assignments[state.selection.scope] === key;
+  if (kind !== 'preset' || !own) return edit(change);
+  remember();
+  state.store = { ...state.store, presets: { ...state.store.presets, [key]: change(state.store.presets[key]) } };
   scheduleSave();
   render();
 }
@@ -438,7 +451,7 @@ const actions = {
   },
   renamePreset(name) {
     const trimmed = name.trim();
-    if (trimmed && playing().kind === 'preset') edit((layout) => ({ ...layout, name: trimmed }));
+    if (trimmed && playing().kind === 'preset') editPlayingMeta((layout) => ({ ...layout, name: trimmed }));
     else render(); // an empty name puts the old one back
   },
   // The card's Applies to (presets.js planScope): moves the preset that plays up or down
@@ -510,9 +523,16 @@ const actions = {
   setPresetLabel(text) {
     const label = text.trim().slice(0, LABEL_MAX);
     if (playing().kind !== 'preset' || (playing().layout.label ?? '') === label) return render();
-    edit((layout) => {
-      const { label: _old, ...rest } = layout;
-      return label ? { ...rest, label } : rest;
+    editPlayingMeta((layout) => {
+      const { label: _old, labelColor, ...rest } = layout;
+      return label ? { ...rest, label, ...(labelColor ? { labelColor } : {}) } : rest; // no label, no colour
+    });
+  },
+  setPresetLabelColor(color) {
+    if (playing().kind !== 'preset' || !LABEL_COLORS.includes(color)) return render();
+    editPlayingMeta((layout) => {
+      const { labelColor: _old, ...rest } = layout;
+      return color === 'blue' ? rest : { ...rest, labelColor: color };
     });
   },
   renamePresetKey(key, name) {
@@ -733,6 +753,7 @@ function render() {
     canExport: current.kind !== 'collection', // a shared file is one already
     presetName: layout.name,
     presetLabel: layout.label ?? '',
+    presetLabelColor: layout.labelColor ?? 'blue',
     width: layout.width,
     matchLoudness: state.settings.matchLoudness,
     loudnessDb: state.loudnessDb,
