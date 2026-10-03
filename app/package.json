@@ -8,6 +8,7 @@
     "start": "electron .",
     "test": "node --test",
     "test:engine": "electron scripts/engine-check.js",
+    "predist": "node scripts/check-plugin.js",
     "dist": "electron-builder --win zip --x64"
   },
   "dependencies": {
@@ -43,6 +44,14 @@
       {
         "from": "presets",
         "to": "presets"
+      },
+      {
+        "from": "plugin",
+        "to": "plugin"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE.txt"
       }
     ],
     "win": {

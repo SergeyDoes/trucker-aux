@@ -34,6 +34,7 @@ const state = {
   store: { ...loaded.store, collection: loaded.collection.collection },
   collectionWarnings: loaded.collection.warnings, // files in presets/ that are not presets
   settings: loaded.settings,
+  debug: loaded.debug, // debug tools shown (main.js): from source, or a build started with --dev-tools
   selection: { mode: 'auto' },
   truck: null,
   pose: null,
@@ -56,6 +57,8 @@ const state = {
 };
 let audio = null; // { ctx, engine, stream, player }
 
+// The test file is a debug tool: a release build always plays the input device.
+const source = () => (state.debug ? state.settings.source : 'input');
 const playing = () => resolvePlaying(state.store, state.selection, state.truck);
 const order = () => playing().layout.speakers.map((s) => s.id);
 
@@ -177,7 +180,7 @@ async function startAudio() {
 
   let stream = null;
   let rate;
-  if (state.settings.source === 'input') {
+  if (source() === 'input') {
     if (!state.inputId) {
       warnings.push('No input device found.');
     } else {
@@ -201,7 +204,7 @@ async function startAudio() {
   const engine = createEngine(ctx);
   let player = null;
   if (stream) ctx.createMediaStreamSource(stream).connect(engine.input);
-  if (state.settings.source === 'file') {
+  if (source() === 'file') {
     player = new Audio();
     player.controls = true;
     player.loop = true;
@@ -477,7 +480,8 @@ function render() {
     outputs: state.devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'communications'),
     inputId: state.inputId,
     outputId: state.outputId,
-    source: state.settings.source,
+    debug: state.debug,
+    source: source(),
     muteWhen: state.settings.muteWhen,
     turnLook: state.settings.turnLook,
     pauseBehavior: state.settings.pauseBehavior,

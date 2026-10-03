@@ -88,6 +88,11 @@ export function createPanel(root, actions) {
   const file = el('input', { type: 'file', accept: 'audio/*' });
   const playerSlot = el('div', { className: 'player' });
   const fileRow = el('div', {}, [file, playerSlot]);
+  // Debug only (view.debug): the test file instead of the input device.
+  const sourceRow = row('Source', el('div', { className: 'inline' }, [
+    el('label', {}, [sourceInput, ' Input device']),
+    el('label', {}, [sourceFile, ' Test file']),
+  ]));
   const muteWhen = el('select', { title: 'Mute the music like a car radio while the vehicle is switched off in the game' });
   const pauseBehavior = el('select', {
     title: 'While the game is paused: keep playing, mute, or play while the vehicle is on, as "Mute when" says',
@@ -198,10 +203,7 @@ export function createPanel(root, actions) {
       el('legend', { textContent: 'Audio' }),
       row('Input', input),
       row('Output', output),
-      row('Source', el('div', { className: 'inline' }, [
-        el('label', {}, [sourceInput, ' Input device']),
-        el('label', {}, [sourceFile, ' Test file']),
-      ])),
+      sourceRow,
       fileRow,
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
@@ -314,6 +316,7 @@ export function createPanel(root, actions) {
     fillSelect(output, view.outputs.map((d) => ({ value: d.deviceId, label: d.label || 'Unnamed output' })), view.outputId);
     sourceInput.checked = view.source === 'input';
     sourceFile.checked = view.source === 'file';
+    sourceRow.hidden = !view.debug;
     fileRow.hidden = view.source !== 'file';
     fillSelect(muteWhen, MUTE_OPTIONS, view.muteWhen);
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);

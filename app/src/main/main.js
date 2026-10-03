@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
@@ -10,6 +10,10 @@ import { presetFileName } from '../shared/collection.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
 const RETRY_MS = 1000;     // how often to look for the memory while the game is not running
+
+// Debug tools (the test file source, the default menu with DevTools and reload):
+// when run from source, or in a build started with --dev-tools (Electron rejects --debug as an old Node flag).
+const debug = !app.isPackaged || process.argv.includes('--dev-tools');
 
 // Everything, including Chromium's profile, lives in the app folder, not in %APPDATA%.
 const dataDir = resolveDataDir({
@@ -24,7 +28,7 @@ app.setPath('userData', path.join(dataDir, 'profile'));
 // folder changes; Export writes a new file there and shows it in Explorer.
 const presetsDir = presetsDirFor(dataDir);
 
-ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir) }));
+ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir), debug }));
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
 ipcMain.handle('collection:export', (_event, fileName, data) => {
@@ -68,6 +72,7 @@ app.whenReady().then(() => {
   const allowed = new Set(['media', 'speaker-selection']);
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed.has(permission)));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
+  if (!debug) Menu.setApplicationMenu(null);
   createWindow();
 });
 app.on('window-all-closed', () => app.quit());
