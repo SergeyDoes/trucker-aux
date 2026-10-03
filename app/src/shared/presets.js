@@ -214,7 +214,8 @@ const readableId = (model) => model.replace(/^vehicle\./, '').replace(/[._]/g, '
 
 function brandName(store, game, brand, truck) {
   if (truck?.game === game && truck?.brand === brand && truck.brandName) return truck.brandName;
-  const known = Object.values(store.vehicles ?? {}).find((v) => v.game === game && v.brand === brand && v.brandName);
+  const known = Object.values(store.vehicles ?? {}).find((v) => v.game === game && v.brand === brand && v.brandName)
+    ?? Object.values(store.collection ?? {}).find((e) => e.game === game && e.brand === brand && e.brandName);
   return known?.brandName ?? brand.charAt(0).toUpperCase() + brand.slice(1); // never driven: its id
 }
 
@@ -263,11 +264,14 @@ const EVERY = 'every vehicle without its own preset';
 const chassisScope = (truck) => (truck.variant ? `all ${truck.name} on this chassis` : `all ${truck.name}`);
 
 // Where a model belongs: { game, brand }, as the game said (the vehicle in it, or when it
-// was driven). Null parts are not known: no guesses.
+// was driven), else as a shared file for it says. Null parts are not known: no guesses.
 function placeOf(store, model, truck) {
   if (truck?.key === model && (truck.game || truck.brand)) return { game: truck.game ?? null, brand: truck.brand ?? null };
   const known = store.vehicles?.[model];
-  return { game: known?.game ?? null, brand: known?.brand ?? null };
+  if (known?.game) return { game: known.game, brand: known.brand ?? null };
+  // A shared file for the model may say where it is from (collection.js).
+  const file = Object.values(store.collection ?? {}).find((e) => e.vehicle && modelOf(e.vehicle) === model && e.game);
+  return { game: file?.game ?? null, brand: file?.brand ?? known?.brand ?? null };
 }
 
 // The chassis of one of your vehicles ("<id>#<plate>"): the vehicle in the game's, else the
@@ -641,7 +645,13 @@ export function exportPreset(store, key, truck) {
   else if (scope) vehicle = truck && plateKey(truck) === scope ? variantKey(truck) : modelOf(scope);
   const name = vehicle && modelName(store, modelOf(vehicle), truck);
   const vehicleName = name && name !== readableId(modelOf(vehicle)) ? name : null; // an id is no name
-  return { fileName: presetFileName(layout.name), data: presetFile({ name: layout.name, vehicle, vehicleName, layout }) };
+  // Where the vehicle is from, if the game has told: the map places it before it is driven.
+  const place = vehicle ? placeOf(store, modelOf(vehicle), truck) : {};
+  const brandLabel = place.game && place.brand ? brandName(store, place.game, place.brand, truck) : null;
+  return {
+    fileName: presetFileName(layout.name),
+    data: presetFile({ name: layout.name, vehicle, vehicleName, game: place.game, brand: place.game && place.brand, brandName: brandLabel, layout }),
+  };
 }
 
 export function selectionValue(selection) {

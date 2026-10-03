@@ -3,7 +3,11 @@
 // these files; edits go to your own presets in layouts.json (presets.js).
 //
 //   { "truckerAuxPreset": 1, "name": "...", "vehicle": "<truck id>[@<hook>]",
-//     "vehicleName": "...", "author": "...", "layout": { width, bounds, speakers } }
+//     "vehicleName": "...", "game": "ats" | "ets2", "brand": "<brand id>", "brandName": "...",
+//     "author": "...", "layout": { width, bounds, speakers } }
+//
+// game and brand (optional) place the vehicle in the preset map before it is driven; the game
+// reports both, so Export writes them when it knows the vehicle.
 //
 // vehicle is a model or chassis key as in layouts.json, never a plate: plates are
 // personal (and random in quick jobs). Without it the preset is only picked by hand.
@@ -35,6 +39,9 @@ export function parsePresetFile(raw, file) {
       name,
       vehicle: vehicle && !vehicle.includes('#') ? vehicle : null,
       vehicleName: optionalText(raw.vehicleName),
+      game: raw.game === 'ats' || raw.game === 'ets2' ? raw.game : null,
+      brand: optionalText(raw.brand),
+      brandName: optionalText(raw.brandName),
       author: optionalText(raw.author),
       layout: normalizeLayout({ ...raw.layout, name }, name),
     },
@@ -47,12 +54,15 @@ export function collectionLabel(entry) {
 }
 
 // The file to share a layout; fields without a value are left out.
-export function presetFile({ name, vehicle, vehicleName, layout }) {
+export function presetFile({ name, vehicle, vehicleName, game, brand, brandName, layout }) {
   return {
     truckerAuxPreset: PRESET_FORMAT,
     name,
     ...(vehicle ? { vehicle } : {}),
     ...(vehicleName ? { vehicleName } : {}),
+    ...(game ? { game } : {}),
+    ...(brand ? { brand } : {}),
+    ...(brandName ? { brandName } : {}),
     layout: { width: layout.width, bounds: layout.bounds, speakers: layout.speakers },
   };
 }

@@ -3,6 +3,7 @@
   "name": "Peterbilt 389, hook 2.6 m",
   "vehicle": "vehicle.peterbilt.389@2.6",
   "vehicleName": "Peterbilt 389",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

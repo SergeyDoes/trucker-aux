@@ -3,6 +3,7 @@
   "name": "International 9900i",
   "vehicle": "vehicle.intnational.9900i",
   "vehicleName": "International 9900i",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

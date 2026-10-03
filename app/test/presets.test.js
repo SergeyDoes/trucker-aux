@@ -466,7 +466,8 @@ test('exportPreset: the preset that plays as a file to share', () => {
   const chassis = exportPreset(store, 'p.3', SLEEPER);
   assert.equal(chassis.fileName, 'International 9900i, hook 3.2 m.json');
   assert.deepEqual({ ...chassis.data, layout: null }, {
-    truckerAuxPreset: 1, name: 'International 9900i, hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i', layout: null,
+    truckerAuxPreset: 1, name: 'International 9900i, hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i',
+    game: 'ats', brand: 'international', brandName: 'International', layout: null,
   });
   assert.equal(chassis.data.layout.width, 1.5);
   assert.equal(exportPreset(store, 'p.2', null).data.vehicle, TRUCK.key);
@@ -575,4 +576,21 @@ test('planMove: moving a preset in the map, up its chain or down to a narrower s
   assert.equal(planMove(assign(store, 'game:ets2', 'file:a.json'), 'game:ets2', 'all'), null);
   // From all vehicles: always a copy.
   assert.equal(planMove(store, 'all', 'game:ets2').mustCopy, true);
+});
+
+test('a shared file may say the game and brand of its vehicle: the map places it before it is driven', () => {
+  const file = shared('anthem.json', 'vehicle.mack.anthem@2.4', { game: 'ats', brand: 'mack', brandName: 'Mack', vehicleName: 'Mack Anthem' });
+  assert.deepEqual([file.game, file.brand, file.brandName], ['ats', 'mack', 'Mack']);
+  assert.equal(shared('x.json', 'vehicle.x', { game: 'gta' }).game, null);
+  const map = presetTree(withCollection(storeWith(), file), null);
+  assert.deepEqual(lines(map.root), [
+    '● All vehicles = Default layout',
+    '  ATS (Default layout)',
+    '    Mack (Default layout)',
+    '      Mack Anthem (Default layout)',
+    '        hook 2.4 m = anthem (file)',
+  ]);
+  // Exported again, the file keeps saying where the vehicle is from.
+  const own = assign(withCollection(storeWith(), file), 'vehicle.mack.anthem@2.4', 'p.1');
+  assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
 });

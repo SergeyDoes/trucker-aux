@@ -193,6 +193,7 @@ Presets shared between people: one JSON file per preset in `presets/` (subfolder
 - `truckerAuxPreset`: the format version, 1 (coordinates as in store version 2).
 - `vehicle`: a model key (`<truck id>`) or a chassis key (`<truck id>@<hook>`), as in `layouts.json`; never a plate (plates are personal, and random in quick jobs). Without it the preset is only picked by hand.
 - `vehicleName`, `author`: optional, shown in the list.
+- `game`, `brand`, `brandName`: optional (added with store version 3), where the vehicle is from, for the preset map; Export writes them when the game has told them.
 - `layout`: as in `layouts.json` (`normalizeLayout`); its name is the file's `name`, else the file name.
 
 **Keys.** A collection preset's key is `file:<path inside presets/, with />`, e.g. `file:kenworth/t680-sleeper.json`. The renderer keeps the collection in `store.collection` (`{ [key]: { file, name, vehicle, vehicleName, author, layout } }`); it is never saved to `layouts.json`. `assignments` may point at `file:` keys; they are kept when the file is missing and simply do not apply.

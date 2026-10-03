@@ -3,6 +3,7 @@
   "name": "Ford Crown Victoria",
   "vehicle": "vehicle.ford.victoria_06",
   "vehicleName": "Ford Crown Victoria",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

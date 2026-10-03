@@ -3,6 +3,7 @@
   "name": "Western Star 49X, hook 1.5 m",
   "vehicle": "vehicle.westernstar.49x@1.5",
   "vehicleName": "Western Star 49X",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

@@ -3,6 +3,7 @@
   "name": "Ford Mustang 1967",
   "vehicle": "vehicle.ford.mustang_67",
   "vehicleName": "Ford Mustang 1967",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

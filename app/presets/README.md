@@ -16,6 +16,7 @@ files: edits go to your own presets in `data/layouts.json`.
   "name": "Kenworth T680 2014, sleeper",
   "vehicle": "vehicle.kenworth.t680@2.7",
   "vehicleName": "Kenworth T680 2014",
+  "game": "ats",
   "author": "Your name",
   "layout": { "width": 1, "bounds": { "min": [-1.15, -1, -1], "max": [1.15, 1, 1] }, "speakers": [] }
 }
@@ -25,6 +26,7 @@ files: edits go to your own presets in `data/layouts.json`.
   one chassis, as the app shows it ("hook 2.7 m"). Without `vehicle` the preset is only
   picked by hand.
 - `vehicleName` and `author` are optional. Export leaves `author` out: add it by hand.
+- `game` (`ats` or `ets2`), `brand` (the game's brand id) and `brandName` are optional: they place the vehicle under its game and brand in the preset map before you have driven it. Export writes them when the game has told them.
 - Coordinates are in metres:
   - X goes right from the vehicle's centre line;
   - Y goes up and Z goes back, from the driver's default head.

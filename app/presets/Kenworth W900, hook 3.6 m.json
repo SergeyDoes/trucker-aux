@@ -3,6 +3,7 @@
   "name": "Kenworth W900, hook 3.6 m",
   "vehicle": "vehicle.kenworth.w900@3.6",
   "vehicleName": "Kenworth W900",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

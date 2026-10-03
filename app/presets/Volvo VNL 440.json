@@ -3,6 +3,7 @@
   "name": "Volvo VNL 440",
   "vehicle": "vehicle.volvo.vnl2025@1.7",
   "vehicleName": "Volvo VNL 440",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {

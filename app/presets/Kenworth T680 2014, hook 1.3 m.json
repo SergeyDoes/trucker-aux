@@ -3,6 +3,7 @@
   "name": "Kenworth T680 2014, hook 1.3 m",
   "vehicle": "vehicle.kenworth.t680@1.3",
   "vehicleName": "Kenworth T680 2014",
+  "game": "ats",
   "layout": {
     "width": 1,
     "bounds": {
