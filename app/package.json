@@ -31,7 +31,6 @@
       "src/**",
       "package.json",
       "!**/node_modules/@koromix/koffi-{linux,darwin,freebsd,openbsd,android}-*{,/**}",
-      "!**/node_modules/koffi/{doc,src/koffi/src,lib,vendor}{,/**}",
       {
         "from": "node_modules/three/examples/jsm/controls",
         "to": "node_modules/three/examples/jsm/controls",
