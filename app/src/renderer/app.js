@@ -11,7 +11,7 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
+  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
   planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
@@ -688,8 +688,9 @@ window.aux.onPose((pose) => {
   if (otherTruck || (truck?.centerX ?? null) !== (state.truck?.centerX ?? null)) {
     state.truck = truck;
     if (otherTruck) resetSession();
-    // Its name, game and brand name the model's scopes while you drive something else.
-    const learned = rememberVehicle(state.store, truck);
+    // Its name, game and brand name the model's scopes while you drive something else; a
+    // model new to the app gets a key of its own (a copy of what it would inherit).
+    const learned = adoptNewModel(rememberVehicle(state.store, truck), truck);
     if (learned !== state.store) {
       state.store = learned;
       scheduleSave();

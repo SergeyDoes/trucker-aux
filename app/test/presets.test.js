@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
+  adoptNewModel, adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -601,4 +601,23 @@ test('a shared file may say the game and brand of its vehicle: the map places it
   // Exported again, the file keeps saying where the vehicle is from.
   const own = assign(withCollection(storeWith(), file), 'vehicle.mack.anthem@2.4', 'p.1');
   assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
+});
+
+test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit', () => {
+  const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
+  const adopted = adoptNewModel(store, SLEEPER);
+  assert.equal(adopted.assignments[TRUCK.key], 'p.3');
+  assert.equal(at(adopted, TRUCK.key).name, 'International 9900i');
+  assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
+  assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
+  assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
+  assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'Peterbilt 579'); // all vehicles' copied
+  // A key for a chassis or a vehicle of the model, or a shared file for it: nothing new.
+  const chassis = storeWith({ [variantKey(SHORT)]: { name: 'Day cab' } });
+  assert.equal(adoptNewModel(chassis, SLEEPER), chassis);
+  const plate = storeWith({ [plateKey(OWNED)]: { name: 'Mine' } });
+  assert.equal(adoptNewModel(plate, SHORT), plate);
+  const file = withCollection(storeWith(), SLEEPER_FILE);
+  assert.equal(adoptNewModel(file, SHORT), file);
+  assert.equal(adoptNewModel(store, null), store);
 });

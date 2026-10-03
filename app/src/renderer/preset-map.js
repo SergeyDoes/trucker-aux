@@ -1,7 +1,7 @@
 // The preset map (presets.js presetTree), laid out like the registry editor: keys in a tree
-// on the left, the selected key on the right. A key with a preset of its own is bold (it
-// overrides what it would inherit, as a prefab override in Unity); a shared file's is
-// italic; the others show, grey, what they inherit.
+// on the left, the selected key on the right. A key with a preset of its own is bold with a
+// "preset" mark (it overrides what it would inherit, as a prefab override in Unity); a shared
+// file's says "shared file"; the others inherit. Preset names are in the right pane only.
 const el = (tag, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
@@ -17,7 +17,7 @@ export function createPresetMap(actions) {
   const root = el('section', { className: 'preset-map', hidden: true }, [
     el('header', {}, [
       el('h2', { textContent: 'Preset map' }),
-      el('p', { className: 'hint', textContent: 'Bold: a preset set on that key. Grey: inherited from above. ● the vehicle in the game, ▶ what plays now. Drag a preset onto a key to move it there; hold Ctrl to set it there as well.' }),
+      el('p', { className: 'hint', textContent: 'Bold with "preset": the key has a preset of its own; other keys inherit from above. ● the vehicle in the game, ▶ what plays now. Drag a key\'s preset onto another key to move it; hold Ctrl to set it there as well.' }),
       close,
     ]),
     el('div', { className: 'reg-panes' }, [el('div', { className: 'reg-left' }, [tree]), details]),
@@ -74,13 +74,14 @@ export function createPresetMap(actions) {
     const icon = el('span', { className: 'reg-icon', innerHTML: FOLDER });
     let kind = 'inherited';
     if (node.own) kind = node.own.file ? 'file' : 'own';
-    const value = node.own ? node.own.name : node.inherited?.name ?? '';
+    // No preset names in the tree: a key either has its own preset (or a shared file) or not.
+    const value = { own: 'preset', file: 'shared file', inherited: '' }[kind];
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.scope === selected ? ' selected' : ''}`,
     }, [
       toggle, icon,
       el('span', { className: 'reg-name', textContent: node.label }),
-      el('span', { className: 'reg-value', textContent: value }),
+      el('span', { className: value ? 'reg-badge' : 'reg-value', textContent: value, title: node.own ? node.own.name : '' }),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => {

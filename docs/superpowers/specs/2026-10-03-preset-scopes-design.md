@@ -168,3 +168,8 @@ An overlay, not a second window: the state lives in the renderer, and a window w
 - **Brand scope.** Layouts depend on the cab, and one brand mixes very different ones (Ford: F-150, Mustang, Bronco, Crown Victoria). Kept for now, as it costs little; dropped if it proves useless.
 - **Game scope.** Only matters if you play both games. Kept: it costs little and gives each game its own default.
 - **Another chassis before the brand** (Auto step 4): today's behaviour, kept. The alternative is to treat it as weaker than the brand.
+
+## After delivery
+
+- **New models get a key** (`adoptNewModel`): a model seen without a key of its own (model, chassis, vehicle) and without a shared file gets a copy of what it would inherit, named after it. The brand's, game's and all vehicles' presets become templates for new models; Auto's ladder is unchanged.
+- **The map shows marks, not names:** "preset" (bold key) or "shared file" beside a key; the preset's name is in the right pane.

@@ -104,10 +104,10 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-toggle { width: 12px; color: var(--dim); cursor: pointer; text-align: center; }
 .reg-icon { display: inline-flex; }
 .reg-name { margin-right: 8px; }
-.reg-row.own .reg-name, .reg-row.own .reg-value { font-weight: 700; }
-.reg-row.file .reg-value { font-style: italic; }
+.reg-row.own .reg-name { font-weight: 700; }
 .reg-value { color: var(--dim); font-size: 12px; }
-.reg-row.own .reg-value { color: inherit; }
+.reg-badge { font-size: 10px; padding: 0 5px; border-radius: 8px; background: #2f6fde22; color: var(--left); }
+.reg-row.file .reg-badge { background: #8882; color: var(--dim); font-style: italic; }
 .reg-mark { margin-left: auto; padding-left: 8px; color: var(--front); }
 .reg-row.current .reg-name { text-decoration: underline dotted var(--front); }
 .reg-details { overflow: auto; }

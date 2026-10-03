@@ -175,6 +175,25 @@ export function deletePreset(store, key) {
   return { ...store, presets, assignments };
 }
 
+// A model seen for the first time without a key of its own (none for the model, its chassis
+// or its vehicles, and no shared file for it) gets one: a copy of what it would inherit
+// (the brand's, the game's or all vehicles' preset), named after it. From then on the model
+// has its own preset to tune, and wider presets serve as templates. The same store when the
+// model has a key.
+export function adoptNewModel(store, truck) {
+  if (!truck) return store;
+  const ofModel = (scope) => modelOf(scope) === truck.key && levelOf(scope) !== 'brand' && levelOf(scope) !== 'game' && scope !== ALL_SCOPE;
+  if (Object.keys(store.assignments).some(ofModel)) return store;
+  if (Object.values(store.collection ?? {}).some((e) => e.vehicle && modelOf(e.vehicle) === truck.key)) return store;
+  const { layout } = resolvePlaying(store, { mode: 'auto' }, truck);
+  const key = freePresetKey(store.presets);
+  return {
+    ...store,
+    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: truck.name } },
+    assignments: { ...store.assignments, [truck.key]: key },
+  };
+}
+
 // Keeps what the game tells about a model (name, game, brand) for naming its scopes when
 // you drive something else. The same store when nothing new was learned.
 export function rememberVehicle(store, truck) {

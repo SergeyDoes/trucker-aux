@@ -211,6 +211,11 @@ Done: 138 unit tests pass; the map checked in the app with a fake truck and the 
 - No guesses about games: a model not driven since the migration is under "Game not known yet (drive a vehicle once)" until it is driven.
 - Drag and drop: a preset dragged from its key onto another moves there (up, down, or across to another chain; down and across ask Move or Copy for here); Ctrl, or a preset or file from "Not on any key", sets it there as well. Closed folders open while something is held over them.
 
+### E2.20 — new models get a key; no preset names in the map ✓
+Done: 142 unit tests pass; checked in the app with a fake truck (a new model got its key, the map shows marks).
+- A model seen for the first time without a key of its own (none for the model, its chassis or vehicles, no shared file for it) gets one at once: a copy of what it would inherit (the brand's, the game's or all vehicles' preset), named after it (`adoptNewModel`). Wider presets act as templates; each model has its own preset to tune.
+- The map's tree shows a "preset" or "shared file" mark beside a key instead of the preset's name; names are in the right pane only. The list, the Name field, Export and Unassigned stay as they were (the user's choice).
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
