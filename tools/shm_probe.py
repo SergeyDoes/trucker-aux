@@ -6,6 +6,9 @@ in <game>\\bin\\win_x64\\plugins\\.
 
     py tools/shm_probe.py                 # 10 lines per second
     py tools/shm_probe.py --hz 30 --csv docs/probe.csv
+
+Press Enter while recording to put a mark into the CSV (the "mark" column counts them):
+for example on each switch between the cab and an outside camera.
 """
 import argparse
 import csv
@@ -14,6 +17,7 @@ import ctypes.wintypes as wt
 import os
 import struct
 import sys
+import threading
 import time
 
 MMF_NAME = "Local\\SCSTelemetry"
@@ -23,6 +27,8 @@ FILE_MAP_READ = 0x0004
 # Offsets from scs-telemetry-common.hpp, computed with offsetof (MSVC x64).
 OFF_PAUSED = 4
 OFF_RENDER_TIME = 24          # u64, updated every frame
+OFF_SPEED = 948               # truck_f.speed, m/s, negative when reversing
+OFF_GAME_STEER = 972          # truck_f.gameSteer, -1..1, positive is left
 OFF_CABIN_OFFSET = 2000       # 6 floats: x y z heading pitch roll
 OFF_HEAD_OFFSET = 2024        # 6 floats: x y z heading pitch roll
 OFF_TRUCK_ROTATION = 2224     # 3 doubles: heading pitch roll (world)
@@ -81,8 +87,19 @@ def main():
         os.makedirs(os.path.dirname(os.path.abspath(args.csv)), exist_ok=True)
         csv_file = open(args.csv, "a", newline="", encoding="utf-8")
         writer = csv.writer(csv_file)
-        writer.writerow(["t", "paused", "frame", "hx", "hy", "hz", "h_raw", "yaw", "pitch", "roll",
-                         "cabin_yaw", "cabin_pitch", "cabin_roll", "truck_heading"])
+        writer.writerow(["t", "mark", "paused", "frame", "speed", "steer",
+                         "hx", "hy", "hz", "h_raw", "yaw", "pitch", "roll",
+                         "cx", "cy", "cz", "cabin_yaw", "cabin_pitch", "cabin_roll", "truck_heading"])
+
+    # Enter puts a mark: the column counts them, so the parts of a recording can be told apart.
+    marks = [0]
+
+    def count_marks():
+        for _ in sys.stdin:
+            marks[0] += 1
+            print(f"--- mark {marks[0]} ---", flush=True)
+
+    threading.Thread(target=count_marks, daemon=True).start()
 
     last_render = None
     period = 1.0 / args.hz
@@ -90,7 +107,9 @@ def main():
         (paused,) = read(view, OFF_PAUSED, "?")
         (render_time,) = read(view, OFF_RENDER_TIME, "Q")
         hx, hy, hz, hh, hp, hr = read(view, OFF_HEAD_OFFSET, "6f")
-        _, _, _, ch, cp, cr = read(view, OFF_CABIN_OFFSET, "6f")
+        cx, cy, cz, ch, cp, cr = read(view, OFF_CABIN_OFFSET, "6f")
+        (speed,) = read(view, OFF_SPEED, "f")
+        (steer,) = read(view, OFF_GAME_STEER, "f")
         (th, _, _) = read(view, OFF_TRUCK_ROTATION, "3d")
 
         # '·' means the frame did not change since the previous line (game in a menu or minimized).
@@ -102,10 +121,12 @@ def main():
               f"  | cabin yaw {deg(ch):+5.1f}°  truck hdg {deg(th):+7.1f}°", flush=True)
 
         if writer:
-            writer.writerow([f"{time.time():.3f}", int(paused), int(frame == " "),
-                             f"{hx:.4f}", f"{hy:.4f}", f"{hz:.4f}", f"{hh:.5f}",
+            # Head and cab values in full: whether they stand exactly still matters.
+            writer.writerow([f"{time.time():.3f}", marks[0], int(paused), int(frame == " "), f"{speed:.2f}", f"{steer:.4f}",
+                             repr(hx), repr(hy), repr(hz), repr(hh),
                              f"{deg(hh):.2f}", f"{deg(hp):.2f}", f"{deg(hr):.2f}",
-                             f"{deg(ch):.2f}", f"{deg(cp):.2f}", f"{deg(cr):.2f}", f"{deg(th):.2f}"])
+                             repr(cx), repr(cy), repr(cz),
+                             f"{deg(ch):.3f}", f"{deg(cp):.3f}", f"{deg(cr):.3f}", f"{deg(th):.2f}"])
             csv_file.flush()
         time.sleep(period)
 
