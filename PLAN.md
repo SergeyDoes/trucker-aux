@@ -213,7 +213,7 @@ Done: 138 unit tests pass; the map checked in the app with a fake truck and the 
 
 ### E2.20 — new models get a key; no preset names in the map ✓
 Done: 142 unit tests pass; checked in the app with a fake truck (a new model got its key, the map shows marks).
-- A model seen for the first time without a key of its own (none for the model, its chassis or vehicles, no shared file for it) gets one at once: a copy of what it would inherit (the brand's, the game's or all vehicles' preset), named after it (`adoptNewModel`). Wider presets act as templates; each model has its own preset to tune.
+- A model seen for the first time without a key of its own (none for the model, its chassis or vehicles, no shared file for it) gets one at once: a copy of what it would inherit (the brand's, the game's or all vehicles' preset), named after it (`adoptNewModel`). Wider presets act as templates; each model has its own preset to tune. It gets the label "new", so it stands out in the key tree until you give it a label of your own.
 - The map's tree shows a "preset" or "shared file" mark beside a key instead of the preset's name; names are in the right pane only. The list, the Name field, Export and Unassigned stay as they were (the user's choice).
 
 ### E2.21 — the key tree as a standing panel; undo ✓

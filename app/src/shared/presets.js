@@ -203,6 +203,8 @@ export function deletePreset(store, key) {
   return { ...store, presets, assignments };
 }
 
+export const NEW_LABEL = 'new';
+
 // A model seen for the first time without a key of its own (none for the model, its chassis
 // or its vehicles, and no shared file for it) gets one: a copy of what it would inherit
 // (the brand's, the game's or all vehicles' preset), named after it. From then on the model
@@ -217,7 +219,8 @@ export function adoptNewModel(store, truck) {
   const key = freePresetKey(store.presets);
   return {
     ...store,
-    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck) } },
+    // Labelled "new" so it stands out in the key tree until you give it a label of your own.
+    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck), label: NEW_LABEL } },
     assignments: { ...store.assignments, [truck.key]: key },
   };
 }

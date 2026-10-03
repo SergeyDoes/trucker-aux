@@ -609,6 +609,7 @@ test('adoptNewModel: a model seen without a key of its own gets a copy of what i
   assert.equal(adopted.assignments[TRUCK.key], 'p.3');
   assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
   assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
+  assert.equal(at(adopted, TRUCK.key).label, 'new'); // stands out in the tree until labelled
   assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
   assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
   assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
