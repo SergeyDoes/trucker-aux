@@ -7,13 +7,50 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "test:engine": "electron scripts/engine-check.js"
+    "test:engine": "electron scripts/engine-check.js",
+    "dist": "electron-builder --win zip --x64"
   },
   "dependencies": {
     "koffi": "^3.3.2",
     "three": "^0.186.1"
   },
   "devDependencies": {
-    "electron": "^44.5.1"
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "description": "Spatial car audio for ATS/ETS2: music from virtual speakers in the cab, turning with the head",
+  "author": "SergeyDoes",
+  "build": {
+    "appId": "com.sergeydoes.trucker-aux",
+    "productName": "Trucker AUX",
+    "directories": {
+      "output": "out"
+    },
+    "files": [
+      "src/**",
+      "package.json",
+      "!**/node_modules/@koromix/koffi-{linux,darwin,freebsd,openbsd,android}-*{,/**}",
+      "!**/node_modules/koffi/{doc,src/koffi/src,lib,vendor}{,/**}",
+      {
+        "from": "node_modules/three/examples/jsm/controls",
+        "to": "node_modules/three/examples/jsm/controls",
+        "filter": [
+          "OrbitControls.js"
+        ]
+      }
+    ],
+    "extraFiles": [
+      {
+        "from": "presets",
+        "to": "presets"
+      }
+    ],
+    "win": {
+      "target": [
+        "zip"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "${productName}-${version}-win-x64.${ext}"
+    }
   }
 }

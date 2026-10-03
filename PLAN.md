@@ -199,7 +199,10 @@ Done: 137 unit tests pass; checked in a sandbox (a type change renames, "+ Pair"
 - Optional: cabin reverb (`ConvolverNode`), muting by speed.
 
 ### E4 — packaging
-- electron-builder portable build (data folder next to the exe).
+- electron-builder build, `npm run dist` → `out/Trucker AUX-<version>-win-x64.zip` (a folder, not the self-extracting "portable" exe: `presets/` ships next to `Trucker AUX.exe` and `data/` is created there). First build done from Linux; the packaged UI checked in a Linux build of the same config.
+  - Electron-builder drops `examples/` folders from `node_modules`, so `three/examples/jsm/controls/OrbitControls.js` is added as a file set; without it the 3D view fails in the build only.
+  - Building on Linux or a Mac: koffi's Windows binary is an optional package installed only on Windows; first `npm install --no-save --force @koromix/koffi-win32-x64@<koffi version>`. Other platforms' koffi binaries are excluded from the package.
+  - Still to do: an icon and exe metadata (`signAndEditExecutable: false` for now, as rcedit needs Wine on Linux; a build on Windows can turn it on), code signing (SmartScreen warns on unsigned exes), a build on Windows or in CI.
 - `docs/audio-setup.md`: a virtual audio device (VB-Cable, VAC, Steam Streaming Speakers); both cable sides and the headphones at one rate; VB-Cable: Max Latency 7168, Internal SR at that rate; VAC trial mixes a "trial" voice in; Steam may reinstall or hold its driver (Remote Play); stereo headphones without virtual surround, player routed to the cable's input, `scs-telemetry.dll` in `<game>\bin\win_x64\plugins\`.
 
 ## Repository layout
