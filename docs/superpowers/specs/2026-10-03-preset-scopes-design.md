@@ -161,7 +161,7 @@ An overlay, not a second window: the state lives in the renderer, and a window w
    - laid out like the registry editor (the user's request): keys in a tree on the left with folders and expand / collapse, the selected key on the right. A key with its own preset is bold (an override, as in Unity prefabs), a shared file's italic, an inherited one grey with the name it inherits;
    - every model driven gets its key, with the chassis and your vehicles seen (`vehicles[id].chassis`, `.plates: { plate: hook }`); a vehicle sits under its chassis;
    - the right pane: what the key plays (set here, a shared file, or inherited from which key), "Pick in the list", "Set preset" (any of yours or a file, `planAssign`), "Move this preset" up its chain (`chainOf`) or down to a key under it (`planMove`), "Unassign"; all with the card's dialogs, and without the game;
-   - no guesses: a model whose game is not known (not driven since presets got scopes) sits under "Recently Added", which is no scope.
+   - no guesses: a model whose game is not known (not driven since presets got scopes) sits under "Game not known yet (drive a vehicle once)", which is no scope.
 
 ## Open questions
 

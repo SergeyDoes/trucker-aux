@@ -207,7 +207,7 @@ Done: 137 unit tests pass; the card driven in the app with a fake truck (`TRUCKE
 Done: 138 unit tests pass; the map checked in the app with a fake truck and the shipped collection (open, pick, Unassign, Esc).
 - "Preset map" under the preset list opens a tree over the views: all vehicles > game > brand > model > chassis > vehicle, every scope that holds a preset or a shared file, their parents and the chain of the vehicle in the game (●, ▶ what plays). A scope without its own shows what it inherits, grey. Clicking a preset picks it in the list; Unassign frees a scope. Below: Unassigned presets and files for no vehicle.
 - Reworked on the user's request like the registry editor: a tree of keys (folders, expand / collapse) and the selected key's pane. Bold: a preset set on the key (an override, as in Unity); italic: a shared file; grey: inherited. Every model driven gets its key with the chassis and your vehicles seen (`vehicles[id].chassis`, `.plates`). The pane: Pick in the list, Set preset (`planAssign`), Move this preset up or down (`planMove`), Unassign; works without the game.
-- No guesses about games: a model not driven since the migration is under "Recently Added" until it is driven.
+- No guesses about games: a model not driven since the migration is under "Game not known yet (drive a vehicle once)" until it is driven.
 - Later: dragging a preset onto a node.
 
 ### E3 — polish

@@ -527,7 +527,7 @@ const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 // your vehicle (by plate). Every model you have driven gets its key, with the chassis and
 // vehicles seen; so do scopes that hold a preset or a shared file, and the vehicle in the game.
 // A model whose game is not known yet (not driven since presets got scopes) sits under
-// "Recently Added"; that folder is no scope (pseudo).
+// "Game not known yet (drive a vehicle once)"; that folder is no scope (pseudo).
 // Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
 //   own        { key, name, file } the preset or file at this key, or null
 //   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
@@ -568,7 +568,7 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     return nodes.get(scope);
   };
   const root = node(ALL_SCOPE, 'All vehicles', null);
-  const gameNode = (game) => (game ? node(`game:${game}`, GAME_NAMES[game] ?? game, root) : node('?recent', 'Recently Added', root));
+  const gameNode = (game) => (game ? node(`game:${game}`, GAME_NAMES[game] ?? game, root) : node('?unknown', 'Game not known yet (drive a vehicle once)', root));
   const modelNode = (model) => {
     const { game, brand } = placeOf(store, model, truck);
     let parent = gameNode(game);

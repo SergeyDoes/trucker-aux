@@ -521,13 +521,13 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
     '    Scania (Default layout)',
     '      Scania R (Default layout)',
     '        AB-1 = My Scania',
-    '  Recently Added (Default layout)',
+    '  Game not known yet (drive a vehicle once) (Default layout)',
     '    Anthem = Anthem',
   ]);
   const sleeper = map.root.children[0].children[0].children[0].children[1];
   assert.deepEqual(sleeper.children[0].inherited, { key: 'p.2', name: 'Sleeper', from: 'hook 3.2 m' });
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
-  assert.equal(map.root.children.at(-1).pseudo, true); // Recently Added is no scope
+  assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
   assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare' }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
   // A model not driven goes up only to all vehicles: its game is not known.
@@ -543,7 +543,7 @@ test('planAssign: one of your presets put at a key of the map', () => {
   assert.equal(done.assignments[TRUCK.key], 'p.1');
   assert.deepEqual(scopesOf(done, 'p.1'), [TRUCK.key, 'all']);
   assert.equal(planAssign(done, 'p.1', TRUCK.key), null);
-  assert.equal(planAssign(done, 'p.1', '?recent'), null);
+  assert.equal(planAssign(done, 'p.1', '?unknown'), null);
 });
 
 test('planMove: moving a preset in the map, up its chain or down to a narrower scope', () => {
