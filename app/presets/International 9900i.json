@@ -4,6 +4,8 @@
   "vehicle": "vehicle.intnational.9900i",
   "vehicleName": "International 9900i",
   "game": "ats",
+  "brand": "intnational",
+  "brandName": "International",
   "layout": {
     "width": 1,
     "bounds": {

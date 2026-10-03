@@ -4,6 +4,8 @@
   "vehicle": "vehicle.kenworth.t680@1.3",
   "vehicleName": "Kenworth T680 2014",
   "game": "ats",
+  "brand": "kenworth",
+  "brandName": "Kenworth",
   "layout": {
     "width": 1,
     "bounds": {

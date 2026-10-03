@@ -4,6 +4,8 @@
   "vehicle": "vehicle.peterbilt.389@2.6",
   "vehicleName": "Peterbilt 389",
   "game": "ats",
+  "brand": "peterbilt",
+  "brandName": "Peterbilt",
   "layout": {
     "width": 1,
     "bounds": {

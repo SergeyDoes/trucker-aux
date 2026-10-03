@@ -4,6 +4,8 @@
   "vehicle": "vehicle.ford.f150_23",
   "vehicleName": "Ford F150 2023",
   "game": "ats",
+  "brand": "ford",
+  "brandName": "Ford",
   "layout": {
     "width": 1,
     "bounds": {

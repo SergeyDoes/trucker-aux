@@ -4,6 +4,8 @@
   "vehicle": "vehicle.westernstar.49x@1.5",
   "vehicleName": "Western Star 49X",
   "game": "ats",
+  "brand": "westernstar",
+  "brandName": "Western Star",
   "layout": {
     "width": 1,
     "bounds": {
