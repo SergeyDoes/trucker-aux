@@ -158,8 +158,10 @@ An overlay, not a second window: the state lives in the renderer, and a window w
 3. The preset map. **Done** (`presetTree`, `renderer/preset-map.js`): an overlay over the views and the 3D view, opened with "Preset map" under the preset list; Esc or Close shuts it, and while it is open the speaker keys do nothing (the views are hidden). Also:
    - the vehicle in the game sits under its chassis; other single vehicles under their model (their chassis is not known);
    - models from shared files are named by the files' `vehicleName`; a brand never driven by its id with a capital letter;
-   - each preset of yours in the map has "Move…": up its chain (`chainOf`) or down to a scope shown under it (`planMove`), with the card's dialogs. Moving works without the game;
-   - a model not driven since version 3 gets its brand from its id and its game from other models of that brand, else from the one game of everything driven; otherwise it sits under "Game not known yet", grouped by brand (no scopes there).
+   - laid out like the registry editor (the user's request): keys in a tree on the left with folders and expand / collapse, the selected key on the right. A key with its own preset is bold (an override, as in Unity prefabs), a shared file's italic, an inherited one grey with the name it inherits;
+   - every model driven gets its key, with the chassis and your vehicles seen (`vehicles[id].chassis`, `.plates: { plate: hook }`); a vehicle sits under its chassis;
+   - the right pane: what the key plays (set here, a shared file, or inherited from which key), "Pick in the list", "Set preset" (any of yours or a file, `planAssign`), "Move this preset" up its chain (`chainOf`) or down to a key under it (`planMove`), "Unassign"; all with the card's dialogs, and without the game;
+   - no guesses: a model whose game is not known (not driven since presets got scopes) sits under "Recently Added", which is no scope.
 
 ## Open questions
 

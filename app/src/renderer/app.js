@@ -12,7 +12,7 @@ import {
 } from '../shared/selection.js';
 import {
   adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
-  planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
+  planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
@@ -418,6 +418,14 @@ const actions = {
   async moveInMap(from, to) {
     await moveInMap(from, to);
   },
+  // Set preset in the map: one of your presets (or a file) on that key, asking first when it
+  // takes the key from another.
+  async assignInMap(scope, key) {
+    const plan = planAssign(state.store, key, scope);
+    if (!plan) return render();
+    const name = state.store.presets[key]?.name ?? state.store.collection?.[key]?.name ?? key;
+    return carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), name, false);
+  },
   // Unassign in the map: frees that scope; the preset stays.
   unassignScope(scope) {
     const before = speakerIds();
@@ -579,7 +587,13 @@ import('./overview3d.js')
   });
 
 function render() {
-  if (presetMap.open) presetMap.update(presetTree(state.store, state.truck, state.selection));
+  if (presetMap.open) {
+    const presets = [
+      ...Object.entries(state.store.presets).map(([key, l]) => ({ key, label: l.name })),
+      ...Object.values(state.store.collection ?? {}).map((e) => ({ key: e.key, label: `${e.name} (collection)` })),
+    ].sort((x, y) => x.label.localeCompare(y.label));
+    presetMap.update(presetTree(state.store, state.truck, state.selection), presets);
+  }
   const current = playing();
   const { layout } = current;
   const { ids } = state.picked;

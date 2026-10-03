@@ -140,7 +140,8 @@ export const ALL_SCOPE = 'all';
 //   presets      { "p.N": layout }
 //   assignments  { scope: preset key or "file:…" } — "all", "game:ats", "brand:ats/peterbilt",
 //                a model "<truck id>", a chassis "<truck id>@<hook>", a vehicle "<truck id>#<plate>"
-//   vehicles     { "<truck id>": { name, game, brand, brandName } } learned in the game
+//   vehicles     { "<truck id>": { name, game, brand, brandName, chassis: [hook], plates: { plate: hook } } }
+//                learned in the game: every model driven, its chassis and your own vehicles
 // Older files are converted: version 1 to 2 (coordinates), then 2 to 3 (migrateV2).
 export function normalizeStore(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
@@ -176,6 +177,12 @@ function normalizeV3(src) {
       if (!id || !v || typeof v !== 'object') continue;
       const info = Object.fromEntries(['name', 'game', 'brand', 'brandName'].map((k) => [k, text(v[k]) || null]));
       if (info.game !== 'ats' && info.game !== 'ets2') info.game = null;
+      // Chassis seen (fifth-wheel positions) and your own vehicles of the model (plate -> chassis).
+      info.chassis = Array.isArray(v.chassis) ? [...new Set(v.chassis.filter((c) => typeof c === 'string' && c))].sort() : [];
+      info.plates = {};
+      if (v.plates && typeof v.plates === 'object') {
+        for (const [plate, hook] of Object.entries(v.plates)) if (plate) info.plates[plate] = typeof hook === 'string' && hook ? hook : null;
+      }
       vehicles[id] = info;
     }
   }
@@ -259,7 +266,7 @@ function migratedVehicles(trucks) {
     }
     if (!names[model] || rank < names[model].rank) names[model] = { name, rank };
   }
-  return Object.fromEntries(Object.entries(names).map(([id, { name }]) => [id, { name, game: null, brand: null, brandName: null }]));
+  return Object.fromEntries(Object.entries(names).map(([id, { name }]) => [id, { name, game: null, brand: null, brandName: null, chassis: [], plates: {} }]));
 }
 
 const withSpeakers = (layout, speakers) => ({ ...layout, speakers });

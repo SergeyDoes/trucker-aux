@@ -180,13 +180,22 @@ export function deletePreset(store, key) {
 export function rememberVehicle(store, truck) {
   if (!truck) return store;
   const known = store.vehicles?.[truck.key] ?? {};
+  const chassis = known.chassis ?? [];
+  const plates = known.plates ?? {};
   const info = {
     name: truck.name || known.name || null,
     game: truck.game ?? known.game ?? null,
     brand: truck.brand ?? known.brand ?? null,
     brandName: truck.brandName ?? known.brandName ?? null,
+    chassis: truck.variant && !chassis.includes(truck.variant) ? [...chassis, truck.variant].sort() : chassis,
+    // A quick job lends a truck with a random plate: not one of yours.
+    plates: truck.plate && !truck.quickJob && plates[truck.plate] !== (truck.variant ?? null)
+      ? { ...plates, [truck.plate]: truck.variant ?? null }
+      : plates,
   };
-  if (Object.keys(info).every((k) => info[k] === (known[k] ?? null))) return store;
+  const same = ['name', 'game', 'brand', 'brandName'].every((k) => info[k] === (known[k] ?? null))
+    && info.chassis === chassis && info.plates === plates && known.chassis;
+  if (same) return store;
   return { ...store, vehicles: { ...store.vehicles, [truck.key]: info } };
 }
 
@@ -253,32 +262,25 @@ function scopeOfKey(store, key, truck) {
 const EVERY = 'every vehicle without its own preset';
 const chassisScope = (truck) => (truck.variant ? `all ${truck.name} on this chassis` : `all ${truck.name}`);
 
-// Where a model belongs: { game, brand }. What the game said (the vehicle in it, or one
-// driven before), else the brand from the id ("vehicle.<brand>.<model>") and the game of
-// other models of that brand you have driven, else the one game of everything you have
-// driven. Null parts are not known. A guess is put right once the model is driven.
+// Where a model belongs: { game, brand }, as the game said (the vehicle in it, or when it
+// was driven). Null parts are not known: no guesses.
 function placeOf(store, model, truck) {
   if (truck?.key === model && (truck.game || truck.brand)) return { game: truck.game ?? null, brand: truck.brand ?? null };
   const known = store.vehicles?.[model];
-  const parts = model.split('.');
-  const brand = known?.brand ?? (parts.length === 3 && parts[0] === 'vehicle' ? parts[1] : null);
-  let game = known?.game ?? null;
-  if (!game && brand) {
-    const games = new Set(Object.values(store.vehicles ?? {}).filter((v) => v.brand === brand && v.game).map((v) => v.game));
-    if (truck?.brand === brand && truck.game) games.add(truck.game);
-    if (games.size === 1) [game] = games;
-  }
-  if (!game) {
-    const all = new Set(Object.values(store.vehicles ?? {}).map((v) => v.game).filter(Boolean));
-    if (truck?.game) all.add(truck.game);
-    if (all.size === 1) [game] = all;
-  }
-  return { game, brand };
+  return { game: known?.game ?? null, brand: known?.brand ?? null };
+}
+
+// The chassis of one of your vehicles ("<id>#<plate>"): the vehicle in the game's, else the
+// one it had when last driven (store.vehicles). Null when not known.
+function plateChassis(store, scope, truck) {
+  if (truck && plateKey(truck) === scope) return chassisKey(truck);
+  const model = modelOf(scope);
+  const hook = store.vehicles?.[model]?.plates?.[scope.slice(scope.indexOf('#') + 1)];
+  return hook ? `${model}@${hook}` : null;
 }
 
 // A scope and the wider ones it falls back to, narrowest first, as far as they are known:
-// a chassis's model, a model's brand and game (placeOf), all vehicles. A single vehicle's
-// chassis is known only for the vehicle in the game.
+// a vehicle's chassis, a chassis's model, a model's brand and game (placeOf), all vehicles.
 export function chainOf(store, scope, truck = null) {
   const level = levelOf(scope);
   if (level === 'all') return [ALL_SCOPE];
@@ -289,8 +291,7 @@ export function chainOf(store, scope, truck = null) {
   const wider = [model, game && brand && `brand:${game}/${brand}`, game && `game:${game}`, ALL_SCOPE].filter(Boolean);
   if (level === 'model') return wider;
   if (level === 'chassis') return [scope, ...wider];
-  const chassis = truck && plateKey(truck) === scope ? chassisKey(truck) : null;
-  return [scope, ...(chassis ? [chassis] : []), ...wider];
+  return [scope, ...(plateChassis(store, scope, truck) ? [plateChassis(store, scope, truck)] : []), ...wider];
 }
 
 // Moving your preset from one scope to another in the map: up its chain, or down to a scope
@@ -520,20 +521,20 @@ export function presetOptions(store, truck) {
   ];
 }
 
-// The preset map: every scope that holds a preset (yours or a shared file's), their parents
-// and the chain of the vehicle in the game, as a tree:
-//   all vehicles > game > brand > model > chassis and single vehicles.
-// Node: { scope, label, own, inherited, current, plays, children }
-//   own        { key, name, file } the preset or file at this scope, or null
-//   inherited  the name of what a node without its own falls back to (the nearest parent's)
-//   current    on the chain of the vehicle in the game; plays: the scope whose preset plays
-// A model whose game is not known yet (not driven since version 3, nor any of its brand)
-// sits under "Game not known yet", grouped by the brand from its id; those two are no
-// scopes (pseudo). Each preset of yours gets moveTo: the scopes it can move to, wider ones
-// up its chain, then narrower ones shown under it. Also gives the unassigned presets and
-// the files that apply nowhere.
 const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 
+// The preset map, laid out like registry keys: all vehicles > game > brand > model > chassis >
+// your vehicle (by plate). Every model you have driven gets its key, with the chassis and
+// vehicles seen; so do scopes that hold a preset or a shared file, and the vehicle in the game.
+// A model whose game is not known yet (not driven since presets got scopes) sits under
+// "Recently Added"; that folder is no scope (pseudo).
+// Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
+//   own        { key, name, file } the preset or file at this key, or null
+//   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
+//   current    on the chain of the vehicle in the game; plays: the key whose preset plays
+//   moveTo     for a preset of yours: [{ value, label }] wider keys up its chain, then the
+//              keys under it
+// Also gives the unassigned presets and the files that apply nowhere.
 export function presetTree(store, truck, selection = { mode: 'auto' }) {
   const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
   const ownAt = (scope) => {
@@ -542,16 +543,24 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     const file = files.find((e) => e.vehicle === scope);
     return file ? { key: file.key, name: file.name, file: true } : null;
   };
+  // Every key to show: the vehicles driven with their chassis and plates, scopes with
+  // presets or files, and the vehicle in the game.
   const scopes = new Set([ALL_SCOPE, ...Object.keys(store.assignments), ...files.map((e) => e.vehicle)]);
-  if (truck) for (const r of scopeLadder(store, truck)) scopes.add(r.scope);
-  const chain = new Set(truck ? scopeLadder(store, truck).map((r) => r.scope) : [ALL_SCOPE]);
+  for (const [model, v] of Object.entries(store.vehicles ?? {})) {
+    scopes.add(model);
+    for (const hook of v.chassis ?? []) scopes.add(`${model}@${hook}`);
+    for (const plate of Object.keys(v.plates ?? {})) scopes.add(`${model}#${plate}`);
+  }
+  const ladder = truck ? scopeLadder(store, truck) : [];
+  for (const r of ladder) scopes.add(r.scope);
+  const chain = new Set(truck ? ladder.map((r) => r.scope) : [ALL_SCOPE]);
   const auto = truck && selection.mode === 'auto' ? autoPreset(store, truck) : null;
   const playsAt = auto && chain.has(auto.scope) ? auto.scope : null;
 
   const nodes = new Map();
   const node = (scope, label, parent) => {
     if (!nodes.has(scope)) {
-      const pseudo = scope.includes('?');
+      const pseudo = scope.startsWith('?');
       nodes.set(scope, {
         scope, label, pseudo, own: pseudo ? null : ownAt(scope), inherited: null, current: chain.has(scope), plays: scope === playsAt, children: [], parent,
       });
@@ -559,29 +568,25 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     return nodes.get(scope);
   };
   const root = node(ALL_SCOPE, 'All vehicles', null);
-  const gameNode = (game) => (game ? node(`game:${game}`, GAME_NAMES[game] ?? game, root) : node('game:?', 'Game not known yet (drive a vehicle once)', root));
-  // A brand of a game not known yet groups its models, but is no scope (brands are per game).
-  const brandNode = (game, brand) => {
-    if (!brand) return gameNode(game);
-    if (!game) return node(`brand:?/${brand}`, brandName(store, null, brand, truck), gameNode(null));
-    return node(`brand:${game}/${brand}`, brandName(store, game, brand, truck), gameNode(game));
-  };
+  const gameNode = (game) => (game ? node(`game:${game}`, GAME_NAMES[game] ?? game, root) : node('?recent', 'Recently Added', root));
   const modelNode = (model) => {
     const { game, brand } = placeOf(store, model, truck);
-    return node(model, modelName(store, model, truck), brandNode(game, brand));
+    let parent = gameNode(game);
+    if (game && brand) parent = node(`brand:${game}/${brand}`, brandName(store, game, brand, truck), parent);
+    return node(model, modelName(store, model, truck), parent);
   };
   for (const scope of [...scopes].sort(byLevel).reverse()) {
     const level = levelOf(scope);
     if (level === 'game') gameNode(scope.slice(5));
     else if (level === 'brand') {
       const [game, brand] = scope.slice(6).split('/');
-      brandNode(game, brand);
+      node(scope, brandName(store, game, brand, truck), gameNode(game));
     } else if (level === 'model') modelNode(scope);
     else if (level === 'chassis') node(scope, `hook ${scope.slice(scope.indexOf('@') + 1)} m`, modelNode(modelOf(scope)));
     else if (level === 'vehicle') {
-      // The vehicle in the game sits under its chassis; others' chassis is not known.
-      const parent = truck && scope === plateKey(truck) && chassisKey(truck) ? nodes.get(chassisKey(truck)) : null;
-      node(scope, scope.slice(scope.indexOf('#') + 1), parent ?? modelNode(modelOf(scope)));
+      const chassis = plateChassis(store, scope, truck);
+      const parent = chassis ? node(chassis, `hook ${chassis.slice(chassis.indexOf('@') + 1)} m`, modelNode(modelOf(scope))) : modelNode(modelOf(scope));
+      node(scope, scope.slice(scope.indexOf('#') + 1), parent);
     }
   }
   for (const n of nodes.values()) {
@@ -590,14 +595,14 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   const below = (n) => n.children.flatMap((c) => [...(c.pseudo ? [] : [c]), ...below(c)]);
   const finish = (n, inherited) => {
     n.inherited = n.own ? null : inherited;
-    n.children.sort((a, b) => MAP_ORDER.indexOf(levelOf(a.scope)) - MAP_ORDER.indexOf(levelOf(b.scope)) || a.label.localeCompare(b.label));
-    for (const c of n.children) finish(c, n.own?.name ?? inherited);
-    if (n.own && !n.own.file) {
-      n.moveTo = [
-        ...chainOf(store, n.scope, truck).slice(1).map((s) => ({ value: s, label: `↑ ${scopeLabel(store, s, truck)}` })),
-        ...below(n).map((c) => ({ value: c.scope, label: `↓ ${scopeLabel(store, c.scope, truck)}` })),
-      ];
-    }
+    n.children.sort((a, b) => MAP_ORDER.indexOf(levelOf(a.scope)) - MAP_ORDER.indexOf(levelOf(b.scope))
+      || Number(a.pseudo) - Number(b.pseudo) || a.label.localeCompare(b.label));
+    const passOn = n.own ? { key: n.own.key, name: n.own.name, from: n.label } : inherited;
+    for (const c of n.children) finish(c, passOn);
+    n.moveTo = n.own && !n.own.file ? [
+      ...chainOf(store, n.scope, truck).slice(1).map((s) => ({ value: s, label: `↑ ${scopeLabel(store, s, truck)}` })),
+      ...below(n).map((c) => ({ value: c.scope, label: `↓ ${scopeLabel(store, c.scope, truck)}` })),
+    ] : [];
     delete n.parent;
     return n;
   };
@@ -609,6 +614,17 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     files: Object.values(store.collection ?? {}).filter((e) => !e.vehicle && !used.has(e.key))
       .map((e) => ({ key: e.key, name: collectionLabel(e) })).sort((a, b) => a.name.localeCompare(b.name)),
   };
+}
+
+// Puts one of your presets (or a file) at a key of the map, as "Use it in" does on the card.
+// A plan for applyScope (mode 'use'), or null when it is there already.
+export function planAssign(store, key, to) {
+  if (store.assignments[to] === key || to.startsWith('?')) return null;
+  const holder = store.assignments[to];
+  const taken = holder
+    ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
+    : null;
+  return { mode: 'use', key, from: null, to, direction: null, mustCopy: false, taken, shadow: [], fallback: null, outplayed: null };
 }
 
 // The preset that plays as a file to share (collection.js): { fileName, data }, or null

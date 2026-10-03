@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
-  levelOf, ownPreset, parseSelection, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
+  levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
@@ -167,8 +167,15 @@ test('createPreset copies a layout into an unassigned preset with a free key and
 
 test('rememberVehicle keeps the name, game and brand of a model; scopes are named from them', () => {
   const store = rememberVehicle(storeWith(), TRUCK);
-  assert.deepEqual(store.vehicles[TRUCK.key], { name: 'International 9900i', game: 'ats', brand: 'international', brandName: 'International' });
+  assert.deepEqual(store.vehicles[TRUCK.key], {
+    name: 'International 9900i', game: 'ats', brand: 'international', brandName: 'International', chassis: [], plates: {},
+  });
   assert.equal(rememberVehicle(store, TRUCK), store); // nothing new
+  // The chassis seen, and your own vehicles with their chassis; a quick job's plate is not yours.
+  const driven = rememberVehicle(rememberVehicle(rememberVehicle(store, OWNED), SHORT), LENT);
+  assert.deepEqual(driven.vehicles[TRUCK.key].chassis, ['2.1', '3.2']);
+  assert.deepEqual(driven.vehicles[TRUCK.key].plates, { 'WP-83695': '3.2' });
+  assert.equal(rememberVehicle(driven, OWNED), driven);
   assert.equal(rememberVehicle(store, { ...TRUCK, game: null }).vehicles[TRUCK.key].game, 'ats'); // an older plugin forgets nothing
   assert.equal(scopeLabel(store, 'all'), 'all vehicles');
   assert.equal(scopeLabel(store, 'game:ats'), 'all ATS vehicles');
@@ -480,19 +487,22 @@ test('exportPreset: the preset that plays as a file to share', () => {
   assert.equal('vehicleName' in exportPreset(chassisOnly, 'p.2', null).data, false);
 });
 
-// The map, as text: "label = own" or "label (inherited)", ● on the vehicle's chain, ▶ what plays.
+// The map, as text: "label = own" (bold in the app) or "label (inherited)", ● on the
+// vehicle's chain, ▶ what plays.
 const lines = (node, depth = 0) => [
-  `${'  '.repeat(depth)}${node.plays ? '▶ ' : node.current ? '● ' : ''}${node.label}${node.own ? ` = ${node.own.name}${node.own.file ? ' (file)' : ''}` : ` (${node.inherited})`}`,
+  `${'  '.repeat(depth)}${node.plays ? '▶ ' : node.current ? '● ' : ''}${node.label}${node.own ? ` = ${node.own.name}${node.own.file ? ' (file)' : ''}` : ` (${node.inherited?.name})`}`,
   ...node.children.flatMap((c) => lines(c, depth + 1)),
 ];
 
-test('presetTree: scopes with presets, their parents and the chain of the vehicle in the game', () => {
+test('presetTree: registry-like keys for every vehicle driven, scopes with presets and the vehicle in the game', () => {
   let store = storeWith({
     [variantKey(SLEEPER)]: { name: 'Sleeper' },
     'brand:ats/peterbilt': { name: 'Petes' },
     'vehicle.scania.r#AB-1': { name: 'My Scania' },
+    'vehicle.mack.anthem': { name: 'Anthem' }, // a model not driven since presets got scopes
   }, [{ name: 'Spare' }]);
-  store = rememberVehicle(store, TRUCK);
+  store = rememberVehicle(store, OWNED); // driven before: the sleeper with its plate
+  store = rememberVehicle(store, OTHER); // a Peterbilt 579, no preset of its own
   store = rememberVehicle(store, { key: 'vehicle.scania.r', name: 'Scania R', game: 'ets2', brand: 'scania', brandName: 'Scania' });
   store = withCollection(store, MODEL_FILE, shared('loose.json', null));
   const map = presetTree(store, { ...SHORT, plate: 'X-1' });
@@ -504,42 +514,36 @@ test('presetTree: scopes with presets, their parents and the chain of the vehicl
     '        ● hook 2.1 m (model)',
     '          ● X-1 (model)',
     '        hook 3.2 m = Sleeper',
+    '          WP-83695 (Sleeper)',
     '    Peterbilt = Petes',
+    '      Peterbilt 579 (Petes)',
     '  ETS2 (Default layout)',
     '    Scania (Default layout)',
     '      Scania R (Default layout)',
     '        AB-1 = My Scania',
+    '  Recently Added (Default layout)',
+    '    Anthem = Anthem',
   ]);
-  assert.deepEqual(map.unassigned, [{ key: 'p.5', name: 'Spare' }]);
+  const sleeper = map.root.children[0].children[0].children[0].children[1];
+  assert.deepEqual(sleeper.children[0].inherited, { key: 'p.2', name: 'Sleeper', from: 'hook 3.2 m' });
+  assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
+  assert.equal(map.root.children.at(-1).pseudo, true); // Recently Added is no scope
+  assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare' }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
-  // Without a game: only what holds presets. A model not driven yet is grouped by the brand
-  // from its id, under "Game not known yet", unless another model of that brand was driven.
-  const unknown = presetTree(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' }, 'vehicle.international.lonestar': { name: 'LS' } }, []), null);
-  assert.deepEqual(lines(unknown.root), [
-    '● All vehicles = Default layout',
-    '  Game not known yet (drive a vehicle once) (Default layout)',
-    '    International (Default layout)',
-    '      LS = LS',
-    '    Mack (Default layout)',
-    '      Anthem = Anthem',
-  ]);
-  const learned = presetTree(rememberVehicle(storeWith({ 'vehicle.international.lonestar': { name: 'LS' } }), TRUCK), null);
-  assert.deepEqual(lines(learned.root).slice(1), [
-    '  ATS (Default layout)',
-    '    International (Default layout)',
-    '      LS = LS',
-  ]);
-  // Everything driven so far is from one game: models not driven are taken to be from it too.
-  const oneGame = presetTree(rememberVehicle(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' } }), TRUCK), null);
-  assert.deepEqual(lines(oneGame.root).slice(1), ['  ATS (Default layout)', '    Mack (Default layout)', '      Anthem = Anthem']);
-  // A preset of yours can move up its chain or down to scopes shown under it.
-  assert.deepEqual(map.root.moveTo.map((o) => o.label), [
-    '↓ all ATS vehicles', '↓ all International', '↓ International 9900i', '↓ International 9900i, hook 2.1 m',
-    '↓ International 9900i, X-1', '↓ International 9900i, hook 3.2 m', '↓ all Peterbilt', '↓ all ETS2 vehicles',
-    '↓ all Scania', '↓ Scania R', '↓ Scania R, AB-1',
-  ]);
-  const sleeperNode = map.root.children[0].children[0].children[0].children.find((n) => n.label === 'hook 3.2 m');
-  assert.deepEqual(sleeperNode.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all']);
+  // A model not driven goes up only to all vehicles: its game is not known.
+  const anthem = map.root.children.at(-1).children[0];
+  assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
+});
+
+test('planAssign: one of your presets put at a key of the map', () => {
+  const store = withPreset();
+  const plan = planAssign(store, 'p.1', TRUCK.key);
+  assert.deepEqual(plan.taken, { key: 'p.2', name: 'International 9900i', keeps: false });
+  const done = applyScope(store, plan, null);
+  assert.equal(done.assignments[TRUCK.key], 'p.1');
+  assert.deepEqual(scopesOf(done, 'p.1'), [TRUCK.key, 'all']);
+  assert.equal(planAssign(done, 'p.1', TRUCK.key), null);
+  assert.equal(planAssign(done, 'p.1', '?recent'), null);
 });
 
 test('planMove: moving a preset in the map, up its chain or down to a narrower scope', () => {

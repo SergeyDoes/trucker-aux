@@ -99,7 +99,10 @@ test('normalizeStore keeps assignments to presets that exist and to shared files
     vehicles: { 'vehicle.x': { name: 'X', game: 'ats', brand: 'x', brandName: 'X' }, 'vehicle.q': { name: 'Q', game: 'gta' } },
   });
   assert.deepEqual(store.assignments, { all: 'p.1', 'vehicle.x@3.2': 'p.2', 'vehicle.z': 'file:z.json' });
-  assert.deepEqual(store.vehicles['vehicle.q'], { name: 'Q', game: null, brand: null, brandName: null });
+  assert.deepEqual(store.vehicles['vehicle.q'], { name: 'Q', game: null, brand: null, brandName: null, chassis: [], plates: {} });
+  const seen = normalizeStore({ version: STORE_VERSION, vehicles: { 'vehicle.x': { chassis: ['3.2', '2.1', '3.2', 4], plates: { 'WP-1': '3.2', 'A-2': 7 } } } });
+  assert.deepEqual(seen.vehicles['vehicle.x'].chassis, ['2.1', '3.2']);
+  assert.deepEqual(seen.vehicles['vehicle.x'].plates, { 'WP-1': '3.2', 'A-2': null });
   // All vehicles never plays a file: a missing file would leave nothing to play.
   assert.equal(normalizeStore({ version: STORE_VERSION, assignments: { all: 'file:a.json' } }).assignments.all, 'p.1');
 });
