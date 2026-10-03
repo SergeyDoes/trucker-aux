@@ -140,8 +140,6 @@ export function createPanel(root, actions) {
     title: 'Copy the current layout into a new preset and switch to it. Auto never picks it: choose it in the list.',
   });
   const deletePreset = el('button', { textContent: 'Delete preset' });
-  const mapButton = el('button', { textContent: 'Preset map', title: 'All your presets and what plays where' });
-  mapButton.onclick = () => actions.toggleMap();
   // Shared presets: one file each in presets/, listed under Collection (collection.js).
   const exportButton = el('button', { textContent: 'Export' });
   const EXPORT_TITLE = 'Save this preset as a file in the presets folder to share it. Files in that folder show up under Collection.';
@@ -235,7 +233,7 @@ export function createPanel(root, actions) {
       row('Preset', preset),
       truckCard,
       row('Name', presetName),
-      el('div', { className: 'inline buttons' }, [newPreset, deletePreset, exportButton, mapButton]),
+      el('div', { className: 'inline buttons' }, [newPreset, deletePreset, exportButton]),
       row('Stereo width', el('div', { className: 'inline' }, [width, widthValue])),
       el('p', { className: 'hint', textContent: '0 mono · 1 as recorded · 2 extra wide. Mono speakers are not affected.' }),
       el('label', {

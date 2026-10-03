@@ -1,5 +1,7 @@
 // Which layout plays and which one an edit goes to.
-// Selection: { mode: 'auto' } | { mode: 'truck', key } (a preset picked in the list).
+// Selection: { mode: 'auto' } | { mode: 'truck', key } (a preset picked in the list)
+//   | { mode: 'scope', scope } (a key picked in the preset map: what it plays; editing it
+//   gives the key a preset of its own first, if it inherits).
 // Truck: { key, variant, plate, quickJob, name, game, brand, brandName, centerX } from
 // telemetry, or null. Layouts are measured from the truck's axis, so one layout fits every truck.
 //
@@ -99,7 +101,24 @@ function ownsEdits(auto, truck) {
   return auto.how === 'vehicle' || auto.how === 'chassis' || (auto.how === 'model' && !truck.variant);
 }
 
+// What a key of the map plays: { key, at } its own preset or file, else what it inherits up
+// its chain (chainOf; a chassis or model also from a shared file for it).
+export function scopePreset(store, scope, truck = null) {
+  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  for (const at of chainOf(store, scope, truck)) {
+    const key = store.assignments[at];
+    if (key && presetLayout(store, key)) return { key, at };
+    const file = files.find((e) => e.vehicle === at);
+    if (file) return { key: file.key, at };
+  }
+  return { key: allPresetKey(store), at: ALL_SCOPE };
+}
+
 export function resolvePlaying(store, selection, truck) {
+  if (selection.mode === 'scope') {
+    const { key } = scopePreset(store, selection.scope, truck);
+    return { kind: kindOf(key), key, layout: presetLayout(store, key) };
+  }
   if (selection.mode === 'truck' && presetLayout(store, selection.key)) {
     return { kind: kindOf(selection.key), key: selection.key, layout: presetLayout(store, selection.key) };
   }
@@ -123,6 +142,18 @@ export function ownPreset(store, truck, scope = 'chassis') {
 
 export function routeEdit(store, selection, truck) {
   if (selection.mode === 'truck') return { store, key: selection.key };
+  if (selection.mode === 'scope') {
+    // A key of the map: its own preset, else a copy of what it inherits becomes its own.
+    const own = store.assignments[selection.scope];
+    if (own && store.presets[own]) return { store, key: own };
+    const { layout } = resolvePlaying(store, selection, truck);
+    const key = freePresetKey(store.presets);
+    const name = nameFor(store, selection.scope, truck, layout.name);
+    return {
+      store: { ...store, presets: { ...store.presets, [key]: { ...structuredClone(layout), name } }, assignments: { ...store.assignments, [selection.scope]: key } },
+      key,
+    };
+  }
   if (!truck) return { store, key: allPresetKey(store) };
   const auto = autoPreset(store, truck);
   if (ownsEdits(auto, truck)) return { store, key: auto.key };
@@ -472,6 +503,16 @@ export function truckStatus(store, selection, truck) {
     return { value: r.scope, label: `${r.label}${other}` };
   });
 
+  if (selection.mode === 'scope') {
+    // A key picked in the map: it plays what is set on it or what it inherits.
+    const label = scopeLabel(store, selection.scope, truck);
+    const { at } = scopePreset(store, selection.scope, truck);
+    const own = at === selection.scope && !isCollectionKey(playing.key);
+    let note = `Editing changes the preset of ${label}.`;
+    if (!own) note = `It inherits this from ${scopeLabel(store, at, truck)}: editing gives ${label} a preset of its own first.`;
+    return { ...base, plays: `${base.plays} (key picked in the map)`, appliesTo: selection.scope === ALL_SCOPE ? EVERY : label, note };
+  }
+
   if (selection.mode !== 'auto') {
     const file = playing.kind === 'collection' ? store.collection[playing.key].file : null;
     return {
@@ -525,7 +566,7 @@ const AUTO_NOTE = {
 
 // The preset list: Auto, your presets that apply somewhere by name, then the Unassigned
 // ones and the Collection.
-export function presetOptions(store, truck) {
+export function presetOptions(store, truck, selection = { mode: 'auto' }) {
   let auto = 'Auto — no game';
   if (truck) {
     const playing = autoPreset(store, truck);
@@ -539,8 +580,13 @@ export function presetOptions(store, truck) {
   const files = Object.values(store.collection ?? {})
     .map((entry) => ({ value: `truck:${entry.key}`, label: collectionLabel(entry) }))
     .sort(byLabel);
+  // A key picked in the map shows as an entry of its own.
+  const key = selection.mode === 'scope'
+    ? [{ value: selectionValue(selection), label: `Key: ${scopeLabel(store, selection.scope, truck)}` }]
+    : [];
   return [
     { value: 'auto', label: auto },
+    ...key,
     ...assigned.map(strip),
     ...(unassigned.length ? [{ group: 'Unassigned', options: unassigned.map(strip) }] : []),
     ...(files.length ? [{ group: 'Collection', options: files }] : []),
@@ -557,7 +603,8 @@ const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 // Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
 //   own        { key, name, file } the preset or file at this key, or null
 //   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
-//   current    on the chain of the vehicle in the game; plays: the key whose preset plays
+//   current    on the chain of the vehicle in the game; plays: the key whose preset plays in
+//              Auto; picked: the key picked in the map (selection mode 'scope')
 //   moveTo     for a preset of yours: [{ value, label }] wider keys up its chain, then the
 //              keys under it
 // Also gives the unassigned presets and the files that apply nowhere.
@@ -588,7 +635,8 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     if (!nodes.has(scope)) {
       const pseudo = scope.startsWith('?');
       nodes.set(scope, {
-        scope, label, pseudo, own: pseudo ? null : ownAt(scope), inherited: null, current: chain.has(scope), plays: scope === playsAt, children: [], parent,
+        scope, label, pseudo, own: pseudo ? null : ownAt(scope), inherited: null, current: chain.has(scope), plays: scope === playsAt,
+        picked: selection.mode === 'scope' && selection.scope === scope, children: [], parent,
       });
     }
     return nodes.get(scope);
@@ -677,9 +725,11 @@ export function exportPreset(store, key, truck) {
 }
 
 export function selectionValue(selection) {
+  if (selection.mode === 'scope') return `scope:${selection.scope}`;
   return selection.mode === 'truck' ? `truck:${selection.key}` : 'auto';
 }
 
 export function parseSelection(value) {
+  if (value.startsWith('scope:')) return { mode: 'scope', scope: value.slice('scope:'.length) };
   return value.startsWith('truck:') ? { mode: 'truck', key: value.slice('truck:'.length) } : { mode: 'auto' };
 }

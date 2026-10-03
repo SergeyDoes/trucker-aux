@@ -17,7 +17,7 @@ import {
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
-import { createPresetMap } from './preset-map.js';
+import { createKeyTree } from './key-tree.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -146,9 +146,50 @@ async function saveSettings() {
   }
 }
 
+// Undo / redo: snapshots of your presets and keys (the shared files are not yours to undo),
+// taken before each change. Changes of one kind in quick succession (a drag sends many edits)
+// make one step.
+const HISTORY_LIMIT = 100;
+const COALESCE_MS = 800;
+const history = { undo: [], redo: [], tag: null, at: 0 };
+const ownStore = () => {
+  const { collection, ...own } = state.store;
+  return structuredClone(own);
+};
+function remember(tag = null) {
+  const now = performance.now();
+  if (tag && tag === history.tag && now - history.at < COALESCE_MS) {
+    history.at = now;
+    return;
+  }
+  history.undo.push(ownStore());
+  if (history.undo.length > HISTORY_LIMIT) history.undo.shift();
+  history.redo = [];
+  history.tag = tag;
+  history.at = now;
+}
+function stepHistory(from, to) {
+  if (!from.length) return;
+  to.push(ownStore());
+  const before = playing().key;
+  state.store = { ...from.pop(), collection: state.store.collection };
+  history.tag = null;
+  if (state.selection.mode === 'truck' && !isCollectionKey(state.selection.key) && !state.store.presets[state.selection.key]) {
+    state.selection = { mode: 'auto' };
+  }
+  if (playing().key !== before) resetSession();
+  else {
+    state.picked = pruneSelection(state.picked, order());
+  }
+  syncEngine();
+  scheduleSave();
+  render();
+}
+
 // Every change to a layout goes through here: routing (with auto-created truck
 // presets), the engine and saving.
 function edit(change) {
+  remember('edit');
   // A shared file picked in the list is never changed: it becomes your own copy first.
   ({ store: state.store, selection: state.selection } = adoptPicked(state.store, state.selection));
   state.store = editLayout(state.store, state.selection, state.truck, change);
@@ -314,6 +355,7 @@ async function carryOut(plan, labelOf, name, inVehicle) {
     return false;
   }
   const before = speakerIds();
+  remember();
   state.store = applyScope(state.store, plan, truck, { copy: answer.button === 'copy', clear: answer.checked });
   afterScopeChange(before);
   return true;
@@ -385,6 +427,7 @@ const actions = {
   },
   // Copies what plays now into a new preset (not tied to a truck) and switches to it.
   newPreset() {
+    remember();
     const created = createPreset(state.store, playing().layout);
     state.store = created.store;
     state.selection = { mode: 'truck', key: created.key };
@@ -409,10 +452,31 @@ const actions = {
     if (await putAtScope(to)) state.selection = { mode: 'auto' };
     render();
   },
-  // The preset map over the views; open or closed, or the other way round.
-  toggleMap(open = !presetMap.open) {
-    presetMap.show(open);
+  // A key clicked in the preset map: it plays what it has or inherits; editing gives it its own.
+  selectScope(scope) {
+    state.selection = { mode: 'scope', scope };
+    resetSession();
+    syncEngine();
     render();
+  },
+  // The map's menu: the preset that plays now set on a key (shared), or a copy of it there.
+  async assignCurrent(scope) {
+    const { key, layout } = playing();
+    const plan = planAssign(state.store, key, scope);
+    if (!plan) return render();
+    return carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), layout.name, false);
+  },
+  async copyCurrent(scope) {
+    const { key, layout } = playing();
+    const plan = planAssign(state.store, key, scope)
+      ?? { mode: 'use', key, from: null, to: scope, direction: null, mustCopy: false, taken: null, shadow: [], fallback: null, outplayed: null };
+    return carryOut({ ...plan, mode: 'copy' }, (s) => scopeLabel(state.store, s, state.truck), layout.name, false);
+  },
+  undo() {
+    stepHistory(history.undo, history.redo);
+  },
+  redo() {
+    stepHistory(history.redo, history.undo);
   },
   // Move in the map: the preset of `from` up or down its chain, with the card's dialogs.
   async moveInMap(from, to) {
@@ -435,6 +499,7 @@ const actions = {
   // Unassign in the map: frees that scope; the preset stays.
   unassignScope(scope) {
     const before = speakerIds();
+    remember();
     state.store = unassign(state.store, scope);
     afterScopeChange(before);
   },
@@ -444,6 +509,7 @@ const actions = {
     const from = currentScope(state.store, state.selection, state.truck);
     if (!from) return;
     const before = speakerIds();
+    remember();
     state.store = unassign(state.store, from);
     afterScopeChange(before);
   },
@@ -463,6 +529,7 @@ const actions = {
       ? ` It applies to ${scopes.map((s) => scopeLabel(state.store, s, state.truck)).join('; ')}: those will play a wider preset.`
       : '';
     if (!confirm(`Delete the preset "${current.layout.name}"?${after}`)) return;
+    remember();
     state.store = deletePreset(state.store, current.key);
     state.selection = { mode: 'auto' };
     resetSession();
@@ -577,7 +644,7 @@ const actions = {
 };
 
 const panel = createPanel(document.getElementById('panel'), actions);
-const presetMap = createPresetMap(actions);
+const keyTree = createKeyTree(document.getElementById('tree'), actions);
 const views = createViews(document.getElementById('views'), actions);
 
 // three.js is loaded on demand; without it the app still works, only the 3D view is missing.
@@ -593,13 +660,10 @@ import('./overview3d.js')
   });
 
 function render() {
-  if (presetMap.open) {
-    const presets = [
-      ...Object.entries(state.store.presets).map(([key, l]) => ({ key, label: l.name })),
-      ...Object.values(state.store.collection ?? {}).map((e) => ({ key: e.key, label: `${e.name} (collection)` })),
-    ].sort((x, y) => x.label.localeCompare(y.label));
-    presetMap.update(presetTree(state.store, state.truck, state.selection), presets);
-  }
+  keyTree.update(
+    { ...presetTree(state.store, state.truck, state.selection), currentKey: playing().key },
+    { undo: history.undo.length, redo: history.redo.length },
+  );
   const current = playing();
   const { layout } = current;
   const { ids } = state.picked;
@@ -617,7 +681,7 @@ function render() {
     turnLook: state.settings.turnLook,
     pauseBehavior: state.settings.pauseBehavior,
     player: audio?.player ?? null,
-    presets: presetOptions(state.store, state.truck),
+    presets: presetOptions(state.store, state.truck, state.selection),
     card: truckStatus(state.store, state.selection, state.truck),
     preset: selectionValue(state.selection),
     canDelete: current.kind === 'preset' && current.key !== allPresetKey(state.store), // all vehicles' preset and files stay
@@ -727,6 +791,8 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 // Keyboard, outside text fields: arrows nudge the selection (Shift: 10 cm), Delete removes
 // it, Esc clears it; Ctrl+A / C / V / D select all, copy, paste, duplicate.
 const SHORTCUTS = {
+  z: (shift) => (shift ? actions.redo() : actions.undo()),
+  y: () => actions.redo(),
   a: () => actions.selectAll(),
   c: () => actions.copySelected(),
   v: () => actions.paste(),
@@ -734,15 +800,10 @@ const SHORTCUTS = {
 };
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof Element && event.target.closest('input, select, textarea')) return;
-  // The map hides the views: speaker keys would act unseen. Esc closes it.
-  if (presetMap.open) {
-    if (event.key === 'Escape') actions.toggleMap(false);
-    return;
-  }
   const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey && SHORTCUTS[event.key.toLowerCase()];
   if (shortcut) {
     event.preventDefault();
-    shortcut();
+    shortcut(event.shiftKey);
   } else if (event.key === 'Delete') {
     actions.deleteSelected();
   } else if (event.key === 'Escape') {

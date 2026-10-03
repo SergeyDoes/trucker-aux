@@ -70,7 +70,7 @@ function startPoseFeed(win) {
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 1280,
+    width: 1600,
     height: 800,
     title: 'Trucker AUX',
     webPreferences: { preload: path.join(here, 'preload.cjs') },

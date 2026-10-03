@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -620,4 +620,26 @@ test('adoptNewModel: a model seen without a key of its own gets a copy of what i
   const file = withCollection(storeWith(), SLEEPER_FILE);
   assert.equal(adoptNewModel(file, SHORT), file);
   assert.equal(adoptNewModel(store, null), store);
+});
+
+test('a key picked in the map: it plays what it has or inherits; editing gives it its own first', () => {
+  const store = rememberVehicle(storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } }), OWNED);
+  const KEY = { mode: 'scope', scope: variantKey(SLEEPER) };
+  assert.deepEqual(scopePreset(store, KEY.scope), { key: 'p.2', at: 'brand:ats/international' });
+  assert.equal(resolvePlaying(store, KEY, null).key, 'p.2');
+  assert.equal(truckStatus(store, KEY, null).note,
+    'It inherits this from all International: editing gives International 9900i, hook 3.2 m a preset of its own first.');
+  const edited = editLayout(store, KEY, null, widen);
+  assert.equal(at(edited, KEY.scope).width, 1.5);
+  assert.equal(at(edited, KEY.scope).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(edited, 'brand:ats/international').width, 0.4); // the brand's stays
+  assert.equal(truckStatus(edited, KEY, null).note, 'Editing changes the preset of International 9900i, hook 3.2 m.');
+  const again = editLayout(edited, KEY, null, (l) => setWidth(l, 0.2));
+  assert.equal(Object.keys(again.presets).length, Object.keys(edited.presets).length); // no second copy
+  // A plate's key inherits through its chassis; a shared file counts on the way.
+  assert.equal(scopePreset(edited, plateKey(OWNED)).at, KEY.scope);
+  assert.equal(scopePreset(withCollection(store, MODEL_FILE), plateKey(OWNED)).key, 'file:model.json');
+  // The list shows the key; values round-trip.
+  assert.equal(presetOptions(store, null, KEY)[1].label, 'Key: International 9900i, hook 3.2 m');
+  assert.deepEqual(parseSelection(selectionValue(KEY)), KEY);
 });

@@ -173,3 +173,4 @@ An overlay, not a second window: the state lives in the renderer, and a window w
 
 - **New models get a key** (`adoptNewModel`): a model seen without a key of its own (model, chassis, vehicle) and without a shared file gets a copy of what it would inherit, named after it. The brand's, game's and all vehicles' presets become templates for new models; Auto's ladder is unchanged.
 - **The map shows marks, not names:** "preset" (bold key) or "shared file" beside a key; the preset's name is in the right pane.
+- **The key tree is a standing panel** on the left; a key clicked plays what it has or inherits (selection mode `scope`), and editing it gives it a preset of its own first. The right-click menu sets or copies the preset that plays onto a key, or unassigns it. **Undo / redo** covers every change to presets and keys.

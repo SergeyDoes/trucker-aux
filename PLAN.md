@@ -216,6 +216,12 @@ Done: 142 unit tests pass; checked in the app with a fake truck (a new model got
 - A model seen for the first time without a key of its own (none for the model, its chassis or vehicles, no shared file for it) gets one at once: a copy of what it would inherit (the brand's, the game's or all vehicles' preset), named after it (`adoptNewModel`). Wider presets act as templates; each model has its own preset to tune.
 - The map's tree shows a "preset" or "shared file" mark beside a key instead of the preset's name; names are in the right pane only. The list, the Name field, Export and Unassigned stay as they were (the user's choice).
 
+### E2.21 — the key tree as a standing panel; undo ✓
+Done: 143 unit tests pass; checked in the app with a fake truck (pick a key, edit it, undo / redo with keys and buttons, the right-click menu, set the current preset on a vehicle and undo it).
+- The preset map is a standing panel on the left (`renderer/key-tree.js`; the overlay and its "Preset map" button are gone; the window opens 1600 px wide). Click a key: it plays what it has or inherits (selection `{ mode: 'scope', scope }`, "Key: …" in the list); editing a key that inherits gives it a preset of its own first (a copy of what it inherited). The tree opens to the vehicle in the game whenever another one comes.
+- Right-click a key: "Set the current preset here" (shared), "Copy the current preset here", "Unassign", Expand / Collapse. Dragging works as before.
+- Undo / redo (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z, and ↶ ↷ above the tree) for every change to your presets and keys: speaker edits, scopes, new / deleted presets. Up to 100 steps; changes of one kind within 0.8 s (a drag) make one step. Text fields keep their own undo. Learning vehicles and keys made for new models are not steps.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
