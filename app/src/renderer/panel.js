@@ -112,17 +112,24 @@ export function createPanel(root, actions) {
   // (presets.js truckStatus). Buttons carry an action name.
   const cardTruck = el('span');
   const cardPlays = el('span');
-  const cardScope = el('span');
+  // Applies to: text, or the vehicle's ladder to move the preset that plays (Auto).
+  const cardScopeText = el('span');
+  const cardScopeSelect = el('select', { title: 'Move the preset that plays to a narrower or wider scope' });
+  const cardScope = el('span', {}, [cardScopeText, cardScopeSelect]);
+  const cardUseIn = el('select', { title: 'Put the preset picked in the list to use in this vehicle' });
   const cardNote = el('p', { className: 'hint card-note' });
-  const cardButtonsLabel = el('span', { className: 'cab-label buttons-label' });
+  const cardUseInLabel = el('span', { className: 'cab-label', textContent: 'Use it in' });
   const cardButtons = el('div', { className: 'inline buttons' });
   const truckCard = el('div', { className: 'cab-card' }, [
     el('span', { className: 'cab-label', textContent: 'Vehicle' }), cardTruck,
     el('span', { className: 'cab-label', textContent: 'Plays' }), cardPlays,
     el('span', { className: 'cab-label', textContent: 'Applies to' }), cardScope,
     cardNote,
-    cardButtonsLabel, cardButtons,
+    cardUseInLabel, cardUseIn,
+    el('span'), cardButtons,
   ]);
+  cardScopeSelect.onchange = () => actions.moveToScope(cardScopeSelect.value);
+  cardUseIn.onchange = () => actions.useInScope(cardUseIn.value);
   cardButtons.onclick = (event) => {
     const action = event.target.closest('button')?.dataset.action;
     if (action) actions.truckAction(action);
@@ -333,10 +340,15 @@ export function createPanel(root, actions) {
     const { card } = view;
     cardTruck.textContent = card.truck;
     cardPlays.textContent = card.plays;
-    cardScope.textContent = card.appliesTo;
+    cardScopeText.textContent = card.appliesTo;
+    cardScopeText.hidden = Boolean(card.scope);
+    cardScopeSelect.hidden = !card.scope;
+    if (card.scope) fillSelect(cardScopeSelect, card.scope.options, card.scope.value);
+    cardUseIn.hidden = !card.useIn;
+    if (card.useIn) fillSelect(cardUseIn, card.useIn.options, '');
     cardNote.textContent = card.note ?? '';
     cardNote.hidden = !card.note;
-    cardButtonsLabel.textContent = card.buttonsLabel;
+
     const key = JSON.stringify(card.buttons);
     if (cardButtons.dataset.key !== key) {
       cardButtons.replaceChildren(...card.buttons.map((b) => {
@@ -347,7 +359,7 @@ export function createPanel(root, actions) {
       cardButtons.dataset.key = key;
     }
     cardButtons.hidden = !card.buttons.length;
-    cardButtonsLabel.hidden = !card.buttons.length;
+    cardUseInLabel.hidden = !card.useIn;
     deletePreset.disabled = !view.canDelete;
     exportButton.disabled = !view.canExport;
     exportButton.title = view.canExport ? EXPORT_TITLE : 'This preset is a file in the collection already.';

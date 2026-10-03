@@ -51,7 +51,14 @@ input.narrow { width: 48px; }
 .cab-label { color: var(--dim); }
 .cab-card .card-note { grid-column: 1 / -1; margin: 2px 0 0; }
 .cab-card .buttons { margin-top: 4px; }
-.cab-card .buttons-label { margin-top: 6px; }
+.cab-card select { min-width: 0; font-size: 12px; }
+dialog.ask { max-width: 440px; border: 1px solid #8886; border-radius: 6px; padding: 12px 14px; }
+dialog.ask::backdrop { background: #0005; }
+dialog.ask h3 { margin: 0 0 8px; font-size: 14px; }
+dialog.ask p { margin: 0 0 8px; }
+dialog.ask label { display: block; margin: 4px 0; }
+.ask-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.ask-buttons .primary { font-weight: 600; }
 .truck-axis { stroke: var(--dim); stroke-width: 1; stroke-dasharray: 6 4; pointer-events: none; }
 .walls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 8px; }
 .walls label { display: grid; gap: 2px; font-size: 11px; color: var(--dim); }

@@ -1,6 +1,6 @@
 # Preset Scopes and the Preset Map — Design
 
-Date: 2026-10-03. Status: step 1 (data, migration, Auto) done; steps 2 and 3 to do. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
+Date: 2026-10-03. Status: steps 1 (data, migration, Auto) and 2 (moving on the card) done; step 3 (the map) to do. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
 
 ## Context
 
@@ -150,7 +150,11 @@ An overlay, not a second window: the state lives in the renderer, and a window w
    - "Unbind" frees a scope and keeps the preset (it used to delete a vehicle's own copy); a chassis's or a model's own preset can be unbound too;
    - "Use it in" asks first when the scope has another preset, which then stays unassigned;
    - a model you have not driven since the migration is named after your preset for it, else its id made readable ("peterbilt 389").
-2. "Applies to" on the card with the dialogs; "Use it in" with a scope choice; unassign.
+2. "Applies to" on the card with the dialogs; "Use it in" with a scope choice; unassign. **Done** (`scopeLadder`, `currentScope`, `planScope`, `applyScope`; the dialogs in `renderer/dialog.js`), with these additions:
+   - "Own preset for this chassis" and "Only this vehicle" are gone: picking "this chassis" or "this vehicle" in Applies to does the same (a copy when what plays is wider, from another chassis or a file);
+   - when what plays is not on this vehicle's ladder (another chassis's, a shared file), the dropdown's first entry says where it comes from, and picking a scope makes a copy there;
+   - the dialog also warns when a shared file for this chassis or the model is narrower than the target and would keep playing (files cannot be unassigned);
+   - debug only: `TRUCKER_AUX_FAKE_TRUCK='{"key":…,"name":…,"variant":…}'` stands for the game (`main.js`), for trying the card without it.
 3. The preset map.
 
 ## Open questions

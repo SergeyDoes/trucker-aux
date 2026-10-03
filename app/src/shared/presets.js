@@ -138,26 +138,11 @@ export function editLayout(store, selection, truck, edit) {
   return { ...routed.store, presets: { ...routed.store.presets, [routed.key]: edit(current) } };
 }
 
-// Auto plays `key` in this truck (by plate) or on this chassis from now on. A preset that
-// held that scope stays, unassigned if it was its only one.
-export function bindPreset(store, truck, scope, key) {
-  const where = scope === 'truck' ? plateKey(truck) : variantKey(truck);
-  return where ? { ...store, assignments: { ...store.assignments, [where]: key } } : store;
-}
-
-// What bindPreset would take the scope from: the preset there now, or null.
-export function boundAt(store, truck, scope) {
-  const where = scope === 'truck' ? plateKey(truck) : variantKey(truck);
-  return (where && store.assignments[where]) || null;
-}
-
-// Frees the narrowest scope of this truck that has a preset: this vehicle's, else this
-// chassis's (or the model's, without chassis). The preset stays.
-export function unbind(store, truck) {
+// Frees a scope; the preset stays. All vehicles always keeps one.
+export function unassign(store, scope) {
+  if (scope === ALL_SCOPE || !store.assignments[scope]) return store;
   const assignments = { ...store.assignments };
-  const plate = plateKey(truck);
-  if (plate && assignments[plate]) delete assignments[plate];
-  else delete assignments[variantKey(truck)];
+  delete assignments[scope];
   return { ...store, assignments };
 }
 
@@ -267,8 +252,117 @@ function scopeOfKey(store, key, truck) {
 const EVERY = 'every vehicle without its own preset';
 const chassisScope = (truck) => (truck.variant ? `all ${truck.name} on this chassis` : `all ${truck.name}`);
 
-// The panel's card for the truck in the game: what plays, what it applies to, a note
-// on editing, and the buttons that change the scope ({ action, label }).
+// A vehicle's scopes for the card, narrowest first: { level, scope, label, holder } where
+// holder is the preset or file assigned there, or null. "This vehicle" only for a plate
+// of your own (a quick job's is random).
+export function scopeLadder(store, truck) {
+  const brand = brandKey(truck);
+  const game = gameKey(truck);
+  return [
+    truck.plate && !truck.quickJob && ['vehicle', plateKey(truck), `this vehicle (${truck.plate})`],
+    truck.variant && ['chassis', chassisKey(truck), `this chassis (hook ${truck.variant} m)`],
+    ['model', truck.key, truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`],
+    brand && ['brand', brand, scopeLabel(store, brand, truck)],
+    game && ['game', game, scopeLabel(store, game, truck)],
+    ['all', ALL_SCOPE, 'all vehicles'],
+  ].filter(Boolean).map(([level, scope, label]) => ({ level, scope, label, holder: store.assignments[scope] ?? null }));
+}
+
+const LADDER_HOWS = new Set(['vehicle', 'chassis', 'model', 'brand', 'game', 'all']);
+
+// Where the preset that plays in Auto sits on this vehicle's ladder, or null: another
+// chassis's preset, a shared file, or a preset picked in the list.
+export function currentScope(store, selection, truck) {
+  if (selection.mode !== 'auto' || !truck) return null;
+  const auto = autoPreset(store, truck);
+  if (!auto || !LADDER_HOWS.has(auto.how) || isCollectionKey(auto.key)) return null;
+  return scopeLadder(store, truck).some((r) => r.scope === auto.scope) ? auto.scope : null;
+}
+
+const holderName = (store, key) => (isCollectionKey(key) ? store.collection?.[key]?.name ?? key : store.presets[key]?.name ?? key);
+
+// What putting the preset that plays at the scope `to` means, for the card's dialogs:
+//   mode       'move' (Auto, from its scope on this ladder), 'copy' (Auto, from another
+//              chassis or a file: a copy takes `to`), 'use' (a preset picked in the list:
+//              it gets `to` as well)
+//   direction  'up' | 'down' for a move
+//   mustCopy   moving away from all vehicles leaves a copy there instead (something must play)
+//   taken      { key, name, keeps } the other preset at `to`, which loses it (keeps: it still
+//              applies elsewhere, or it is a file)
+//   shadow     [{ scope, label, name }] narrower scopes of this vehicle with other presets,
+//              which would keep playing here
+//   fallback   for a move down: { label, name } what plays from then on where it was
+//   outplayed  { name, file } what would still play in this vehicle, narrower than `to`, with
+//              the shadow cleared: a shared file for this chassis or the model (files are
+//              never unassigned), or null
+// Null when nothing would change.
+export function planScope(store, selection, truck, to) {
+  if (!truck) return null;
+  const ladder = scopeLadder(store, truck);
+  const index = (scope) => ladder.findIndex((r) => r.scope === scope);
+  if (index(to) < 0) return null;
+  const { key } = resolvePlaying(store, selection, truck);
+  const from = currentScope(store, selection, truck);
+  if (from === to || (selection.mode !== 'auto' && store.assignments[to] === key)) return null;
+  let mode = 'copy';
+  if (selection.mode !== 'auto') mode = 'use';
+  else if (from) mode = 'move';
+  const direction = mode === 'move' ? (index(to) > index(from) ? 'up' : 'down') : null;
+  const holder = store.assignments[to];
+  const taken = holder && holder !== key
+    ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
+    : null;
+  const shadow = ladder.slice(0, index(to))
+    .filter((r) => r.holder && r.holder !== key && !(mode === 'move' && r.scope === from))
+    .map((r) => ({ scope: r.scope, label: r.label, name: holderName(store, r.holder) }));
+  let fallback = null;
+  if (direction === 'down') {
+    const wider = ladder.slice(index(from) + 1).find((r) => r.holder && r.holder !== key);
+    fallback = wider ? { label: wider.label, name: holderName(store, wider.holder) } : null;
+  }
+  const plan = { mode, key, from, to, direction, mustCopy: mode === 'move' && from === ALL_SCOPE, taken, shadow, fallback, outplayed: null };
+  const after = applyScope(store, plan, truck, { clear: shadow.map((s) => s.scope) });
+  const plays = autoPreset(after, truck);
+  if (plays && plays.key !== after.assignments[to]) {
+    plan.outplayed = { name: holderName(store, plays.key), file: isCollectionKey(plays.key) };
+  }
+  return plan;
+}
+
+// Carries out a plan (planScope): copy (a move down kept where it was, or anything from a
+// file, another chassis or all vehicles) puts a copy at `to`; a move frees `from`; clear
+// frees those narrower scopes. Presets that lose a scope stay.
+export function applyScope(store, plan, truck, { copy = false, clear = [] } = {}) {
+  let next = store;
+  let key = plan.key;
+  if (plan.mode === 'copy' || plan.mustCopy || copy || isCollectionKey(key)) {
+    const layout = presetLayout(store, key);
+    key = freePresetKey(store.presets);
+    next = { ...next, presets: { ...next.presets, [key]: { ...structuredClone(layout), name: nameFor(store, plan.to, truck, layout.name) } } };
+  }
+  const assignments = { ...next.assignments };
+  if (plan.mode === 'move' && key === plan.key && plan.from !== ALL_SCOPE) delete assignments[plan.from];
+  for (const scope of clear) if (scope !== ALL_SCOPE) delete assignments[scope];
+  assignments[plan.to] = key;
+  return { ...next, assignments };
+}
+
+// A copy's name: the vehicle, chassis or model as ownPreset names it; for wider scopes the
+// source's name with " copy".
+function nameFor(store, scope, truck, sourceName) {
+  const level = levelOf(scope);
+  if (level === 'vehicle') return `${truck.name}, ${truck.plate}`;
+  if (level === 'chassis') return `${truck.name}, hook ${truck.variant} m`;
+  if (level === 'model') return truck.name;
+  return uniqueName(sourceName, new Set(Object.values(store.presets).map((l) => l.name)));
+}
+
+// The panel's card for the truck in the game: what plays, what it applies to, a note on
+// editing, and what can be done:
+//   scope   { value, options } the vehicle's ladder to move the preset that plays (Auto);
+//           value '' with a first option saying where it comes from when it is not on it
+//   useIn   { options } the ladder to put a preset picked in the list to use here
+//   buttons [{ action, label }]: Unbind
 export function truckStatus(store, selection, truck) {
   const playing = resolvePlaying(store, selection, truck);
   const base = {
@@ -276,64 +370,52 @@ export function truckStatus(store, selection, truck) {
     plays: displayName(store, playing.key, truck),
     appliesTo: EVERY,
     note: null,
-    buttonsLabel: '',
+    scope: null,
+    useIn: null,
     buttons: [],
   };
-  const byPlate = Boolean(truck?.plate && !truck.quickJob);
-  const lent = truck?.plate && truck.quickJob ? 'This quick-job vehicle has a random plate, so "this vehicle only" is not offered.' : '';
+  const lent = truck?.plate && truck.quickJob ? 'This quick-job vehicle has a random plate, so "this vehicle" is not offered.' : '';
   const note = (...parts) => parts.filter(Boolean).join(' ') || null;
-  const onlyThisTruck = byPlate ? [{ action: 'own-truck', label: 'Only this vehicle' }] : [];
-  const unbindButton = { action: 'unbind', label: 'Unbind' };
+  const rungOptions = (marked) => scopeLadder(store, truck).map((r) => {
+    const other = r.holder && r.holder !== marked ? ` — "${holderName(store, r.holder)}"` : '';
+    return { value: r.scope, label: `${r.label}${other}` };
+  });
 
   if (selection.mode !== 'auto') {
-    const buttons = truck ? [
-      ...(byPlate ? [{ action: 'bind-truck', label: 'this vehicle only' }] : []),
-      { action: 'bind-chassis', label: chassisScope(truck) },
-    ] : [];
     const file = playing.kind === 'collection' ? store.collection[playing.key].file : null;
     return {
       ...base,
       plays: `${base.plays} (picked in the list)`,
       appliesTo: scopeOfKey(store, playing.key, truck),
-      note: note(file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', buttons.length && lent),
-      buttonsLabel: buttons.length ? 'Use it in' : '',
-      buttons,
+      note: note(file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', truck && lent),
+      useIn: truck ? { options: [{ value: '', label: 'Use it in…' }, ...rungOptions(playing.key)] } : null,
     };
   }
   if (!truck) return base;
   const auto = autoPreset(store, truck);
-  switch (auto?.how) {
-    case 'vehicle':
-      return { ...base, appliesTo: `only this vehicle (${truck.plate})`, buttons: [unbindButton] };
-    case 'chassis':
-      return { ...base, appliesTo: chassisScope(truck), note: note(lent), buttons: [...onlyThisTruck, unbindButton] };
-    case 'model':
-      if (!truck.variant) return { ...base, appliesTo: `all ${truck.name}`, note: note(lent), buttons: [...onlyThisTruck, unbindButton] };
-      break;
-    default:
-  }
-  // Something wider plays: the model's preset for all chassis, another chassis's, a shared
-  // file, the brand's, the game's, all vehicles'.
-  const allChassis = truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`;
-  const APPLIES = {
-    model: allChassis,
+  const from = currentScope(store, selection, truck);
+  const FROM = {
     sibling: `another chassis of ${truck.name}`,
     collectionChassis: `${chassisScope(truck)}, from the collection`,
-    collectionModel: `${allChassis}, from the collection`,
+    collectionModel: `${truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`}, from the collection`,
     collectionSibling: `another chassis of ${truck.name}, from the collection`,
-    brand: auto && scopeLabel(store, auto.scope, truck),
-    game: auto && scopeLabel(store, auto.scope, truck),
   };
-  const file = auto && isCollectionKey(auto.key) ? store.collection[auto.key].file : null;
+  const appliesTo = from ? scopeLadder(store, truck).find((r) => r.scope === from).label : FROM[auto?.how] ?? `${scopeLabel(store, auto.scope, truck)}, from the collection`;
+  const scope = from
+    ? { value: from, options: rungOptions(playing.key) }
+    : { value: '', options: [{ value: '', label: appliesTo }, ...rungOptions(playing.key)] };
+  const owns = ownsEdits(auto, truck);
+  const file = isCollectionKey(auto.key) ? store.collection[auto.key].file : null;
   const copy = truck.variant ? 'copy for this chassis' : `preset for ${truck.name}`;
+  let editNote = null;
+  if (file) editNote = `From the collection: ${file}. Editing makes your own ${copy} first.`;
+  else if (!owns) editNote = `Editing makes a ${copy} first.`;
   return {
     ...base,
-    appliesTo: APPLIES[auto?.how] ?? EVERY,
-    note: note(file ? `From the collection: ${file}. Editing makes your own ${copy} first.` : `Editing makes a ${copy} first.`, lent),
-    buttons: [
-      { action: 'own-chassis', label: truck.variant ? 'Own preset for this chassis' : `Own preset for ${truck.name}` },
-      ...onlyThisTruck,
-    ],
+    appliesTo: from === ALL_SCOPE ? EVERY : appliesTo,
+    note: note(editNote, lent),
+    scope,
+    buttons: from && from !== ALL_SCOPE ? [{ action: 'unbind', label: 'Unbind' }] : [],
   };
 }
 

@@ -198,6 +198,11 @@ Done: 133 unit tests pass; a version 2 `layouts.json` checked in the app (conver
 - Version 2 is converted on load: each preset keyed by its scope becomes `p.N` assigned to it; `custom.N` ones are unassigned; a binding wins over the scope's own preset, which stays unassigned; model names from the presets' names.
 - Unbind keeps the preset; "Use it in" asks before taking a scope from another preset. Steps 2 (moving on the card) and 3 (the preset map) are next.
 
+### E2.18 — moving a preset on the card (step 2 of the preset scopes spec) ✓
+Done: 137 unit tests pass; the card driven in the app with a fake truck (`TRUCKER_AUX_FAKE_TRUCK`, debug only): a copy from all vehicles to the game, down with Move and with Copy, up, a picked preset put to use.
+- The card's "Applies to" is the vehicle's ladder (this vehicle, this chassis, the model, the brand, the game, all vehicles), each scope saying which other preset holds it. Picking one moves the preset that plays; a dialog (`renderer/dialog.js`) asks first when the target is taken (that preset stays, unassigned), lists narrower presets that would keep playing (cleared by default), warns about a narrower shared file, and on the way down offers Move or Copy for here. All vehicles always keeps a preset: moving from it copies.
+- A preset picked in the list: "Use it in" with the same ladder adds a scope. "Unbind" frees the scope of what plays. The old "Own preset for this chassis" / "Only this vehicle" buttons are now entries of the ladder.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

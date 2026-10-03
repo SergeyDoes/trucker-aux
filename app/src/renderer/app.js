@@ -11,11 +11,12 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptPicked, allPresetKey, bindPreset, boundAt, createPreset, deletePreset, editLayout, exportPreset, ownPreset,
-  parseSelection, presetOptions, rememberVehicle, resolvePlaying, scopeLabel, scopesOf, selectionValue, truckStatus, unbind,
-  variantKey,
+  adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
+  planScope, presetOptions, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
+  unassign, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
+import { ask } from './dialog.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -236,6 +237,77 @@ const deviceRef = (id) => {
   return device ? { id, label: device.label } : null;
 };
 
+// Asks what the card's scope choice needs (see moveToScope) and carries it out. True when
+// something changed.
+async function putAtScope(to) {
+  const truck = state.truck;
+  const plan = truck && planScope(state.store, state.selection, truck, to);
+  if (!plan) {
+    render(); // puts the dropdown back
+    return false;
+  }
+  const ladder = scopeLadder(state.store, truck);
+  const labelOf = (scope) => ladder.find((r) => r.scope === scope)?.label ?? scope;
+  const name = resolvePlaying(state.store, state.selection, truck).layout.name;
+  const lines = [];
+  if (plan.taken) {
+    lines.push(`"${plan.taken.name}" will no longer apply to ${labelOf(to)}.${plan.taken.keeps ? '' : ' It stays in the list, unassigned.'}`);
+  }
+  if (plan.outplayed) {
+    const what = plan.outplayed.file ? `The collection's "${plan.outplayed.name}"` : `"${plan.outplayed.name}"`;
+    lines.push(`${what} is narrower and will keep playing in this vehicle.`);
+  }
+  const checks = plan.shadow.map((s) => ({
+    value: s.scope,
+    label: `Also unassign "${s.name}" from ${s.label} (otherwise it keeps playing in this vehicle)`,
+  }));
+  const copies = plan.mode === 'copy' || plan.mustCopy;
+  let answer = { button: copies ? 'copy' : 'move', checked: checks.map((c) => c.value) };
+  if (plan.direction === 'down' && !plan.mustCopy) {
+    const after = plan.fallback ? `"${plan.fallback.name}" (${plan.fallback.label})` : 'a wider preset';
+    answer = await ask({
+      title: `"${name}" to ${labelOf(to)}`,
+      lines: [
+        `Move: it no longer applies to ${labelOf(plan.from)}; other vehicles there will play ${after}.`,
+        `Copy for here: ${labelOf(plan.from)} keeps it, and a copy applies to ${labelOf(to)}.`,
+        ...lines,
+      ],
+      checks,
+      buttons: [{ value: 'move', label: 'Move' }, { value: 'copy', label: 'Copy for here', primary: true }, { value: null, label: 'Cancel' }],
+    });
+  } else if (lines.length || checks.length || plan.mustCopy) {
+    let title = `"${name}" to ${labelOf(to)}`;
+    if (plan.mustCopy) {
+      title = `A copy of "${name}" to ${labelOf(to)}`;
+      lines.unshift('All vehicles keep this preset: something must play when nothing else does.');
+    }
+    answer = await ask({
+      title,
+      lines,
+      checks,
+      buttons: [{ value: answer.button, label: copies ? 'Copy' : 'Move', primary: true }, { value: null, label: 'Cancel' }],
+    });
+  }
+  if (!answer) {
+    render();
+    return false;
+  }
+  const before = speakerIds();
+  state.store = applyScope(state.store, plan, truck, { copy: answer.button === 'copy', clear: answer.checked });
+  afterScopeChange(before);
+  return true;
+}
+
+// What plays may have changed with the scopes: solo and mute stay only on the same layout
+// (a copy of what plays keeps them).
+const speakerIds = () => JSON.stringify(playing().layout.speakers);
+function afterScopeChange(before) {
+  if (speakerIds() !== before) resetSession();
+  syncEngine();
+  scheduleSave();
+  render();
+}
+
 const actions = {
   selectInput(id) {
     state.settings = { ...state.settings, input: deviceRef(id) };
@@ -305,33 +377,25 @@ const actions = {
     if (trimmed && playing().kind === 'preset') edit((layout) => ({ ...layout, name: trimmed }));
     else render(); // an empty name puts the old one back
   },
-  // The truck card's buttons (presets.js truckStatus): a copy of what plays for this
-  // chassis or this truck, binding the preset picked in the list, and undoing that.
-  truckAction(action) {
-    const truck = state.truck;
-    if (!truck) return;
-    let changesWhatPlays = true;
-    if (action === 'own-chassis' || action === 'own-truck') {
-      state.store = ownPreset(state.store, truck, action === 'own-truck' ? 'truck' : 'chassis');
-      changesWhatPlays = false; // a copy of what plays: the same speakers
-    } else if (action === 'bind-truck' || action === 'bind-chassis') {
-      const scope = action === 'bind-truck' ? 'truck' : 'chassis';
-      // The preset there now is not deleted: it stays in the list, unassigned if it was its only place.
-      const taken = boundAt(state.store, truck, scope);
-      if (taken && taken !== state.selection.key && !isCollectionKey(taken)) {
-        const { name } = state.store.presets[taken];
-        const left = scopesOf(state.store, taken).length > 1 ? '' : ' It stays in the list, unassigned.';
-        if (!confirm(`"${name}" will no longer apply here.${left}`)) return;
-      }
-      state.store = bindPreset(state.store, truck, scope, state.selection.key);
-      state.selection = { mode: 'auto' };
-    } else if (action === 'unbind') {
-      state.store = unbind(state.store, truck);
-    } else return;
-    if (changesWhatPlays) resetSession();
-    syncEngine();
-    scheduleSave();
+  // The card's Applies to (presets.js planScope): moves the preset that plays up or down
+  // this vehicle's ladder, asking first when that takes a scope from another preset, leaves
+  // narrower ones playing, or (down) whether to move or copy.
+  async moveToScope(to) {
+    await putAtScope(to);
+  },
+  // A preset picked in the list is put to use in this vehicle as well; back to Auto.
+  async useInScope(to) {
+    if (await putAtScope(to)) state.selection = { mode: 'auto' };
     render();
+  },
+  // Unbind: frees the scope the preset that plays holds here; the preset stays.
+  truckAction(action) {
+    if (action !== 'unbind' || !state.truck) return;
+    const from = currentScope(state.store, state.selection, state.truck);
+    if (!from) return;
+    const before = speakerIds();
+    state.store = unassign(state.store, from);
+    afterScopeChange(before);
   },
   // Writes what plays as a file in presets/ to share it; main shows it in Explorer.
   async exportPreset() {

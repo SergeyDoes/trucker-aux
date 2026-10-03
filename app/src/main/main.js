@@ -38,8 +38,24 @@ ipcMain.handle('collection:export', (_event, fileName, data) => {
   return result;
 });
 
+// Debug only: TRUCKER_AUX_FAKE_TRUCK='{"key":"vehicle.x.y","name":"X Y","variant":"3.2",...}'
+// stands for the game, for trying the preset card without it (on a Mac too). The truck's
+// fields as parsePose gives them; the head looks straight ahead.
+function fakeTelemetry() {
+  const json = debug && process.env.TRUCKER_AUX_FAKE_TRUCK;
+  if (!json) return null;
+  const truck = { variant: null, plate: null, quickJob: false, game: 'ats', brand: null, brandName: null, centerX: 0.45, ...JSON.parse(json) };
+  const start = Date.now();
+  return {
+    read: () => ({
+      sdkActive: true, paused: false, renderTime: (Date.now() - start) * 1000, steer: 0, gear: 1, electricOn: true, engineOn: true,
+      blinkers: { left: false, right: false }, head: { x: 0, y: 0, z: 0, heading: 0, pitch: 0, roll: 0 }, truck,
+    }),
+  };
+}
+
 function startPoseFeed(win) {
-  let telemetry = null;
+  let telemetry = fakeTelemetry();
   let lastTry = 0;
   const timer = setInterval(() => {
     const now = Date.now();
