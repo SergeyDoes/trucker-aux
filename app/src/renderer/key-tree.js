@@ -16,16 +16,54 @@ export function createKeyTree(root, actions) {
   const undo = el('button', { textContent: '↶', title: 'Undo (Ctrl+Z)', onclick: () => actions.undo() });
   const redo = el('button', { textContent: '↷', title: 'Redo (Ctrl+Y)', onclick: () => actions.redo() });
   const tree = el('ul', { className: 'reg-tree', role: 'tree' });
-  const loose = el('div', { className: 'reg-loose-list' });
+  // Below the keys: presets on no key, to keep, rename and put on keys again.
+  const unusedList = el('div', { className: 'reg-unused-list' });
+  const unused = el('section', { className: 'reg-unused' }, [
+    el('h3', { textContent: 'Unused presets' }),
+    el('p', { className: 'hint', textContent: 'Drag a key\'s preset here to take it off the key (Ctrl: a copy). Double-click or F2 to rename; drag onto a key to use it.' }),
+    unusedList,
+  ]);
+  const splitter = el('div', { className: 'reg-split', title: 'Drag to resize' });
   root.replaceChildren(
     el('header', {}, [el('h2', { textContent: 'Presets' }), undo, redo]),
     el('p', {
       className: 'hint',
       textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
     }),
-    tree,
-    loose,
+    el('div', { className: 'reg-keys' }, [tree]),
+    splitter,
+    unused,
   );
+  // The splitter sets the height of the unused presets (remembered for this session).
+  splitter.addEventListener('pointerdown', (event) => {
+    splitter.setPointerCapture(event.pointerId);
+    const start = event.clientY;
+    const height = unused.getBoundingClientRect().height;
+    const move = (e) => { unused.style.height = `${Math.max(60, Math.min(root.clientHeight - 160, height - (e.clientY - start)))}px`; };
+    const stop = () => {
+      splitter.removeEventListener('pointermove', move);
+      splitter.removeEventListener('pointerup', stop);
+    };
+    splitter.addEventListener('pointermove', move);
+    splitter.addEventListener('pointerup', stop);
+  });
+  // A key's preset dropped here leaves the key (with Ctrl, or from all vehicles, a copy).
+  unused.addEventListener('dragover', (event) => {
+    if (!dragging?.from && !dragging?.file) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = event.ctrlKey || dragging.from === 'all' || dragging.file ? 'copy' : 'move';
+    unused.classList.add('drop');
+  });
+  unused.addEventListener('dragleave', (event) => {
+    if (!unused.contains(event.relatedTarget)) unused.classList.remove('drop');
+  });
+  unused.addEventListener('drop', (event) => {
+    event.preventDefault();
+    unused.classList.remove('drop');
+    const payload = dragging;
+    dragging = null;
+    if (payload) actions.dropToUnused(payload, event.ctrlKey);
+  });
 
   const menu = el('div', { className: 'reg-menu', hidden: true });
   document.body.append(menu);
@@ -131,7 +169,7 @@ export function createKeyTree(root, actions) {
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
     line.ondblclick = flip;
     line.oncontextmenu = (event) => showMenu(event, node, map);
-    if (node.own) dragSource(line, { from: node.own.file ? null : node.scope, key: node.own.key });
+    if (node.own) dragSource(line, { from: node.own.file ? null : node.scope, key: node.own.key, file: node.own.file });
     if (!node.pseudo) {
       line.addEventListener('dragover', (event) => {
         if (!dragging || dragging.from === node.scope || node.own?.key === dragging.key) return;
@@ -165,23 +203,72 @@ export function createKeyTree(root, actions) {
     return li;
   }
 
+  // One unused preset: click plays it, drag onto a key uses it, double-click or F2 renames
+  // (not a shared file: those are files), right-click for its menu.
+  function unusedItem(p, file) {
+    const name = el('span', { textContent: p.name });
+    const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? 'A shared file for no vehicle' : 'Click to play; drag onto a key' }, [name]);
+    dragSource(item, { from: null, key: p.key, file });
+    const rename = () => {
+      if (file) return;
+      const input = el('input', { type: 'text', value: p.name, className: 'reg-rename' });
+      renaming = true;
+      const done = (commit) => {
+        if (!renaming) return; // Enter, then the blur that follows
+        renaming = false;
+        if (commit && input.value.trim() && input.value.trim() !== p.name) actions.renamePresetKey(p.key, input.value.trim());
+        else draw();
+      };
+      input.onkeydown = (event) => {
+        event.stopPropagation();
+        if (event.key === 'Enter') done(true);
+        if (event.key === 'Escape') done(false);
+      };
+      input.onblur = () => done(true);
+      input.onclick = (event) => event.stopPropagation();
+      item.draggable = false;
+      name.replaceWith(input);
+      input.focus();
+      input.select();
+    };
+    // The first click plays it (and redraws the list), so the second click of a double-click
+    // lands on the new item: it renames there.
+    item.onclick = (event) => (event.detail === 2 ? rename() : actions.selectPreset(`truck:${p.key}`));
+    item.onkeydown = (event) => {
+      if (event.key === 'F2') rename();
+    };
+    item.oncontextmenu = (event) => {
+      event.preventDefault();
+      const entry = (label, run, disabled = false) => el('button', { textContent: label, disabled, onclick: () => { closeMenu(); run(); } });
+      menu.replaceChildren(
+        el('div', { className: 'reg-menu-title', textContent: p.name }),
+        entry('Play it', () => actions.selectPreset(`truck:${p.key}`)),
+        entry('Rename', rename, file),
+        entry('Duplicate', () => actions.duplicatePresetKey(p.key)),
+        entry('Delete', () => actions.deletePresetKey(p.key), file),
+      );
+      menu.hidden = false;
+      const box = menu.getBoundingClientRect();
+      menu.style.left = `${Math.min(event.clientX, window.innerWidth - box.width - 4)}px`;
+      menu.style.top = `${Math.min(event.clientY, window.innerHeight - box.height - 4)}px`;
+    };
+    return item;
+  }
+
   function draw() {
     if (!last) return;
     const { map } = last;
     tree.replaceChildren(row(map.root, map));
-    const entries = [...map.unassigned, ...map.files.map((f) => ({ ...f, file: true }))];
-    loose.replaceChildren(...(entries.length ? [
-      el('h3', { textContent: 'Not on any key' }),
-      ...entries.map((p) => {
-        const item = el('div', { className: 'reg-loose', title: 'Click to play it; drag onto a key to set it there' }, [p.name]);
-        item.onclick = () => actions.selectPreset(`truck:${p.key}`);
-        dragSource(item, { from: null, key: p.key });
-        return item;
-      }),
-    ] : []));
+    if (renaming) return; // a redraw would drop the name being typed
+    unusedList.replaceChildren(
+      ...map.unassigned.map((p) => unusedItem(p, false)),
+      ...map.files.map((f) => unusedItem(f, true)),
+    );
+    if (!map.unassigned.length && !map.files.length) unusedList.append(el('p', { className: 'hint', textContent: 'None.' }));
   }
 
   let lastPicked = null;
+  let renaming = false;
   let lastCurrent = null;
   return {
     // map: presetTree(...) plus currentKey (the preset that plays); history: { undo, redo } counts.

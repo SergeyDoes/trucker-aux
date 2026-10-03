@@ -496,6 +496,41 @@ const actions = {
     if (from && !alsoHere) await moveInMap(from, to);
     else await actions.assignInMap(to, key);
   },
+  // A key's preset dropped among the unused presets: it leaves that key (the preset stays).
+  // With Ctrl, from all vehicles (something must play) or for a shared file: a copy instead.
+  dropToUnused({ from, key, file }, copy) {
+    if (copy || file || from === 'all' || !from) return actions.duplicatePresetKey(key);
+    const before = speakerIds();
+    remember();
+    state.store = unassign(state.store, from);
+    afterScopeChange(before);
+  },
+  // The unused presets' menu and in-place rename.
+  renamePresetKey(key, name) {
+    if (!state.store.presets[key]) return;
+    remember();
+    state.store = { ...state.store, presets: { ...state.store.presets, [key]: { ...state.store.presets[key], name } } };
+    scheduleSave();
+    render();
+  },
+  duplicatePresetKey(key) {
+    const layout = state.store.presets[key] ?? state.store.collection?.[key]?.layout;
+    if (!layout) return;
+    remember();
+    state.store = createPreset(state.store, layout).store;
+    scheduleSave();
+    render();
+  },
+  deletePresetKey(key) {
+    const layout = state.store.presets[key];
+    if (!layout || key === allPresetKey(state.store)) return;
+    if (!confirm(`Delete the preset "${layout.name}"?`)) return;
+    const before = speakerIds();
+    remember();
+    state.store = deletePreset(state.store, key);
+    if (state.selection.mode === 'truck' && state.selection.key === key) state.selection = { mode: 'auto' };
+    afterScopeChange(before);
+  },
   // Unassign in the map: frees that scope; the preset stays.
   unassignScope(scope) {
     const before = speakerIds();

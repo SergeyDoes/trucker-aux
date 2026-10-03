@@ -226,6 +226,11 @@ Done: 143 unit tests pass; checked in the app with a fake truck (pick a key, edi
 Done: 143 unit tests pass.
 - A preset the app makes for a key (the first edit of a key that inherits, Copy here, a copy when moving, a new model's key, "this chassis" / "this vehicle" on the card) is named by the key's path as the tree shows it, without "All vehicles": "ATS › Kenworth › Kenworth T680 2014 › hook 2.7 m" (`keyPath`); "All vehicles" for that key. Parts not known yet are left out. Existing presets keep their names. Such a name is not repeated by "— where it applies" in the list; an exported file name has ", " for " › ".
 
+### E2.23 — unused presets under the key tree ✓
+Done: 143 unit tests pass; checked in the app (drag a key's preset down, rename in place, undo, drag an unused preset onto a vehicle).
+- The left panel is split (a splitter sets the height): keys above, "Unused presets" below (presets on no key, and shared files for no vehicle, in italics).
+- A key's preset dropped among them leaves that key and stays (Ctrl, from all vehicles, or a shared file: a copy). Click plays one; double-click or F2 renames it in place; right-click: Play it, Rename, Duplicate, Delete; drag one onto a key to use it there. All of it can be undone.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

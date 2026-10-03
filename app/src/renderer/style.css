@@ -86,7 +86,15 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .overview-compass { position: absolute; left: 0; top: 0; width: 150px; height: 110px; pointer-events: none; }
 
 /* The preset map: a standing key tree on the left, like the registry editor. */
-#tree { overflow: auto; padding: 8px 6px; border-right: 1px solid #8884; font-size: 12px; }
+#tree { display: flex; flex-direction: column; min-height: 0; padding: 8px 6px; border-right: 1px solid #8884; font-size: 12px; }
+.reg-keys { flex: 1; min-height: 80px; overflow: auto; }
+.reg-split { flex: none; height: 6px; margin: 4px 0; cursor: row-resize; border-top: 1px solid #8884; }
+.reg-split:hover { background: #8882; }
+.reg-unused { flex: none; height: 30%; min-height: 60px; overflow: auto; border-radius: 4px; }
+.reg-unused.drop { outline: 2px dashed var(--front); outline-offset: -2px; background: #d08c0022; }
+.reg-unused h3 { margin: 0 0 2px; }
+.reg-loose.file { font-style: italic; color: var(--dim); }
+.reg-rename { width: 100%; font-size: 12px; }
 #tree header { display: flex; align-items: center; gap: 4px; }
 #tree header h2 { flex: 1; margin: 0; font-size: 14px; }
 #tree header button { padding: 0 6px; font-size: 14px; }
