@@ -235,6 +235,9 @@ Done: 143 unit tests pass; checked in the app (drag a key's preset down, rename 
 Done: 145 unit tests pass; checked in the app (a label typed in the panel shows beside the key).
 - A preset may have a short label (up to 16 characters, `layout.label`; the "Label" field under Name). The key tree shows it beside the keys that use the preset instead of "preset" (a shared file: its label, else "shared file"); unused presets show it beside their names. Export writes it into the file's layout. Changing it can be undone.
 
+### E2.25 — filling game and brand into shared presets ✓
+- The tree put models you have driven under their brand, and the shipped presets' models (game known from the file, brand not) straight under ATS. `npm run fill-presets` (`scripts/fill-preset-places.js`) writes `game`, `brand`, `brandName` into each file in `presets/` whose vehicle the app has seen in the game (`data/layouts.json` "vehicles"); others are listed as not driven yet. Facts only.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
