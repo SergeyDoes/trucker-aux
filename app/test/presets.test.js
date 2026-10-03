@@ -529,7 +529,7 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(sleeper.children[0].inherited, { key: 'p.2', name: 'Sleeper', from: 'hook 3.2 m' });
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
-  assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare' }]);
+  assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
   // A model not driven goes up only to all vehicles: its game is not known.
   const anthem = map.root.children.at(-1).children[0];
@@ -642,4 +642,15 @@ test('a key picked in the map: it plays what it has or inherits; editing gives i
   // The list shows the key; values round-trip.
   assert.equal(presetOptions(store, null, KEY)[1].label, 'Key: International 9900i, hook 3.2 m');
   assert.deepEqual(parseSelection(selectionValue(KEY)), KEY);
+});
+
+test('the map shows a preset\'s label beside its keys', () => {
+  const store = storeWith({ [TRUCK.key]: { name: 'International 9900i', label: 'Day cab' } }, [{ name: 'Spare', label: 'Test' }]);
+  const map = presetTree(store, null);
+  const model = (function find(n) { return n.scope === TRUCK.key ? n : n.children.map(find).find(Boolean); })(map.root);
+  assert.equal(model.own.label, 'Day cab');
+  assert.equal(map.root.own.label, null);
+  assert.deepEqual(map.unassigned, [{ key: 'p.3', name: 'Spare', label: 'Test' }]);
+  // A shared file carries its label too, and Export writes it.
+  assert.equal(exportPreset(store, 'p.2', null).data.layout.label, 'Day cab');
 });

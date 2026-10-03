@@ -231,6 +231,10 @@ Done: 143 unit tests pass; checked in the app (drag a key's preset down, rename 
 - The left panel is split (a splitter sets the height): keys above, "Unused presets" below (presets on no key, and shared files for no vehicle, in italics).
 - A key's preset dropped among them leaves that key and stays (Ctrl, from all vehicles, or a shared file: a copy). Click plays one; double-click or F2 renames it in place; right-click: Play it, Rename, Duplicate, Delete; drag one onto a key to use it there. All of it can be undone.
 
+### E2.24 — preset labels ✓
+Done: 145 unit tests pass; checked in the app (a label typed in the panel shows beside the key).
+- A preset may have a short label (up to 16 characters, `layout.label`; the "Label" field under Name). The key tree shows it beside the keys that use the preset instead of "preset" (a shared file: its label, else "shared file"); unused presets show it beside their names. Export writes it into the file's layout. Changing it can be undone.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

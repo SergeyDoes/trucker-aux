@@ -3,7 +3,7 @@ import { createPanel } from './panel.js';
 import { createViews } from './views.js';
 import { listDevices, openInput, probeOutput } from './audio-io.js';
 import {
-  MAX_SPEAKERS, addPair, addSpeaker, copySpeakers, linkPair, moveSpeakers, pasteSpeakers, patchSpeakers,
+  LABEL_MAX, MAX_SPEAKERS, addPair, addSpeaker, copySpeakers, linkPair, moveSpeakers, pasteSpeakers, patchSpeakers,
   defaultLayout, removeSpeakers, setCoordinate, setBoundsEdge, setWidth, shiftGains, unlinkPair,
 } from '../shared/layout.js';
 import { nudge } from '../shared/view.js';
@@ -506,6 +506,15 @@ const actions = {
     afterScopeChange(before);
   },
   // The unused presets' menu and in-place rename.
+  // The short label of what plays, shown beside its keys in the map; empty removes it.
+  setPresetLabel(text) {
+    const label = text.trim().slice(0, LABEL_MAX);
+    if (playing().kind !== 'preset' || (playing().layout.label ?? '') === label) return render();
+    edit((layout) => {
+      const { label: _old, ...rest } = layout;
+      return label ? { ...rest, label } : rest;
+    });
+  },
   renamePresetKey(key, name) {
     if (!state.store.presets[key]) return;
     remember();
@@ -723,6 +732,7 @@ function render() {
     canRename: current.kind === 'preset',
     canExport: current.kind !== 'collection', // a shared file is one already
     presetName: layout.name,
+    presetLabel: layout.label ?? '',
     width: layout.width,
     matchLoudness: state.settings.matchLoudness,
     loudnessDb: state.loudnessDb,

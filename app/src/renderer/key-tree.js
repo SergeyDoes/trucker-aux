@@ -154,8 +154,9 @@ export function createKeyTree(root, actions) {
     };
     let kind = 'inherited';
     if (node.own) kind = node.own.file ? 'file' : 'own';
-    // No preset names in the tree: a key either has its own preset (or a shared file) or not.
-    const badge = { own: 'preset', file: 'shared file', inherited: '' }[kind];
+    // No preset names in the tree: a key's own preset shows its label, else "preset" (a shared
+    // file: its label, else "shared file"); a key that inherits shows nothing.
+    const badge = node.own ? node.own.label || (node.own.file ? 'shared file' : 'preset') : '';
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.picked ? ' selected' : ''}${node.pseudo ? ' pseudo' : ''}`,
       title: node.own ? node.own.name : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
@@ -207,7 +208,8 @@ export function createKeyTree(root, actions) {
   // (not a shared file: those are files), right-click for its menu.
   function unusedItem(p, file) {
     const name = el('span', { textContent: p.name });
-    const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? 'A shared file for no vehicle' : 'Click to play; drag onto a key' }, [name]);
+    const tag = p.label ? [el('span', { className: 'reg-badge', textContent: p.label })] : [];
+    const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? 'A shared file for no vehicle' : 'Click to play; drag onto a key' }, [name, ...tag]);
     dragSource(item, { from: null, key: p.key, file });
     const rename = () => {
       if (file) return;
@@ -262,7 +264,7 @@ export function createKeyTree(root, actions) {
     if (renaming) return; // a redraw would drop the name being typed
     unusedList.replaceChildren(
       ...map.unassigned.map((p) => unusedItem(p, false)),
-      ...map.files.map((f) => unusedItem(f, true)),
+      ...map.files.map((f) => unusedItem({ ...f, label: null }, true)),
     );
     if (!map.unassigned.length && !map.files.length) unusedList.append(el('p', { className: 'hint', textContent: 'None.' }));
   }

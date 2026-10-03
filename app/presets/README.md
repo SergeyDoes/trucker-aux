@@ -26,6 +26,7 @@ files: edits go to your own presets in `data/layouts.json`.
   one chassis, as the app shows it ("hook 2.7 m"). Without `vehicle` the preset is only
   picked by hand.
 - `vehicleName` and `author` are optional. Export leaves `author` out: add it by hand.
+- `layout.label` (optional): a short tag, up to 16 characters, shown beside the keys that use the preset in the preset map.
 - `game` (`ats` or `ets2`), `brand` (the game's brand id) and `brandName` are optional: they place the vehicle under its game and brand in the preset map before you have driven it. Export writes them when the game has told them.
 - Coordinates are in metres:
   - X goes right from the vehicle's centre line;

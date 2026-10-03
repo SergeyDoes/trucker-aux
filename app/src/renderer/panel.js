@@ -1,6 +1,6 @@
 // The control panel on the left. Built once; update(view) refreshes values in place
 // so a field the user is typing into keeps its focus.
-import { TYPES, TYPE_NAMES } from '../shared/layout.js';
+import { LABEL_MAX, TYPES, TYPE_NAMES } from '../shared/layout.js';
 import { bandText } from '../shared/dsp.js';
 import { speakerIcon } from './marks.js';
 
@@ -135,6 +135,10 @@ export function createPanel(root, actions) {
     if (action) actions.truckAction(action);
   };
   const presetName = el('input', { type: 'text', title: 'Name of this preset' });
+  const presetLabel = el('input', {
+    type: 'text', maxLength: LABEL_MAX, className: 'narrow-text', placeholder: 'short tag',
+    title: 'A short label, shown beside the keys that use this preset in the preset map',
+  });
   const newPreset = el('button', {
     textContent: 'New preset',
     title: 'Copy the current layout into a new preset and switch to it. Auto never picks it: choose it in the list.',
@@ -233,6 +237,7 @@ export function createPanel(root, actions) {
       row('Preset', preset),
       truckCard,
       row('Name', presetName),
+      row('Label', presetLabel),
       el('div', { className: 'inline buttons' }, [newPreset, deletePreset, exportButton]),
       row('Stereo width', el('div', { className: 'inline' }, [width, widthValue])),
       el('p', { className: 'hint', textContent: '0 mono · 1 as recorded · 2 extra wide. Mono speakers are not affected.' }),
@@ -272,6 +277,10 @@ export function createPanel(root, actions) {
     presetName.select();
   };
   presetName.onchange = () => actions.renamePreset(presetName.value);
+  presetLabel.onchange = () => actions.setPresetLabel(presetLabel.value);
+  presetLabel.onkeydown = (event) => {
+    if (event.key === 'Enter') presetLabel.blur();
+  };
   presetName.onkeydown = (event) => {
     if (event.key === 'Enter') presetName.blur();
   };
@@ -365,6 +374,8 @@ export function createPanel(root, actions) {
     exportButton.title = view.canExport ? EXPORT_TITLE : 'This preset is a file in the collection already.';
     presetName.disabled = !view.canRename; // a shared file keeps its name
     setValue(presetName, view.presetName);
+    presetLabel.disabled = !view.canRename;
+    setValue(presetLabel, view.presetLabel);
     setValue(width, view.width);
     widthValue.textContent = view.width.toFixed(2);
     matchLoudness.checked = view.matchLoudness;

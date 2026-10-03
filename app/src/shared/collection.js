@@ -63,7 +63,7 @@ export function presetFile({ name, vehicle, vehicleName, game, brand, brandName,
     ...(game ? { game } : {}),
     ...(brand ? { brand } : {}),
     ...(brandName ? { brandName } : {}),
-    layout: { width: layout.width, bounds: layout.bounds, speakers: layout.speakers },
+    layout: { ...(layout.label ? { label: layout.label } : {}), width: layout.width, bounds: layout.bounds, speakers: layout.speakers },
   };
 }
 

@@ -5,6 +5,7 @@
 // game reports (pose.js headRestX). Mirrored pairs are mirror images about X = 0.
 
 export const MAX_SPEAKERS = 16;
+export const LABEL_MAX = 16; // characters of a preset's label
 // 1: X started at the driver's head. 2: X starts at the truck's axis. 3: presets apart from
 // their scopes (normalizeStore).
 export const STORE_VERSION = 3;
@@ -125,8 +126,10 @@ export function normalizeLayout(raw, fallbackName = 'Default layout') {
     used.add(id);
     return cleanSpeaker(s, id, `Speaker ${i + 1}`);
   });
+  const label = text(src.label).slice(0, LABEL_MAX);
   return {
     name: text(src.name) || fallbackName,
+    ...(label ? { label } : {}), // a short tag shown beside its keys in the preset map
     width: clamp(isNum(src.width) ? src.width : 1, 0, 2),
     bounds,
     speakers: fixPairs(speakers),

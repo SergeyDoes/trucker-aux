@@ -338,3 +338,10 @@ test('snap never returns -0', () => {
   assert.ok(Object.is(snap(-0.001), 0));
   assert.ok(Object.is(mirrorPosition([0, 0, 0])[0], 0));
 });
+
+test('normalizeLayout keeps a short label, trimmed to 16 characters, and leaves it out when empty', () => {
+  assert.equal(normalizeLayout({ label: '  Sleeper  ' }).label, 'Sleeper');
+  assert.equal(normalizeLayout({ label: 'A very long label indeed' }).label, 'A very long labe');
+  assert.equal('label' in normalizeLayout({ label: '  ' }), false);
+  assert.equal('label' in normalizeLayout({}), false);
+});
