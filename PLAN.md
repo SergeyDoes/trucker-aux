@@ -222,6 +222,10 @@ Done: 143 unit tests pass; checked in the app with a fake truck (pick a key, edi
 - Right-click a key: "Set the current preset here" (shared), "Copy the current preset here", "Unassign", Expand / Collapse. Dragging works as before.
 - Undo / redo (Ctrl+Z, Ctrl+Y or Ctrl+Shift+Z, and ↶ ↷ above the tree) for every change to your presets and keys: speaker edits, scopes, new / deleted presets. Up to 100 steps; changes of one kind within 0.8 s (a drag) make one step. Text fields keep their own undo. Learning vehicles and keys made for new models are not steps.
 
+### E2.22 — presets the app makes are named by their key's path ✓
+Done: 143 unit tests pass.
+- A preset the app makes for a key (the first edit of a key that inherits, Copy here, a copy when moving, a new model's key, "this chassis" / "this vehicle" on the card) is named by the key's path as the tree shows it, without "All vehicles": "ATS › Kenworth › Kenworth T680 2014 › hook 2.7 m" (`keyPath`); "All vehicles" for that key. Parts not known yet are left out. Existing presets keep their names. Such a name is not repeated by "— where it applies" in the list; an exported file name has ", " for " › ".
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

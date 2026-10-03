@@ -58,7 +58,7 @@ test('edit, auto: the preset of this vehicle; a vehicle without one gets a copy 
   assert.equal(at(edited, TRUCK.key).width, 1.5);
   assert.equal(at(edited, 'all').width, 1);
   const fresh = editLayout(storeWith(), AUTO, OTHER, widen);
-  assert.equal(at(fresh, OTHER.key).name, 'Peterbilt 579');
+  assert.equal(at(fresh, OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579');
   assert.equal(at(fresh, OTHER.key).width, 1.5);
   assert.deepEqual(at(fresh, OTHER.key).speakers, defaultLayout().speakers);
   assert.equal(at(fresh, 'all').width, 1);
@@ -83,17 +83,17 @@ test('chassis: the model preset plays on every chassis until one gets its own', 
   const edited = editLayout(store, AUTO, SLEEPER, widen);
   const own = at(edited, variantKey(SLEEPER));
   assert.equal(own.width, 1.5);
-  assert.equal(own.name, 'International 9900i, hook 3.2 m');
+  assert.equal(own.name, 'ATS › International › International 9900i › hook 3.2 m');
   assert.equal(at(edited, TRUCK.key).width, 0.5); // the model preset stays
   assert.equal(resolvePlaying(edited, AUTO, SHORT).key, 'p.2');
   assert.equal(presetOptions(edited, SHORT)[0].label, 'Auto — International 9900i (all chassis)');
-  assert.equal(presetOptions(edited, SLEEPER)[0].label, 'Auto — International 9900i, hook 3.2 m');
+  assert.equal(presetOptions(edited, SLEEPER)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m');
 });
 
 test('chassis: without a model preset another chassis plays before the brand', () => {
   const store = editLayout(storeWith({ 'brand:ats/international': { name: 'Brand' } }), AUTO, SLEEPER, widen);
   assert.equal(autoPreset(store, SHORT).how, 'sibling');
-  assert.equal(presetOptions(store, SHORT)[0].label, 'Auto — International 9900i, hook 3.2 m (other chassis)');
+  assert.equal(presetOptions(store, SHORT)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m (other chassis)');
   const both = editLayout(store, AUTO, SHORT, (l) => setWidth(l, 0.3));
   assert.equal(at(both, variantKey(SHORT)).width, 0.3);
   assert.equal(at(both, variantKey(SLEEPER)).width, 1.5);
@@ -110,17 +110,17 @@ test('the ladder: model, brand, game, all vehicles; a vehicle without a game id 
   assert.equal(autoPreset(store, { ...TRUCK, game: null, brand: null }).how, 'all');
   // Something wider than the chassis plays: the first edit makes a copy for this chassis.
   const edited = editLayout(store, AUTO, SLEEPER, widen);
-  assert.equal(at(edited, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(edited, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
   assert.equal(at(edited, 'brand:ats/international').width, 1);
 });
 
 test('this vehicle only: a copy for the plate wins over the chassis and takes the edits', () => {
   const store = ownPreset(ownPreset(withPreset(), OWNED, 'chassis'), OWNED, 'truck');
   const key = plateKey(OWNED);
-  assert.equal(at(store, key).name, 'International 9900i, WP-83695');
+  assert.equal(at(store, key).name, 'ATS › International › International 9900i › hook 3.2 m › WP-83695');
   assert.equal(resolvePlaying(store, AUTO, OWNED).key, store.assignments[key]);
   assert.equal(resolvePlaying(store, AUTO, { ...OWNED, plate: 'OTHER-1' }).key, store.assignments[variantKey(SLEEPER)]);
-  assert.equal(presetOptions(store, OWNED)[0].label, 'Auto — International 9900i, WP-83695 (this vehicle)');
+  assert.equal(presetOptions(store, OWNED)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m › WP-83695 (this vehicle)');
   const edited = editLayout(store, AUTO, OWNED, widen);
   assert.equal(at(edited, key).width, 1.5);
   assert.equal(at(edited, variantKey(SLEEPER)).width, 0.5);
@@ -253,14 +253,14 @@ test('moving down: move frees the wider scope, copy keeps it; all vehicles alway
   assert.equal(resolvePlaying(moved, AUTO, OTHER).key, 'p.1');
   const copied = applyScope(store, plan, SLEEPER, { copy: true });
   assert.equal(copied.assignments['game:ats'], 'p.2');
-  assert.equal(at(copied, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(copied, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
   assert.deepEqual(at(copied, variantKey(SLEEPER)).speakers, store.presets['p.2'].speakers);
   // From all vehicles: always a copy.
   const fromAll = planScope(storeWith(), AUTO, OWNED, plateKey(OWNED));
   assert.equal(fromAll.mustCopy, true);
   const done = applyScope(storeWith(), fromAll, OWNED);
   assert.equal(done.assignments.all, 'p.1');
-  assert.equal(at(done, plateKey(OWNED)).name, 'International 9900i, WP-83695');
+  assert.equal(at(done, plateKey(OWNED)).name, 'ATS › International › International 9900i › hook 3.2 m › WP-83695');
   // A preset picked in the list, put to use for the model while this vehicle has its own:
   // the vehicle's keeps playing here, so it is named, to be cleared.
   const plated = assign(store, plateKey(OWNED), 'p.1');
@@ -280,7 +280,7 @@ test('copy and use: a preset from another chassis or a file is copied; a picked 
   // A shared file: your own copy.
   const files = withCollection(storeWith(), MODEL_FILE);
   const fromFile = applyScope(files, planScope(files, AUTO, SLEEPER, 'game:ats'), SLEEPER);
-  assert.equal(at(fromFile, 'game:ats').name, 'model');
+  assert.equal(at(fromFile, 'game:ats').name, 'ATS'); // named by its key
   assert.equal(at(fromFile, 'game:ats').width, 0.8);
   // Picked in the list: it gets the scope as well and keeps its others.
   const picked = withPreset();
@@ -315,7 +315,7 @@ test('truckStatus: what plays, where it applies, and the scope choices', () => {
   ]);
   const chassis = ownPreset(store, OWNED, 'chassis');
   assert.deepEqual(card(truckStatus(chassis, AUTO, OWNED), 'plays', 'appliesTo', 'note'), {
-    plays: 'International 9900i, hook 3.2 m', appliesTo: 'this chassis (hook 3.2 m)', note: null,
+    plays: 'ATS › International › International 9900i › hook 3.2 m', appliesTo: 'this chassis (hook 3.2 m)', note: null,
   });
   assert.equal(truckStatus(chassis, AUTO, OWNED).scope.options[2].label, 'all chassis of International 9900i — "International 9900i"');
   // Not on this vehicle's ladder: another chassis's, a file's. The first option says where it comes from.
@@ -363,7 +363,7 @@ test('truckStatus: what plays, where it applies, and the scope choices', () => {
 });
 
 test('the preset list: Auto, your presets with where they apply, Unassigned, Collection', () => {
-  let store = rememberVehicle(withPreset(), TRUCK);
+  let store = rememberVehicle(withPreset(), OWNED); // its plate and chassis are known, as after driving it
   store = editLayout(store, AUTO, SLEEPER, widen);
   store = ownPreset(store, OWNED, 'truck');
   store = createPreset(store, store.presets['p.1']).store; // "Default layout copy", unassigned
@@ -371,9 +371,9 @@ test('the preset list: Auto, your presets with where they apply, Unassigned, Col
   store = assign(store, variantKey(SHORT), 'p.3'); // the sleeper's preset on the day cab too
   assert.deepEqual(presetOptions(store, null), [
     { value: 'auto', label: 'Auto — no game' },
+    { value: 'truck:p.4', label: 'ATS › International › International 9900i › hook 3.2 m › WP-83695' },
     { value: 'truck:p.1', label: 'Default layout — all vehicles' },
     { value: 'truck:p.2', label: 'International 9900i' },
-    { value: 'truck:p.4', label: 'International 9900i, WP-83695' },
     { value: 'truck:p.3', label: 'Sleeper — International 9900i, hook 2.1 m +1' },
     { group: 'Unassigned', options: [{ value: 'truck:p.5', label: 'Default layout copy' }] },
   ]);
@@ -417,7 +417,7 @@ test('collection: editing never changes a file', () => {
   // Auto: the first edit makes this chassis's own copy, which plays from then on.
   const edited = editLayout(store, AUTO, SLEEPER, widen);
   assert.equal(at(edited, variantKey(SLEEPER)).width, 1.5);
-  assert.equal(at(edited, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(edited, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
   assert.equal(edited.collection['file:sleeper.json'].layout.width, 0.8);
   assert.equal(autoPreset(edited, SLEEPER).how, 'chassis');
   // Picked in the list: an unassigned copy, chosen instead.
@@ -464,9 +464,9 @@ test('collection: the card and the list', () => {
 test('exportPreset: the preset that plays as a file to share', () => {
   const store = editLayout(rememberVehicle(withPreset(), TRUCK), AUTO, SLEEPER, widen); // p.2 the model's, p.3 the sleeper's
   const chassis = exportPreset(store, 'p.3', SLEEPER);
-  assert.equal(chassis.fileName, 'International 9900i, hook 3.2 m.json');
+  assert.equal(chassis.fileName, 'ATS, International, International 9900i, hook 3.2 m.json');
   assert.deepEqual({ ...chassis.data, layout: null }, {
-    truckerAuxPreset: 1, name: 'International 9900i, hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i',
+    truckerAuxPreset: 1, name: 'ATS › International › International 9900i › hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i',
     game: 'ats', brand: 'international', brandName: 'International', layout: null,
   });
   assert.equal(chassis.data.layout.width, 1.5);
@@ -569,7 +569,7 @@ test('planMove: moving a preset in the map, up its chain or down to a narrower s
   assert.deepEqual(down.fallback, { label: 'all vehicles', name: 'Default layout' });
   const copied = applyScope(store, down, null, { copy: true });
   assert.equal(copied.assignments['game:ats'], 'p.4');
-  assert.equal(at(copied, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(copied, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
   // Across, to a key on another chain (dragging): the old key is freed, what it plays next is named.
   const across = planMove(store, variantKey(SLEEPER), variantKey(SHORT));
   assert.equal(across.direction, 'across');
@@ -607,11 +607,11 @@ test('adoptNewModel: a model seen without a key of its own gets a copy of what i
   const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
   const adopted = adoptNewModel(store, SLEEPER);
   assert.equal(adopted.assignments[TRUCK.key], 'p.3');
-  assert.equal(at(adopted, TRUCK.key).name, 'International 9900i');
+  assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
   assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
   assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
   assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
-  assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'Peterbilt 579'); // all vehicles' copied
+  assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
   // A key for a chassis or a vehicle of the model, or a shared file for it: nothing new.
   const chassis = storeWith({ [variantKey(SHORT)]: { name: 'Day cab' } });
   assert.equal(adoptNewModel(chassis, SLEEPER), chassis);
@@ -631,7 +631,7 @@ test('a key picked in the map: it plays what it has or inherits; editing gives i
     'It inherits this from all International: editing gives International 9900i, hook 3.2 m a preset of its own first.');
   const edited = editLayout(store, KEY, null, widen);
   assert.equal(at(edited, KEY.scope).width, 1.5);
-  assert.equal(at(edited, KEY.scope).name, 'International 9900i, hook 3.2 m');
+  assert.equal(at(edited, KEY.scope).name, 'ATS › International › International 9900i › hook 3.2 m');
   assert.equal(at(edited, 'brand:ats/international').width, 0.4); // the brand's stays
   assert.equal(truckStatus(edited, KEY, null).note, 'Editing changes the preset of International 9900i, hook 3.2 m.');
   const again = editLayout(edited, KEY, null, (l) => setWidth(l, 0.2));

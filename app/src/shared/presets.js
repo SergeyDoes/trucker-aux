@@ -132,11 +132,8 @@ export function resolvePlaying(store, selection, truck) {
 export function ownPreset(store, truck, scope = 'chassis') {
   const where = scope === 'truck' ? plateKey(truck) : variantKey(truck);
   if (!where || store.assignments[where]) return store;
-  let name = truck.name;
-  if (scope === 'truck') name = `${truck.name}, ${truck.plate}`;
-  else if (truck.variant) name = `${truck.name}, hook ${truck.variant} m`;
   const key = freePresetKey(store.presets);
-  const preset = { ...structuredClone(resolvePlaying(store, { mode: 'auto' }, truck).layout), name };
+  const preset = { ...structuredClone(resolvePlaying(store, { mode: 'auto' }, truck).layout), name: keyPath(store, where, truck) };
   return { ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [where]: key } };
 }
 
@@ -148,7 +145,7 @@ export function routeEdit(store, selection, truck) {
     if (own && store.presets[own]) return { store, key: own };
     const { layout } = resolvePlaying(store, selection, truck);
     const key = freePresetKey(store.presets);
-    const name = nameFor(store, selection.scope, truck, layout.name);
+    const name = nameFor(store, selection.scope, truck);
     return {
       store: { ...store, presets: { ...store.presets, [key]: { ...structuredClone(layout), name } }, assignments: { ...store.assignments, [selection.scope]: key } },
       key,
@@ -220,7 +217,7 @@ export function adoptNewModel(store, truck) {
   const key = freePresetKey(store.presets);
   return {
     ...store,
-    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: truck.name } },
+    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck) } },
     assignments: { ...store.assignments, [truck.key]: key },
   };
 }
@@ -294,7 +291,9 @@ function displayName(store, key, truck = null) {
   if (!scopes.length) return name;
   const where = scopeLabel(store, scopes[0], truck);
   const more = scopes.length > 1 ? ` +${scopes.length - 1}` : '';
-  return where === name ? `${name}${more}` : `${name} — ${where}${more}`;
+  // A name that is the key's path (or the older "Model, hook 2.7 m") says where it applies.
+  const said = name === where || name === keyPath(store, scopes[0], truck);
+  return said ? `${name}${more}` : `${name} — ${where}${more}`;
 }
 
 // What a preset picked in the list applies to by itself.
@@ -463,7 +462,7 @@ export function applyScope(store, plan, truck, { copy = false, clear = [] } = {}
   if (plan.mode === 'copy' || plan.mustCopy || copy || isCollectionKey(key)) {
     const layout = presetLayout(store, key);
     key = freePresetKey(store.presets);
-    next = { ...next, presets: { ...next.presets, [key]: { ...structuredClone(layout), name: nameFor(store, plan.to, truck, layout.name) } } };
+    next = { ...next, presets: { ...next.presets, [key]: { ...structuredClone(layout), name: nameFor(store, plan.to, truck) } } };
   }
   const assignments = { ...next.assignments };
   if (plan.mode === 'move' && key === plan.key && plan.from !== ALL_SCOPE) delete assignments[plan.from];
@@ -472,11 +471,28 @@ export function applyScope(store, plan, truck, { copy = false, clear = [] } = {}
   return { ...next, assignments };
 }
 
-// A copy's name: the vehicle, chassis or model as ownPreset names it; for wider scopes the
-// source's name with " copy".
-function nameFor(store, scope, truck, sourceName) {
-  if (['vehicle', 'chassis', 'model'].includes(levelOf(scope))) return scopeLabel(store, scope, truck);
-  return uniqueName(sourceName, new Set(Object.values(store.presets).map((l) => l.name)));
+// A key's path as the tree shows it, without "All vehicles": "ATS › Kenworth › Kenworth T680
+// 2014 › hook 2.7 m › WP-1"; "All vehicles" for that key. Presets the app makes for a key are
+// named so. Parts not known (a model's game and brand before it is driven) are left out.
+export function keyPath(store, scope, truck = null) {
+  if (scope === ALL_SCOPE) return 'All vehicles';
+  const part = (s) => {
+    const level = levelOf(s);
+    if (level === 'game') return GAME_NAMES[s.slice(5)] ?? s.slice(5);
+    if (level === 'brand') {
+      const [game, brand] = s.slice(6).split('/');
+      return brandName(store, game, brand, truck);
+    }
+    if (level === 'model') return modelName(store, s, truck);
+    if (level === 'chassis') return `hook ${s.slice(s.indexOf('@') + 1)} m`;
+    return s.slice(s.indexOf('#') + 1);
+  };
+  return chainOf(store, scope, truck).filter((s) => s !== ALL_SCOPE).reverse().map(part).join(' › ');
+}
+
+// A copy's name: the path of its key.
+function nameFor(store, scope, truck) {
+  return keyPath(store, scope, truck);
 }
 
 // The panel's card for the truck in the game: what plays, what it applies to, a note on

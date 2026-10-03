@@ -70,6 +70,7 @@ export function presetFile({ name, vehicle, vehicleName, game, brand, brandName,
 // A file name Windows accepts, from a preset's name.
 export function presetFileName(name) {
   const safe = name
+    .replace(/ › /g, ', ') // a key's path ("ATS › Kenworth › …") reads better so in a file name
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
     .replace(/\s+/g, ' ')
     .slice(0, 80)
