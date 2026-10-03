@@ -157,7 +157,9 @@ An overlay, not a second window: the state lives in the renderer, and a window w
    - debug only: `TRUCKER_AUX_FAKE_TRUCK='{"key":…,"name":…,"variant":…}'` stands for the game (`main.js`), for trying the card without it.
 3. The preset map. **Done** (`presetTree`, `renderer/preset-map.js`): an overlay over the views and the 3D view, opened with "Preset map" under the preset list; Esc or Close shuts it, and while it is open the speaker keys do nothing (the views are hidden). Also:
    - the vehicle in the game sits under its chassis; other single vehicles under their model (their chassis is not known);
-   - models from shared files are named by the files' `vehicleName`; a brand never driven by its id with a capital letter.
+   - models from shared files are named by the files' `vehicleName`; a brand never driven by its id with a capital letter;
+   - each preset of yours in the map has "Move…": up its chain (`chainOf`) or down to a scope shown under it (`planMove`), with the card's dialogs. Moving works without the game;
+   - a model not driven since version 3 gets its brand from its id and its game from other models of that brand, else from the one game of everything driven; otherwise it sits under "Game not known yet", grouped by brand (no scopes there).
 
 ## Open questions
 

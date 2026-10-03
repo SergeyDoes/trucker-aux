@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
-  levelOf, ownPreset, parseSelection, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
+  levelOf, ownPreset, parseSelection, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
@@ -512,11 +512,63 @@ test('presetTree: scopes with presets, their parents and the chain of the vehicl
   ]);
   assert.deepEqual(map.unassigned, [{ key: 'p.5', name: 'Spare' }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
-  // Without a game: only what holds presets; a model not driven yet is under "Unknown game".
-  const unknown = presetTree(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' } }), null);
+  // Without a game: only what holds presets. A model not driven yet is grouped by the brand
+  // from its id, under "Game not known yet", unless another model of that brand was driven.
+  const unknown = presetTree(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' }, 'vehicle.international.lonestar': { name: 'LS' } }, []), null);
   assert.deepEqual(lines(unknown.root), [
     '● All vehicles = Default layout',
-    '  Unknown game (Default layout)',
-    '    Anthem = Anthem',
+    '  Game not known yet (drive a vehicle once) (Default layout)',
+    '    International (Default layout)',
+    '      LS = LS',
+    '    Mack (Default layout)',
+    '      Anthem = Anthem',
   ]);
+  const learned = presetTree(rememberVehicle(storeWith({ 'vehicle.international.lonestar': { name: 'LS' } }), TRUCK), null);
+  assert.deepEqual(lines(learned.root).slice(1), [
+    '  ATS (Default layout)',
+    '    International (Default layout)',
+    '      LS = LS',
+  ]);
+  // Everything driven so far is from one game: models not driven are taken to be from it too.
+  const oneGame = presetTree(rememberVehicle(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' } }), TRUCK), null);
+  assert.deepEqual(lines(oneGame.root).slice(1), ['  ATS (Default layout)', '    Mack (Default layout)', '      Anthem = Anthem']);
+  // A preset of yours can move up its chain or down to scopes shown under it.
+  assert.deepEqual(map.root.moveTo.map((o) => o.label), [
+    '↓ all ATS vehicles', '↓ all International', '↓ International 9900i', '↓ International 9900i, hook 2.1 m',
+    '↓ International 9900i, X-1', '↓ International 9900i, hook 3.2 m', '↓ all Peterbilt', '↓ all ETS2 vehicles',
+    '↓ all Scania', '↓ Scania R', '↓ Scania R, AB-1',
+  ]);
+  const sleeperNode = map.root.children[0].children[0].children[0].children.find((n) => n.label === 'hook 3.2 m');
+  assert.deepEqual(sleeperNode.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all']);
+});
+
+test('planMove: moving a preset in the map, up its chain or down to a narrower scope', () => {
+  const store = rememberVehicle(storeWith({
+    [TRUCK.key]: { name: 'Model' },                   // p.2
+    [variantKey(SLEEPER)]: { name: 'Sleeper' },        // p.3
+    'game:ats': { name: 'ATS' },                       // p.4
+  }), TRUCK);
+  // Up from the chassis to the game: the model in between keeps playing on this chassis.
+  const up = planMove(store, variantKey(SLEEPER), 'game:ats');
+  assert.deepEqual({ ...up, shadow: up.shadow.map((s) => s.scope) }, {
+    mode: 'move', key: 'p.3', from: variantKey(SLEEPER), to: 'game:ats', direction: 'up', mustCopy: false,
+    taken: { key: 'p.4', name: 'ATS', keeps: false }, shadow: [TRUCK.key], fallback: null, outplayed: null,
+  });
+  const moved = applyScope(store, up, null, { clear: [TRUCK.key] });
+  assert.equal(moved.assignments['game:ats'], 'p.3');
+  assert.equal(moved.assignments[TRUCK.key], undefined);
+  assert.ok(moved.presets['p.2'] && moved.presets['p.4']); // unassigned, not deleted
+  // Down from the game to the chassis: what plays there afterwards is named.
+  const down = planMove(store, 'game:ats', variantKey(SLEEPER));
+  assert.equal(down.direction, 'down');
+  assert.deepEqual(down.fallback, { label: 'all vehicles', name: 'Default layout' });
+  const copied = applyScope(store, down, null, { copy: true });
+  assert.equal(copied.assignments['game:ats'], 'p.4');
+  assert.equal(at(copied, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
+  // Not on one chain, a file, nothing there: no plan.
+  assert.equal(planMove(store, TRUCK.key, 'brand:ats/peterbilt'), null);
+  assert.equal(planMove(store, 'vehicle.nothing', 'all'), null);
+  assert.equal(planMove(assign(store, 'game:ets2', 'file:a.json'), 'game:ets2', 'all'), null);
+  // From all vehicles: always a copy.
+  assert.equal(planMove(store, 'all', 'game:ets2').mustCopy, true);
 });

@@ -206,6 +206,8 @@ Done: 137 unit tests pass; the card driven in the app with a fake truck (`TRUCKE
 ### E2.19 — the preset map (step 3 of the preset scopes spec) ✓
 Done: 138 unit tests pass; the map checked in the app with a fake truck and the shipped collection (open, pick, Unassign, Esc).
 - "Preset map" under the preset list opens a tree over the views: all vehicles > game > brand > model > chassis > vehicle, every scope that holds a preset or a shared file, their parents and the chain of the vehicle in the game (●, ▶ what plays). A scope without its own shows what it inherits, grey. Clicking a preset picks it in the list; Unassign frees a scope. Below: Unassigned presets and files for no vehicle.
+- "Move…" on each preset of yours in the map: up its chain or down to a scope shown under it, with the card's dialogs; works without the game (the card's Applies to needs a vehicle in the game).
+- Models not driven since the migration: brand from the id, game from other models of the brand or the one game driven so far; else under "Game not known yet". A brand never driven reads as its id ("Intnational", SCS's own spelling) until one of it is driven.
 - Later: dragging a preset onto a node.
 
 ### E3 — polish

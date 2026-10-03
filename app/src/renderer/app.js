@@ -12,7 +12,7 @@ import {
 } from '../shared/selection.js';
 import {
   adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
-  planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
+  planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
@@ -249,7 +249,24 @@ async function putAtScope(to) {
   }
   const ladder = scopeLadder(state.store, truck);
   const labelOf = (scope) => ladder.find((r) => r.scope === scope)?.label ?? scope;
-  const name = resolvePlaying(state.store, state.selection, truck).layout.name;
+  return carryOut(plan, labelOf, resolvePlaying(state.store, state.selection, truck).layout.name, true);
+}
+
+// The preset map's Move: a preset of yours from its scope to another on its chain.
+async function moveInMap(from, to) {
+  const plan = planMove(state.store, from, to, state.truck);
+  if (!plan) {
+    render();
+    return false;
+  }
+  return carryOut(plan, (scope) => scopeLabel(state.store, scope, state.truck), state.store.presets[plan.key].name, false);
+}
+
+// Asks what a plan (planScope, planMove) needs and carries it out. True when something
+// changed. inVehicle: the plan is about the vehicle in the game (the card), not the map.
+async function carryOut(plan, labelOf, name, inVehicle) {
+  const { to } = plan;
+  const truck = state.truck;
   const lines = [];
   if (plan.taken) {
     lines.push(`"${plan.taken.name}" will no longer apply to ${labelOf(to)}.${plan.taken.keeps ? '' : ' It stays in the list, unassigned.'}`);
@@ -258,9 +275,12 @@ async function putAtScope(to) {
     const what = plan.outplayed.file ? `The collection's "${plan.outplayed.name}"` : `"${plan.outplayed.name}"`;
     lines.push(`${what} is narrower and will keep playing in this vehicle.`);
   }
+  if (!inVehicle && plan.shadow.length) {
+    lines.push('Narrower presets on the way keep playing for their vehicles unless unassigned:');
+  }
   const checks = plan.shadow.map((s) => ({
     value: s.scope,
-    label: `Also unassign "${s.name}" from ${s.label} (otherwise it keeps playing in this vehicle)`,
+    label: `Also unassign "${s.name}" from ${s.label}${inVehicle ? ' (otherwise it keeps playing in this vehicle)' : ''}`,
   }));
   const copies = plan.mode === 'copy' || plan.mustCopy;
   let answer = { button: copies ? 'copy' : 'move', checked: checks.map((c) => c.value) };
@@ -393,6 +413,10 @@ const actions = {
   toggleMap(open = !presetMap.open) {
     presetMap.show(open);
     render();
+  },
+  // Move in the map: the preset of `from` up or down its chain, with the card's dialogs.
+  async moveInMap(from, to) {
+    await moveInMap(from, to);
   },
   // Unassign in the map: frees that scope; the preset stays.
   unassignScope(scope) {

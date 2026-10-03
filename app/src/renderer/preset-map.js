@@ -38,6 +38,14 @@ export function createPresetMap(actions) {
     ]);
     if (node.own) {
       row.append(presetButton(node.own));
+      if (node.moveTo?.length) {
+        const move = el('select', { className: 'map-move', title: 'Move this preset to a wider or narrower scope' }, [
+          el('option', { value: '', textContent: 'Move…' }),
+          ...node.moveTo.map((o) => el('option', { value: o.value, textContent: o.label })),
+        ]);
+        move.onchange = () => actions.moveInMap(node.scope, move.value);
+        row.append(move);
+      }
       if (!node.own.file && node.scope !== 'all') {
         const unassign = el('button', { className: 'map-unassign', textContent: 'Unassign', title: 'Free this scope; the preset stays in the list' });
         unassign.onclick = () => actions.unassignScope(node.scope);

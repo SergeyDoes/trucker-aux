@@ -101,5 +101,6 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .map-preset { font-size: 12px; padding: 1px 6px; }
 .map-preset.file { font-style: italic; }
 .map-inherited { color: var(--dim); font-size: 12px; }
+.map-move { font-size: 11px; max-width: 200px; }
 .map-unassign { font-size: 11px; padding: 0 4px; color: var(--dim); }
 .map-list { display: flex; flex-wrap: wrap; gap: 4px; }
