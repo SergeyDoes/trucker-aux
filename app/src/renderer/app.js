@@ -284,7 +284,7 @@ async function carryOut(plan, labelOf, name, inVehicle) {
   }));
   const copies = plan.mode === 'copy' || plan.mustCopy;
   let answer = { button: copies ? 'copy' : 'move', checked: checks.map((c) => c.value) };
-  if (plan.direction === 'down' && !plan.mustCopy) {
+  if ((plan.direction === 'down' || plan.direction === 'across') && !plan.mustCopy) {
     const after = plan.fallback ? `"${plan.fallback.name}" (${plan.fallback.label})` : 'a wider preset';
     answer = await ask({
       title: `"${name}" to ${labelOf(to)}`,
@@ -425,6 +425,12 @@ const actions = {
     if (!plan) return render();
     const name = state.store.presets[key]?.name ?? state.store.collection?.[key]?.name ?? key;
     return carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), name, false);
+  },
+  // Dragging in the map: a preset of yours from its key onto another moves it there; with Ctrl,
+  // or for a preset or file on no key, it is set there as well.
+  async dropInMap({ from, key }, to, alsoHere) {
+    if (from && !alsoHere) await moveInMap(from, to);
+    else await actions.assignInMap(to, key);
   },
   // Unassign in the map: frees that scope; the preset stays.
   unassignScope(scope) {

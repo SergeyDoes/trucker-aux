@@ -98,6 +98,9 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-row { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; white-space: nowrap; cursor: default; }
 .reg-row:hover { background: #8882; }
 .reg-row.selected { background: #2f6fde33; }
+.reg-row.drop { outline: 2px dashed var(--front); outline-offset: -2px; background: #d08c0022; }
+.reg-row[draggable=true] { cursor: grab; }
+.reg-loose[draggable=true] { cursor: grab; margin: 2px 0; }
 .reg-toggle { width: 12px; color: var(--dim); cursor: pointer; text-align: center; }
 .reg-icon { display: inline-flex; }
 .reg-name { margin-right: 8px; }

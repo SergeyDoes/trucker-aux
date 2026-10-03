@@ -209,7 +209,7 @@ Done: 138 unit tests pass; the map checked in the app with a fake truck and the 
 - Reworked on the user's request like the registry editor: a tree of keys (folders, expand / collapse) and the selected key's pane. Bold: a preset set on the key (an override, as in Unity); italic: a shared file; grey: inherited. Every model driven gets its key with the chassis and your vehicles seen (`vehicles[id].chassis`, `.plates`). The pane: Pick in the list, Set preset (`planAssign`), Move this preset up or down (`planMove`), Unassign; works without the game.
 - Preset files may say `game`, `brand`, `brandName` of their vehicle (Export writes them when known); the 13 shipped files say `"game": "ats"`, so they sit under ATS before they are driven (brand ids left out: the game's may differ from the vehicle id, e.g. International).
 - No guesses about games: a model not driven since the migration is under "Game not known yet (drive a vehicle once)" until it is driven.
-- Later: dragging a preset onto a node.
+- Drag and drop: a preset dragged from its key onto another moves there (up, down, or across to another chain; down and across ask Move or Copy for here); Ctrl, or a preset or file from "Not on any key", sets it there as well. Closed folders open while something is held over them.
 
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.

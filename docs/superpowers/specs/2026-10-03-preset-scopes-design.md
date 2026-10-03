@@ -1,6 +1,6 @@
 # Preset Scopes and the Preset Map — Design
 
-Date: 2026-10-03. Status: done (steps 1–3). Dragging in the map is left for later. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
+Date: 2026-10-03. Status: done (steps 1–3, and dragging in the map). The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
 
 ## Context
 
@@ -126,7 +126,7 @@ Collection: …
 - Nodes: every scope that holds a preset (yours or a file's), their parents, and the chain of the vehicle in the game (●).
 - Each node: its own preset in normal text; otherwise what it inherits, grey, in brackets.
 - Click a preset: picks it in the list. Each own preset has "Unassign".
-- Later (not in this step): drag a preset onto a node to move it there.
+- Dragging (done after step 3): a preset of yours dragged from its key onto another moves it there (`planMove`: up, down, or across to a key on another chain, which frees the old key); with Ctrl held, or for a preset or file on no key, it is set there as well (`planAssign`). The card's dialogs apply: on the way down or across, Move or Copy for here. A closed folder opens when something is held over it.
 
 An overlay, not a second window: the state lives in the renderer, and a window would need it synced over IPC. If the map is wanted on a second monitor, it can become a window later.
 

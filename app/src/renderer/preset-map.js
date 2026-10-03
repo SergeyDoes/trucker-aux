@@ -17,7 +17,7 @@ export function createPresetMap(actions) {
   const root = el('section', { className: 'preset-map', hidden: true }, [
     el('header', {}, [
       el('h2', { textContent: 'Preset map' }),
-      el('p', { className: 'hint', textContent: 'Bold: a preset set on that key. Grey: inherited from above. ● the vehicle in the game, ▶ what plays now.' }),
+      el('p', { className: 'hint', textContent: 'Bold: a preset set on that key. Grey: inherited from above. ● the vehicle in the game, ▶ what plays now. Drag a preset onto a key to move it there; hold Ctrl to set it there as well.' }),
       close,
     ]),
     el('div', { className: 'reg-panes' }, [el('div', { className: 'reg-left' }, [tree]), details]),
@@ -26,6 +26,23 @@ export function createPresetMap(actions) {
   close.onclick = () => actions.toggleMap(false);
 
   const expanded = new Set();
+  // Dragging: { from, key } of what is dragged (from: its key, or null for one on no key).
+  const DRAG_TYPE = 'application/x-trucker-aux-preset';
+  let dragging = null;
+  let openTimer = null;
+  const dragSource = (element, payload) => {
+    element.draggable = true;
+    element.addEventListener('dragstart', (event) => {
+      dragging = payload;
+      event.dataTransfer.setData(DRAG_TYPE, JSON.stringify(payload));
+      event.dataTransfer.effectAllowed = 'copyMove';
+    });
+    element.addEventListener('dragend', () => {
+      dragging = null;
+      clearTimeout(openTimer);
+      for (const r of tree.querySelectorAll('.drop')) r.classList.remove('drop');
+    });
+  };
   let seeded = false;
   let selected = null;
   let last = null; // { map, presets }
@@ -70,6 +87,36 @@ export function createPresetMap(actions) {
       selected = node.scope;
       draw();
     };
+    // Drag a preset of yours (or a shared file) by its key; drop on another key.
+    if (node.own) dragSource(line, { from: node.own.file ? null : node.scope, key: node.own.key });
+    if (!node.pseudo) {
+      line.addEventListener('dragover', (event) => {
+        if (!dragging || dragging.from === node.scope || node.own?.key === dragging.key) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = event.ctrlKey || !dragging.from ? 'copy' : 'move';
+        line.classList.add('drop');
+      });
+      line.addEventListener('dragleave', () => line.classList.remove('drop'));
+      line.addEventListener('drop', (event) => {
+        event.preventDefault();
+        line.classList.remove('drop');
+        const payload = dragging ?? JSON.parse(event.dataTransfer.getData(DRAG_TYPE) || 'null');
+        dragging = null; // the source row may be gone (a folder opened while dragging redraws)
+        clearTimeout(openTimer);
+        if (payload) actions.dropInMap(payload, node.scope, event.ctrlKey);
+      });
+    }
+    // A closed folder opens when something is held over it, as in Explorer.
+    if (node.children.length && !open) {
+      line.addEventListener('dragenter', () => {
+        if (!dragging) return;
+        clearTimeout(openTimer);
+        openTimer = setTimeout(() => {
+          expanded.add(node.scope);
+          draw();
+        }, 600);
+      });
+    }
     line.ondblclick = () => toggle.onclick(new Event('click'));
     const li = el('li', { role: 'treeitem' }, [line]);
     if (open && node.children.length) li.append(el('ul', {}, node.children.map(row)));
@@ -119,7 +166,11 @@ export function createPresetMap(actions) {
     parts.push(actionsRow);
     if (map.unassigned.length || map.files.length) {
       parts.push(el('h3', { textContent: 'Not on any key' }));
-      for (const p of [...map.unassigned, ...map.files]) parts.push(el('div', {}, [pick(p.key), ` ${p.name}`]));
+      for (const p of [...map.unassigned, ...map.files]) {
+        const item = el('div', { className: 'reg-loose', title: 'Drag onto a key to set it there' }, [pick(p.key), ` ${p.name}`]);
+        dragSource(item, { from: null, key: p.key });
+        parts.push(item);
+      }
     }
     details.replaceChildren(...parts);
   }

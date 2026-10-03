@@ -570,8 +570,16 @@ test('planMove: moving a preset in the map, up its chain or down to a narrower s
   const copied = applyScope(store, down, null, { copy: true });
   assert.equal(copied.assignments['game:ats'], 'p.4');
   assert.equal(at(copied, variantKey(SLEEPER)).name, 'International 9900i, hook 3.2 m');
-  // Not on one chain, a file, nothing there: no plan.
-  assert.equal(planMove(store, TRUCK.key, 'brand:ats/peterbilt'), null);
+  // Across, to a key on another chain (dragging): the old key is freed, what it plays next is named.
+  const across = planMove(store, variantKey(SLEEPER), variantKey(SHORT));
+  assert.equal(across.direction, 'across');
+  assert.deepEqual(across.fallback, { label: 'International 9900i', name: 'Model' });
+  const acrossDone = applyScope(store, across, null);
+  assert.equal(acrossDone.assignments[variantKey(SHORT)], 'p.3');
+  assert.equal(acrossDone.assignments[variantKey(SLEEPER)], undefined);
+  assert.equal(planMove(store, TRUCK.key, 'brand:ats/peterbilt').direction, 'across');
+  assert.equal(planMove(store, TRUCK.key, '?unknown'), null); // a folder
+  // A file, nothing there: no plan.
   assert.equal(planMove(store, 'vehicle.nothing', 'all'), null);
   assert.equal(planMove(assign(store, 'game:ets2', 'file:a.json'), 'game:ets2', 'all'), null);
   // From all vehicles: always a copy.

@@ -298,26 +298,29 @@ export function chainOf(store, scope, truck = null) {
   return [scope, ...(plateChassis(store, scope, truck) ? [plateChassis(store, scope, truck)] : []), ...wider];
 }
 
-// Moving your preset from one scope to another in the map: up its chain, or down to a scope
-// whose chain passes through it. A plan as planScope gives (mode 'move'), or null.
+// Moving your preset from one scope to another in the map: up its chain, down to a scope
+// whose chain passes through it, or across to any other key (dragging). A plan as
+// planScope gives (mode 'move'; direction 'up', 'down' or 'across'), or null.
 export function planMove(store, from, to, truck = null) {
   const key = store.assignments[from];
   if (!key || isCollectionKey(key) || from === to) return null;
   const up = chainOf(store, from, truck);
   const down = chainOf(store, to, truck);
-  let direction = null;
+  if (to.startsWith('?')) return null; // a folder, no scope
+  let direction = 'across';
   if (up.includes(to)) direction = 'up';
   else if (down.includes(from)) direction = 'down';
-  if (!direction) return null;
   const holder = store.assignments[to];
   const taken = holder && holder !== key
     ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
     : null;
-  const between = direction === 'up' ? up.slice(1, up.indexOf(to)) : down.slice(1, down.indexOf(from));
+  let between = [];
+  if (direction === 'up') between = up.slice(1, up.indexOf(to));
+  else if (direction === 'down') between = down.slice(1, down.indexOf(from));
   const shadow = between.filter((s) => store.assignments[s] && store.assignments[s] !== key)
     .map((s) => ({ scope: s, label: scopeLabel(store, s, truck), name: holderName(store, store.assignments[s]) }));
   let fallback = null;
-  if (direction === 'down') {
+  if (direction !== 'up') {
     const wider = up.slice(1).find((s) => store.assignments[s] && store.assignments[s] !== key);
     fallback = wider ? { label: scopeLabel(store, wider, truck), name: holderName(store, store.assignments[wider]) } : null;
   }
