@@ -2,6 +2,9 @@
 
 A helper application that allows to simulate 3D speakers of the vehicle in ETS2/ATS and route any audio stream through virtual speakers according to in-game head position.
 
+<br>
+<br>
+
 ## How it works
 
 ```
@@ -20,6 +23,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 - Any content player (browser, Spotify, VLC) plays into a virtual cable. Trucker AUX records the cable's other end.
 - Each virtual speaker is a Web Audio HRTF panner placed according to the vehicle interior. The listener turns and moves with the driver's head, read from the game's telemetry (`head.offset`).
 - The game's own sound goes straight to the headphones, outside this chain.
+
+<br>
+<br>
 
 ## Features
 
@@ -52,6 +58,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - no sign-ins, no network.
   - app's data stored within it's folder
 
+<br>
+<br>
+
 ## Setup and Requirements
 
 - **Prerequisites**:
@@ -78,6 +87,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
      - Enjoy!
      - Don't forget to set the *content* Output device back to your *Headset (or Default) Device* after you finished playing the game
 
+<br>
+<br>
+
 ## Editing Presets
 
 - **Coordinates:**
@@ -101,16 +113,19 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
    | Vehicle | Notes
    |---|---|
    | Freightliner Cascadia
-   | International 9900i | Day Cab and Sleeper
+   | International 9900i | Day Cab
    | Kenworth T680 | Day Cab and Sleeper
    | Kenworth W900
    | Peterbilt 389
-   | Volvo VNL | Sleeper
+   | Volvo VNL | 440 Sleeper
    | Western Star 49X | Day Cab and Sleeper
    | Ford F150 | Road Trip: Ford DLC
    | Ford Bronco | Road Trip: Ford DLC
    | Ford Mustang | Road Trip: Ford DLC
    | Ford Crown Victoria | Road Trip: Ford DLC
+
+<br>
+<br>
 
 ## Workarounds and Limitations
 
@@ -118,12 +133,23 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 - The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.
+  - The **current camera mode** is not reported by the game either, the head position is just defaulted when not in FPV. The above-mentioned behavior is processed directly from the trucks steer and turn signal states, and *it keep affect the head's position even in third person camera modes.*
 
+<br>
+<br>
+
+## [Repo Memes](./MEMES.md)
+
+<br>
+<br>
 
 ## My other mods (co-authored by Claude)
 
 Lately, I've started modding games I play just as an experiment to see how far I can go with *complete AI-slop*. Just resting from my main activity that actually requires a brain. This mod encouraged me to start this repo so we could share presets and shit. You can check out my other little mods and tweaks for some random games here:
  [Vibe O'Drone Boosty](https://boosty.to/vibeodrone)
+
+<br>
+<br>
 
 ## License
 
