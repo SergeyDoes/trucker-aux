@@ -40,7 +40,7 @@ test('writeJsonAtomic: an unwritable path gives a warning', () => {
 test('loadData: a fresh folder gives defaults without warnings', () => {
   const data = loadData(tempDir());
   assert.deepEqual(data.store.presets[data.store.assignments.all], defaultLayout());
-  assert.deepEqual(data.settings, { version: 1, source: 'input', input: null, output: null, muteWhen: 'never', pauseBehavior: 'vehicle', matchLoudness: true, turnLook: { on: false, percent: 100, reverse: 'off', blinkers: false } });
+  assert.deepEqual(data.settings, { version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true, turnLook: { on: false, percent: 100, reverse: 'off', blinkers: false } });
   assert.deepEqual(data.warnings, []);
 });
 

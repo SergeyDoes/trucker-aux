@@ -40,7 +40,8 @@ export function normalizeSettings(raw) {
     source: src.source === 'file' ? 'file' : 'input',
     input: deviceRef(src.input),
     output: deviceRef(src.output),
-    muteWhen: MUTE_MODES.includes(src.muteWhen) ? src.muteWhen : 'never',
+    // Like a car radio by default: silent while the vehicle's electrics are off.
+    muteWhen: MUTE_MODES.includes(src.muteWhen) ? src.muteWhen : 'electric',
     pauseBehavior: PAUSE_BEHAVIORS.includes(src.pauseBehavior) ? src.pauseBehavior : 'vehicle',
     // Trim every preset to the loudness of the default layout (loudness.js).
     matchLoudness: typeof src.matchLoudness === 'boolean' ? src.matchLoudness : true,

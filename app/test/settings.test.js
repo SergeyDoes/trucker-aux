@@ -6,7 +6,7 @@ const TURN_LOOK_OFF = { on: false, percent: 100, reverse: 'off', blinkers: false
 
 test('normalizeSettings: defaults', () => {
   assert.deepEqual(normalizeSettings(undefined), {
-    version: 1, source: 'input', input: null, output: null, muteWhen: 'never', pauseBehavior: 'vehicle', matchLoudness: true,
+    version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true,
     turnLook: TURN_LOOK_OFF,
   });
 });
@@ -26,7 +26,8 @@ test('normalizeSettings keeps valid devices and drops junk', () => {
   });
   assert.equal(normalizeSettings({ source: 'radio' }).source, 'input');
   assert.equal(normalizeSettings({ muteWhen: 'electric' }).muteWhen, 'electric');
-  assert.equal(normalizeSettings({ muteWhen: 'always' }).muteWhen, 'never');
+  assert.equal(normalizeSettings({ muteWhen: 'always' }).muteWhen, 'electric');
+  assert.equal(normalizeSettings({ muteWhen: 'never' }).muteWhen, 'never'); // a choice made stays
   assert.equal(normalizeSettings({ pauseBehavior: 'active' }).pauseBehavior, 'active');
   assert.equal(normalizeSettings({ pauseBehavior: 'sometimes' }).pauseBehavior, 'vehicle');
   assert.equal(normalizeSettings({ matchLoudness: 'yes' }).matchLoudness, true);

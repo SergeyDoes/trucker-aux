@@ -91,7 +91,7 @@ Spec sections updated in place (types, filters, orientation). Done: 75 unit test
 ### E2.2 — small full range, parked-truck mute ✓
 Done: 77 unit tests and 14 engine checks pass; checked end to end with `tools/fake_shm.py --engine-off`.
 - Speaker type "small full range": highpass 120 Hz, meeting the sub (sums flat with it); a smaller circle / sphere.
-- Setting "Mute when": never / engine is off / electrics are off. The music fades out in ~0.7 s and back in; without the game it always plays. The status line shows `muted, engine off`.
+- Setting "Mute when": never / engine is off / electrics are off (the default since E2.19; a saved choice stays). The music fades out in ~0.7 s and back in; without the game it always plays. The status line shows `muted, engine off`.
 - In the pause menu the flags keep the truck's real state and "Mute when" applies. In the main menu the plugin keeps the last truck's flags; see E2.9.
 
 ### E2.3 — cabin centred on the truck ✓
