@@ -569,6 +569,7 @@ const actions = {
   },
   // Unbind: frees the scope the preset that plays holds here; the preset stays.
   truckAction(action) {
+    if (action === 'auto') return actions.selectPreset('auto');
     if (action !== 'unbind' || !state.truck) return;
     const from = currentScope(state.store, state.selection, state.truck);
     if (!from) return;
@@ -726,7 +727,7 @@ import('./overview3d.js')
 function render() {
   keyTree.update(
     { ...presetTree(state.store, state.truck, state.selection), currentKey: playing().key },
-    { undo: history.undo.length, redo: history.redo.length },
+    { undo: history.undo.length, redo: history.redo.length, auto: state.selection.mode === 'auto' },
   );
   const current = playing();
   const { layout } = current;

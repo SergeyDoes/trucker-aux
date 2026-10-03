@@ -243,6 +243,10 @@ Done: 146 unit tests pass; checked in the app (a new model's green "new", change
 - A label has a colour: grey, blue (default, not stored), orange, green, red (`layout.labelColor`, the select beside Label; Export writes it). A new model's "new" is green.
 - Fix: changing the name, label or colour of what plays went through the speaker-edit route, so on a model with chassis it first made a copy for this chassis. They now change that very preset (`editPlayingMeta`), with undo.
 
+### E2.27 — back to Auto ✓
+Done: 147 unit tests pass; checked in the app (pick a key, back with the card's button and with the header's).
+- Picking a key in the tree or a preset in the list stops following the vehicle in the game. An "Auto" button in the tree's header brings it back: dim while Auto is on, highlighted while it is off. The card offers "Back to Auto" too.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

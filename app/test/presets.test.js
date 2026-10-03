@@ -657,3 +657,11 @@ test('the map shows a preset\'s label beside its keys', () => {
   // A shared file carries its label too, and Export writes it.
   assert.equal(exportPreset(store, 'p.2', null).data.layout.label, 'Day cab');
 });
+
+test('the card offers Back to Auto when a key or a preset is picked', () => {
+  const store = withPreset();
+  const back = { action: 'auto', label: 'Back to Auto' };
+  assert.deepEqual(truckStatus(store, PICK('p.2'), OWNED).buttons, [back]);
+  assert.deepEqual(truckStatus(store, { mode: 'scope', scope: TRUCK.key }, OWNED).buttons, [back]);
+  assert.equal(truckStatus(store, AUTO, OWNED).buttons.some((b) => b.action === 'auto'), false);
+});

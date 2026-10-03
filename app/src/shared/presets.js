@@ -313,6 +313,8 @@ function scopeOfKey(store, key, truck) {
 }
 
 const EVERY = 'every vehicle without its own preset';
+// Picking a key or a preset stops following the vehicle in the game; this goes back.
+const BACK_TO_AUTO = { action: 'auto', label: 'Back to Auto' };
 const chassisScope = (truck) => (truck.variant ? `all ${truck.name} on this chassis` : `all ${truck.name}`);
 
 // Where a model belongs: { game, brand }, as the game said (the vehicle in it, or when it
@@ -503,7 +505,7 @@ function nameFor(store, scope, truck) {
 //   scope   { value, options } the vehicle's ladder to move the preset that plays (Auto);
 //           value '' with a first option saying where it comes from when it is not on it
 //   useIn   { options } the ladder to put a preset picked in the list to use here
-//   buttons [{ action, label }]: Unbind
+//   buttons [{ action, label }]: Unbind; Back to Auto when a key or a preset is picked
 export function truckStatus(store, selection, truck) {
   const playing = resolvePlaying(store, selection, truck);
   const base = {
@@ -529,7 +531,7 @@ export function truckStatus(store, selection, truck) {
     const own = at === selection.scope && !isCollectionKey(playing.key);
     let note = `Editing changes the preset of ${label}.`;
     if (!own) note = `It inherits this from ${scopeLabel(store, at, truck)}: editing gives ${label} a preset of its own first.`;
-    return { ...base, plays: `${base.plays} (key picked in the map)`, appliesTo: selection.scope === ALL_SCOPE ? EVERY : label, note };
+    return { ...base, plays: `${base.plays} (key picked in the map)`, appliesTo: selection.scope === ALL_SCOPE ? EVERY : label, note, buttons: [BACK_TO_AUTO] };
   }
 
   if (selection.mode !== 'auto') {
@@ -540,6 +542,7 @@ export function truckStatus(store, selection, truck) {
       appliesTo: scopeOfKey(store, playing.key, truck),
       note: note(file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', truck && lent),
       useIn: truck ? { options: [{ value: '', label: 'Use it in…' }, ...rungOptions(playing.key)] } : null,
+      buttons: [BACK_TO_AUTO],
     };
   }
   if (!truck) return base;
