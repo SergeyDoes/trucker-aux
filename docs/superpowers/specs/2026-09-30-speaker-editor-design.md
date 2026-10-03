@@ -143,6 +143,8 @@ The Web-Audio-free logic is pure and unit-tested:
 
 ## Presets
 
+> Superseded for storage, scopes and Auto by `2026-10-03-preset-scopes-design.md` (store version 3: presets apart from the scopes they apply to). The rest of this section describes version 2.
+
 - **Selection:** `{ mode: "auto" }` | `{ mode: "default" }` | `{ mode: "truck", key }`. Not persisted; every start is `auto`.
 - **Playing layout** (`resolvePlaying`):
   - `auto` (`autoPreset`) — the narrowest that exists: a preset bound to this truck, this truck's own, a preset bound to this chassis, this chassis's own, the model's, another chassis's of the model, else the default. The Auto entry says which: "(this truck)", "(assigned)", "(all chassis)", "(other chassis)" or "(default layout)";

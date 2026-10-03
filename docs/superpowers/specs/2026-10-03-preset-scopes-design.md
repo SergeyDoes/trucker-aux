@@ -1,6 +1,6 @@
 # Preset Scopes and the Preset Map — Design
 
-Date: 2026-10-03. Status: draft. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
+Date: 2026-10-03. Status: step 1 (data, migration, Auto) done; steps 2 and 3 to do. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
 
 ## Context
 
@@ -59,9 +59,9 @@ Two problems came up in use:
 
 ## Auto
 
-The narrowest scope of the vehicle's chain that holds a preset, yours before the collection at the same scope:
+The narrowest scope of the vehicle's chain that holds a preset:
 
-1. this vehicle; 2. this chassis (yours, then a file for it); 3. the model (yours, then a file); 4. **another chassis of the model** (as now: a better guess than anything wider, as the cab is the same model); 5. the brand; 6. the game; 7. all vehicles.
+1. this vehicle; 2. this chassis; 3. the model; 4. the collection's file for this chassis, then for the model (after your own of both, as now: a file dropped into `presets/` never takes over a truck you have set up); 5. **another chassis of the model**, yours then a file's (as now: a better guess than anything wider, as the cab is the same model); 6. the brand; 7. the game; 8. all vehicles.
 
 The Auto entry and the card name the scope that plays ("(all Peterbilt)", "(all ATS)").
 
@@ -145,7 +145,11 @@ An overlay, not a second window: the state lives in the renderer, and a window w
 
 ## Delivery
 
-1. Data: version 3, migration, telemetry game and brand, `vehicles`; Auto on the new ladder; the list. No UI for moving yet; everything else works as before.
+1. Data: version 3, migration, telemetry game and brand, `vehicles`; Auto on the new ladder; the list. No UI for moving yet; everything else works as before. **Done**, with these differences from before:
+   - the list has no separate "Default layout" entry: the preset of all vehicles is listed as "Default layout — all vehicles"; it can be renamed, not deleted; custom presets are the "Unassigned" group;
+   - "Unbind" frees a scope and keeps the preset (it used to delete a vehicle's own copy); a chassis's or a model's own preset can be unbound too;
+   - "Use it in" asks first when the scope has another preset, which then stays unassigned;
+   - a model you have not driven since the migration is named after your preset for it, else its id made readable ("peterbilt 389").
 2. "Applies to" on the card with the dialogs; "Use it in" with a scope choice; unassign.
 3. The preset map.
 

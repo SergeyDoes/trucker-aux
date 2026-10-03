@@ -5,8 +5,9 @@
 // game reports (pose.js headRestX). Mirrored pairs are mirror images about X = 0.
 
 export const MAX_SPEAKERS = 16;
-// 1: X started at the driver's head. 2: X starts at the truck's axis.
-export const STORE_VERSION = 2;
+// 1: X started at the driver's head. 2: X starts at the truck's axis. 3: presets apart from
+// their scopes (normalizeStore).
+export const STORE_VERSION = 3;
 export const CHANNELS = ['L', 'R', 'M'];
 export const TYPES = ['full', 'small', 'tweeter', 'mid', 'midbass', 'sub']; // full-range ones, then high to low
 // The types' names, as the panel lists them; speakers the app adds are named after them.
@@ -132,8 +133,67 @@ export function normalizeLayout(raw, fallbackName = 'Default layout') {
   };
 }
 
+// The scope every vehicle falls back to: its preset is what the default layout was.
+export const ALL_SCOPE = 'all';
+
+// Version 3: presets apart from the scopes they apply to (presets.js).
+//   presets      { "p.N": layout }
+//   assignments  { scope: preset key or "file:…" } — "all", "game:ats", "brand:ats/peterbilt",
+//                a model "<truck id>", a chassis "<truck id>@<hook>", a vehicle "<truck id>#<plate>"
+//   vehicles     { "<truck id>": { name, game, brand, brandName } } learned in the game
+// Older files are converted: version 1 to 2 (coordinates), then 2 to 3 (migrateV2).
 export function normalizeStore(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
+  if (src.version !== STORE_VERSION) return normalizeV3(migrateV2(normalizeV2(src)));
+  return normalizeV3(src);
+}
+
+function normalizeV3(src) {
+  const presets = {};
+  if (src.presets && typeof src.presets === 'object') {
+    for (const [key, layout] of Object.entries(src.presets)) {
+      if (PRESET_KEY.test(key)) presets[key] = normalizeLayout(layout, key);
+    }
+  }
+  const assignments = {};
+  if (src.assignments && typeof src.assignments === 'object') {
+    for (const [scope, key] of Object.entries(src.assignments)) {
+      // A shared file's key ("file:…", collection.js) is kept: the folder is read separately.
+      if (scope && typeof key === 'string' && (presets[key] || (key.startsWith('file:') && scope !== ALL_SCOPE))) {
+        assignments[scope] = key;
+      }
+    }
+  }
+  // Something must play when nothing else does.
+  if (!assignments[ALL_SCOPE]) {
+    const key = freePresetKey(presets);
+    presets[key] = defaultLayout();
+    assignments[ALL_SCOPE] = key;
+  }
+  const vehicles = {};
+  if (src.vehicles && typeof src.vehicles === 'object') {
+    for (const [id, v] of Object.entries(src.vehicles)) {
+      if (!id || !v || typeof v !== 'object') continue;
+      const info = Object.fromEntries(['name', 'game', 'brand', 'brandName'].map((k) => [k, text(v[k]) || null]));
+      if (info.game !== 'ats' && info.game !== 'ets2') info.game = null;
+      vehicles[id] = info;
+    }
+  }
+  return { version: STORE_VERSION, presets, assignments, vehicles };
+}
+
+const PRESET_KEY = /^p\.\d+$/;
+
+// The next "p.N" not taken.
+export function freePresetKey(presets) {
+  let n = 0;
+  for (const key of Object.keys(presets)) if (PRESET_KEY.test(key)) n = Math.max(n, Number(key.slice(2)));
+  return `p.${n + 1}`;
+}
+
+// Version 2 (and 1, converted): { default, trucks: { scope or "custom.N": layout },
+// assignments: { vehicle or chassis: truck key or "file:…" } }.
+function normalizeV2(src) {
   const trucks = {};
   if (src.trucks && typeof src.trucks === 'object') {
     for (const [key, layout] of Object.entries(src.trucks)) {
@@ -142,21 +202,64 @@ export function normalizeStore(raw) {
   }
   // Version 1 measured X from the driver's head; its mirror line was the centre of the
   // bounds, which becomes X = 0 (with "Center on truck" that was the truck's axis).
-  const convert = src.version === STORE_VERSION ? (l) => l : (l) => centerOn(l, 0);
-  // Presets chosen by hand for a truck variant ("<truck id>@<variant>" -> preset key).
+  const convert = src.version === 2 ? (l) => l : (l) => centerOn(l, 0);
   const assignments = {};
   if (src.assignments && typeof src.assignments === 'object') {
-    for (const [variant, key] of Object.entries(src.assignments)) {
-      // A shared file's key ("file:…", collection.js) is kept: the folder is read separately.
-      if (variant && typeof key === 'string' && (trucks[key] || key.startsWith('file:'))) assignments[variant] = key;
+    for (const [scope, key] of Object.entries(src.assignments)) {
+      if (scope && typeof key === 'string' && (trucks[key] || key.startsWith('file:'))) assignments[scope] = key;
     }
   }
   return {
-    version: STORE_VERSION,
     default: convert(normalizeLayout(src.default)),
     trucks: Object.fromEntries(Object.entries(trucks).map(([key, l]) => [key, convert(l)])),
     assignments,
   };
+}
+
+// Version 2 keyed each preset by its scope. Now each layout becomes a preset "p.N"
+// assigned to that scope; "custom.N" ones are unassigned; a binding wins over the scope's
+// own preset (as Auto played it), which then stays unassigned. Model names are taken from
+// the presets' names, as the version 2 list did; game and brand come once a vehicle is driven.
+function migrateV2(v2) {
+  const presets = { 'p.1': v2.default };
+  const assignments = { [ALL_SCOPE]: 'p.1' };
+  const keyOf = {};
+  for (const [old, layout] of Object.entries(v2.trucks)) {
+    const key = freePresetKey(presets);
+    presets[key] = layout;
+    keyOf[old] = key;
+    if (!old.startsWith('custom.')) assignments[old] = key;
+  }
+  for (const [scope, target] of Object.entries(v2.assignments)) {
+    const key = target.startsWith('file:') ? target : keyOf[target];
+    if (key) assignments[scope] = key;
+  }
+  return { presets, assignments, vehicles: migratedVehicles(v2.trucks) };
+}
+
+// "International 9900i" from the model's preset, else from "International 9900i, hook 3.2 m"
+// or "International 9900i, WP-83695" with the generated ending cut off.
+function migratedVehicles(trucks) {
+  const names = {};
+  for (const [key, layout] of Object.entries(trucks)) {
+    if (key.startsWith('custom.')) continue;
+    const model = key.split(/[@#]/)[0];
+    const at = key.indexOf('@');
+    const hash = key.indexOf('#');
+    let name = layout.name;
+    let rank = 0; // the model's own name wins
+    if (at > 0) {
+      rank = 1;
+      const suffix = `, hook ${key.slice(at + 1)} m`;
+      if (name.endsWith(suffix)) name = name.slice(0, -suffix.length);
+    } else if (hash > 0) {
+      rank = 2;
+      const suffix = `, ${key.slice(hash + 1)}`;
+      if (name.endsWith(suffix)) name = name.slice(0, -suffix.length);
+    }
+    if (!names[model] || rank < names[model].rank) names[model] = { name, rank };
+  }
+  return Object.fromEntries(Object.entries(names).map(([id, { name }]) => [id, { name, game: null, brand: null, brandName: null }]));
 }
 
 const withSpeakers = (layout, speakers) => ({ ...layout, speakers });

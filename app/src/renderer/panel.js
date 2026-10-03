@@ -351,7 +351,7 @@ export function createPanel(root, actions) {
     deletePreset.disabled = !view.canDelete;
     exportButton.disabled = !view.canExport;
     exportButton.title = view.canExport ? EXPORT_TITLE : 'This preset is a file in the collection already.';
-    presetName.disabled = !view.canDelete; // the default layout keeps its name
+    presetName.disabled = !view.canRename; // a shared file keeps its name
     setValue(presetName, view.presetName);
     setValue(width, view.width);
     widthValue.textContent = view.width.toFixed(2);

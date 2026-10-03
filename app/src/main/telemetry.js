@@ -10,6 +10,7 @@ const FILE_MAP_READ = 0x0004;
 // (offsetof, MSVC x64), the same as in tools/shm_probe.py.
 const OFF_SDK_ACTIVE = 0;
 const OFF_PAUSED = 4;
+const OFF_GAME = 52;               // scs_values.game, u32: 1 ETS2, 2 ATS
 const OFF_RENDER_TIME = 24;        // u64, µs; stands still outside the game world
 const OFF_GEAR = 504;              // truck_i.gear, int; negative is reverse
 const OFF_GAME_STEER = 972;        // truck_f.gameSteer, -1..1, positive is left
@@ -31,6 +32,7 @@ const STR_SIZE = 64;
 const MARKET_SIZE = 32;
 export const SNAPSHOT_SIZE = OFF_JOB_MARKET + MARKET_SIZE; // only the start of the structure is copied
 
+const GAMES = { 1: 'ets2', 2: 'ats' };
 const decoder = new TextDecoder();
 
 function readString(view, offset, size = STR_SIZE) {
@@ -89,6 +91,9 @@ export function parsePose(view) {
       plate: readString(view, OFF_PLATE).trim() || null,
       quickJob: readString(view, OFF_JOB_MARKET, MARKET_SIZE) === 'quick_job',
       name: `${brand} ${name}`.trim() || key,
+      game: GAMES[view.getUint32(OFF_GAME, true)] ?? null, // the brand and game scopes of presets
+      brand: brandId || null,
+      brandName: brand || null,
       centerX: truckCenterX(view),
     } : null,
   };

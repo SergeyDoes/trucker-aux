@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--plate", default="")
     parser.add_argument("--quick-job", action="store_true")
     parser.add_argument("--blinker", choices=("left", "right"))
+    parser.add_argument("--game", choices=("ats", "ets2"), default="ats")
     args = parser.parse_args()
     electrics = not args.electrics_off
     engine = electrics and not args.engine_off
@@ -41,6 +42,7 @@ def main():
     mem = mmap.mmap(-1, MMF_SIZE, tagname=MMF_NAME)
     struct.pack_into("?", mem, 0, True)   # sdkActive
     struct.pack_into("?", mem, 4, False)  # paused
+    struct.pack_into("<I", mem, 52, 2 if args.game == "ats" else 1)  # scs_values.game
     struct.pack_into("?", mem, 1575, electrics)  # truck_b.electricEnabled
     struct.pack_into("?", mem, 1576, engine)     # truck_b.engineEnabled
     struct.pack_into("?", mem, 1578, args.blinker == "left")   # truck_b.blinkerLeftActive

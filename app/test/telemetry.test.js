@@ -17,6 +17,7 @@ test('parsePose reads the RenCloud plugin offsets', () => {
   put(view, 2492, '9900i');
   view.setUint8(1575, 1); // electricEnabled; engineEnabled at 1576 stays 0
   view.setBigUint64(24, 71709661n, true); // renderTime, µs
+  view.setUint32(52, 2, true); // scs_values.game: ATS
 
   const pose = parsePose(view);
 
@@ -30,7 +31,12 @@ test('parsePose reads the RenCloud plugin offsets', () => {
   assert.ok(Math.abs(pose.head.pitch - -0.0083) < 1e-6);
   assert.deepEqual(pose.truck, {
     key: 'vehicle.international.9900i', variant: null, plate: null, quickJob: false, name: 'International 9900i', centerX: null,
+    game: 'ats', brand: 'international', brandName: 'International',
   });
+  view.setUint32(52, 1, true);
+  assert.equal(parsePose(view).truck.game, 'ets2');
+  view.setUint32(52, 0, true); // an older plugin or no game id
+  assert.equal(parsePose(view).truck.game, null);
 });
 
 test('the truck axis comes from the head position (values read from the 9900i in ATS)', () => {

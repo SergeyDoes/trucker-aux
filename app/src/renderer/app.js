@@ -11,8 +11,9 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptPicked, bindPreset, createPreset, deletePreset, editLayout, exportPreset, isCustomKey, ownPreset, parseSelection,
-  plateKey, presetOptions, resolvePlaying, selectionValue, truckStatus, unbind, variantKey,
+  adoptPicked, allPresetKey, bindPreset, boundAt, createPreset, deletePreset, editLayout, exportPreset, ownPreset,
+  parseSelection, presetOptions, rememberVehicle, resolvePlaying, scopeLabel, scopesOf, selectionValue, truckStatus, unbind,
+  variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
@@ -301,7 +302,7 @@ const actions = {
   },
   renamePreset(name) {
     const trimmed = name.trim();
-    if (trimmed && playing().kind === 'truck') edit((layout) => ({ ...layout, name: trimmed }));
+    if (trimmed && playing().kind === 'preset') edit((layout) => ({ ...layout, name: trimmed }));
     else render(); // an empty name puts the old one back
   },
   // The truck card's buttons (presets.js truckStatus): a copy of what plays for this
@@ -314,13 +315,18 @@ const actions = {
       state.store = ownPreset(state.store, truck, action === 'own-truck' ? 'truck' : 'chassis');
       changesWhatPlays = false; // a copy of what plays: the same speakers
     } else if (action === 'bind-truck' || action === 'bind-chassis') {
-      state.store = bindPreset(state.store, truck, action === 'bind-truck' ? 'truck' : 'chassis', state.selection.key);
+      const scope = action === 'bind-truck' ? 'truck' : 'chassis';
+      // The preset there now is not deleted: it stays in the list, unassigned if it was its only place.
+      const taken = boundAt(state.store, truck, scope);
+      if (taken && taken !== state.selection.key && !isCollectionKey(taken)) {
+        const { name } = state.store.presets[taken];
+        const left = scopesOf(state.store, taken).length > 1 ? '' : ' It stays in the list, unassigned.';
+        if (!confirm(`"${name}" will no longer apply here.${left}`)) return;
+      }
+      state.store = bindPreset(state.store, truck, scope, state.selection.key);
       state.selection = { mode: 'auto' };
     } else if (action === 'unbind') {
       state.store = unbind(state.store, truck);
-    } else if (action === 'drop-truck') {
-      if (!confirm(`Delete the preset for this vehicle only (${truck.plate})? It will play the chassis or model preset again.`)) return;
-      state.store = deletePreset(state.store, plateKey(truck));
     } else return;
     if (changesWhatPlays) resetSession();
     syncEngine();
@@ -337,8 +343,11 @@ const actions = {
   },
   deleteCurrentPreset() {
     const current = playing();
-    if (current.kind !== 'truck') return;
-    const after = isCustomKey(current.key) ? '' : ' Vehicles using it will play a wider preset or the default layout.';
+    if (current.kind !== 'preset' || current.key === allPresetKey(state.store)) return;
+    const scopes = scopesOf(state.store, current.key);
+    const after = scopes.length
+      ? ` It applies to ${scopes.map((s) => scopeLabel(state.store, s, state.truck)).join('; ')}: those will play a wider preset.`
+      : '';
     if (!confirm(`Delete the preset "${current.layout.name}"?${after}`)) return;
     state.store = deletePreset(state.store, current.key);
     state.selection = { mode: 'auto' };
@@ -489,9 +498,10 @@ function render() {
     presets: presetOptions(state.store, state.truck),
     card: truckStatus(state.store, state.selection, state.truck),
     preset: selectionValue(state.selection),
-    canDelete: current.kind === 'truck', // the default layout and shared files stay
+    canDelete: current.kind === 'preset' && current.key !== allPresetKey(state.store), // all vehicles' preset and files stay
+    canRename: current.kind === 'preset',
     canExport: current.kind !== 'collection', // a shared file is one already
-    presetName: current.kind === 'default' ? 'Default layout' : layout.name,
+    presetName: layout.name,
     width: layout.width,
     matchLoudness: state.settings.matchLoudness,
     loudnessDb: state.loudnessDb,
@@ -509,8 +519,8 @@ function render() {
     muted: state.muted,
     silentIds,
   });
-  views.update({ layout, layoutKey: current.key ?? 'default', selectedIds: ids, silentIds });
-  overview?.update({ layout, layoutKey: current.key ?? 'default', selectedIds: ids, silentIds });
+  views.update({ layout, layoutKey: current.key, selectedIds: ids, silentIds });
+  overview?.update({ layout, layoutKey: current.key, selectedIds: ids, silentIds });
 }
 
 function statusText() {
@@ -556,6 +566,12 @@ window.aux.onPose((pose) => {
   if (otherTruck || (truck?.centerX ?? null) !== (state.truck?.centerX ?? null)) {
     state.truck = truck;
     if (otherTruck) resetSession();
+    // Its name, game and brand name the model's scopes while you drive something else.
+    const learned = rememberVehicle(state.store, truck);
+    if (learned !== state.store) {
+      state.store = learned;
+      scheduleSave();
+    }
     syncEngine();
     render();
   }

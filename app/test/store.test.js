@@ -39,14 +39,14 @@ test('writeJsonAtomic: an unwritable path gives a warning', () => {
 
 test('loadData: a fresh folder gives defaults without warnings', () => {
   const data = loadData(tempDir());
-  assert.deepEqual(data.store.default, defaultLayout());
+  assert.deepEqual(data.store.presets[data.store.assignments.all], defaultLayout());
   assert.deepEqual(data.settings, { version: 1, source: 'input', input: null, output: null, muteWhen: 'never', pauseBehavior: 'vehicle', matchLoudness: true, turnLook: { on: false, percent: 100, reverse: 'off', blinkers: false } });
   assert.deepEqual(data.warnings, []);
 });
 
 test('saveLayouts then loadData returns the same store', () => {
   const dir = tempDir();
-  const store = normalizeStore({ trucks: { k: { name: 'K', width: 0.3 } } });
+  const store = normalizeStore({ version: 2, trucks: { k: { name: 'K', width: 0.3 } } });
   assert.equal(saveLayouts(dir, store), null);
   assert.deepEqual(loadData(dir).store, store);
 });
@@ -73,6 +73,6 @@ test('loadData: a broken layouts file gives defaults and a warning', () => {
   const dir = tempDir();
   fs.writeFileSync(path.join(dir, 'layouts.json'), '[1,');
   const data = loadData(dir);
-  assert.deepEqual(data.store.default, defaultLayout());
+  assert.deepEqual(data.store.presets[data.store.assignments.all], defaultLayout());
   assert.equal(data.warnings.length, 1);
 });

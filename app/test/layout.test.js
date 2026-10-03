@@ -77,23 +77,62 @@ test('normalizeLayout: at most 16 speakers', () => {
   assert.equal(layout.speakers.length, MAX_SPEAKERS);
 });
 
-test('normalizeStore keeps and normalizes truck presets', () => {
-  const store = normalizeStore({ version: STORE_VERSION, trucks: { 'vehicle.x': { name: 'X 1', width: 0.5 }, '': {} } });
-  assert.equal(store.version, 2);
-  assert.deepEqual(store.default, defaultLayout());
-  assert.deepEqual(Object.keys(store.trucks), ['vehicle.x']);
-  assert.equal(store.trucks['vehicle.x'].name, 'X 1');
-  assert.equal(store.trucks['vehicle.x'].width, 0.5);
+test('normalizeStore keeps and normalizes presets; all vehicles always has one', () => {
+  const store = normalizeStore({ version: STORE_VERSION, presets: { 'p.1': { name: 'X 1', width: 0.5 }, 'bad': {} }, assignments: { all: 'p.1' } });
+  assert.equal(store.version, 3);
+  assert.deepEqual(Object.keys(store.presets), ['p.1']);
+  assert.equal(store.presets['p.1'].width, 0.5);
+  assert.deepEqual(store.assignments, { all: 'p.1' });
+  assert.deepEqual(store.vehicles, {});
+  // Nothing for all vehicles: the default layout gets a new preset.
+  const empty = normalizeStore({ version: STORE_VERSION });
+  assert.deepEqual(empty.presets, { 'p.1': defaultLayout() });
+  assert.deepEqual(empty.assignments, { all: 'p.1' });
+  assert.deepEqual(normalizeStore(null), empty);
 });
 
-test('normalizeStore keeps assignments only to presets that exist', () => {
+test('normalizeStore keeps assignments to presets that exist and to shared files', () => {
   const store = normalizeStore({
     version: STORE_VERSION,
-    trucks: { 'custom.1': {} },
-    assignments: { 'vehicle.x@3.2': 'custom.1', 'vehicle.x@2.1': 'gone', 'vehicle.y': 7 },
+    presets: { 'p.1': {}, 'p.2': {} },
+    assignments: { all: 'p.1', 'vehicle.x@3.2': 'p.2', 'vehicle.x@2.1': 'gone', 'vehicle.y': 7, 'vehicle.z': 'file:z.json' },
+    vehicles: { 'vehicle.x': { name: 'X', game: 'ats', brand: 'x', brandName: 'X' }, 'vehicle.q': { name: 'Q', game: 'gta' } },
   });
-  assert.deepEqual(store.assignments, { 'vehicle.x@3.2': 'custom.1' });
-  assert.deepEqual(normalizeStore({}).assignments, {});
+  assert.deepEqual(store.assignments, { all: 'p.1', 'vehicle.x@3.2': 'p.2', 'vehicle.z': 'file:z.json' });
+  assert.deepEqual(store.vehicles['vehicle.q'], { name: 'Q', game: null, brand: null, brandName: null });
+  // All vehicles never plays a file: a missing file would leave nothing to play.
+  assert.equal(normalizeStore({ version: STORE_VERSION, assignments: { all: 'file:a.json' } }).assignments.all, 'p.1');
+});
+
+test('normalizeStore converts version 2: each preset keyed by its scope becomes p.N assigned to it', () => {
+  const store = normalizeStore({
+    version: 2,
+    default: { name: 'Default layout', width: 0.7 },
+    trucks: {
+      'vehicle.a.b': { name: 'A B', width: 0.1 },
+      'vehicle.a.b@2.6': { name: 'A B, hook 2.6 m' },
+      'vehicle.c.d@3.2': { name: 'C D, hook 3.2 m' },
+      'vehicle.c.d#WP-1': { name: 'Mine' },
+      'custom.1': { name: 'Try' },
+      'custom.2': { name: 'Bound' },
+    },
+    assignments: { 'vehicle.a.b@2.6': 'custom.2', 'vehicle.e.f#X-1': 'custom.2', 'vehicle.g.h': 'file:g.json' },
+  });
+  const named = (name) => Object.keys(store.presets).find((k) => store.presets[k].name === name);
+  assert.equal(store.presets[store.assignments.all].width, 0.7);
+  assert.equal(store.presets[store.assignments['vehicle.a.b']].width, 0.1);
+  // A binding wins over the scope's own preset, which stays unassigned.
+  assert.equal(store.assignments['vehicle.a.b@2.6'], named('Bound'));
+  assert.equal(store.assignments['vehicle.e.f#X-1'], named('Bound'));
+  assert.equal(Object.values(store.assignments).includes(named('A B, hook 2.6 m')), false);
+  assert.ok(store.presets[named('A B, hook 2.6 m')]);
+  assert.equal(Object.values(store.assignments).includes(named('Try')), false);
+  assert.equal(store.assignments['vehicle.c.d#WP-1'], named('Mine'));
+  assert.equal(store.assignments['vehicle.g.h'], 'file:g.json');
+  // Model names from the presets' names, with the generated ending cut off.
+  assert.deepEqual(Object.fromEntries(Object.entries(store.vehicles).map(([id, v]) => [id, v.name])), {
+    'vehicle.a.b': 'A B', 'vehicle.c.d': 'C D',
+  });
 });
 
 test('normalizeStore converts version 1: X then started at the head, now at the centre of the bounds', () => {
@@ -104,16 +143,18 @@ test('normalizeStore converts version 1: X then started at the head, now at the 
     trucks: { 'vehicle.intnational.9900i': { name: '9900i', field: { min: [-0.67, -1.15, -1.3], max: [1.63, 0.95, 0.6] }, speakers: [door('s1', -0.64, null)] } },
   };
   const store = normalizeStore(old);
-  assert.equal(store.version, 2);
-  assert.deepEqual(store.default.bounds, defaultLayout().bounds);
-  assert.deepEqual(store.default.speakers.map((s) => s.position[0]), [-1.12, 1.12]);
-  const truck = store.trucks['vehicle.intnational.9900i'];
+  assert.equal(store.version, 3);
+  const all = store.presets[store.assignments.all];
+  assert.deepEqual(all.bounds, defaultLayout().bounds);
+  assert.deepEqual(all.speakers.map((s) => s.position[0]), [-1.12, 1.12]);
+  const truck = store.presets[store.assignments['vehicle.intnational.9900i']];
   assert.deepEqual(truck.bounds, defaultLayout().bounds);
   assert.equal(truck.speakers[0].position[0], -1.12);
-  // A file without a version is version 1; a version 2 file is taken as it is.
-  assert.equal(normalizeStore({ default: old.default }).default.speakers[0].position[0], -1.12);
+  // A file without a version is version 1; a version 2 file keeps its coordinates.
+  const unversioned = normalizeStore({ default: old.default });
+  assert.equal(unversioned.presets[unversioned.assignments.all].speakers[0].position[0], -1.12);
   const kept = normalizeStore({ version: 2, default: { bounds: { min: [-0.5, -1, -1], max: [1, 1, 1] } } });
-  assert.deepEqual(kept.default.bounds.min, [-0.5, -1, -1]);
+  assert.deepEqual(kept.presets[kept.assignments.all].bounds.min, [-0.5, -1, -1]);
 });
 
 test('updateSpeaker moves the mirrored partner and clamps values', () => {

@@ -191,6 +191,13 @@ Done: 137 unit tests pass; checked in a sandbox (a type change renames, "+ Pair"
 - A standard name (a type's name, "Door L", "Speaker 3 R", "Speaker 5") follows the type when it changes (`nameForType` in `updateSpeaker`); a name typed by hand stays.
 - The author's presets were renamed the same way, 76 speakers in all ("Midbass L", "Tweeter R", "Subwoofer", "Small full range L 2" for the Mustang's second small pair); copies of `layouts.json` from before are in `app/data/layouts.backup-2026-10-02-before-renames.json` and `…-before-type-names.json`.
 
+### E2.17 — presets apart from their scopes (step 1 of `docs/superpowers/specs/2026-10-03-preset-scopes-design.md`) ✓
+Done: 133 unit tests pass; a version 2 `layouts.json` checked in the app (converted, `layouts.v2.json` kept, an edit saved as version 3).
+- `layouts.json` version 3: presets `p.N` apart from `assignments` (scope → preset or shared file) and `vehicles` (name, game, brand of each model driven). The default layout is the preset of the scope `all`, which always has one.
+- The ladder: this vehicle, this chassis, the model, (shared files for the chassis and the model), another chassis, the brand (`brand:<game>/<brand id>`), the game (`game:ats|ets2`), all vehicles. Telemetry reads `scs_values.game` @52 and gives the brand id and name; `tools/fake_shm.py --game`.
+- Version 2 is converted on load: each preset keyed by its scope becomes `p.N` assigned to it; `custom.N` ones are unassigned; a binding wins over the scope's own preset, which stays unassigned; model names from the presets' names.
+- Unbind keeps the preset; "Use it in" asks before taking a scope from another preset. Steps 2 (moving on the card) and 3 (the preset map) are next.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
