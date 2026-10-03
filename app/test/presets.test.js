@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   adoptPicked, allPresetKey, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
-  levelOf, ownPreset, parseSelection, planScope, plateKey, presetOptions, rememberVehicle, resolvePlaying, scopeLabel,
+  levelOf, ownPreset, parseSelection, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
@@ -173,7 +173,7 @@ test('rememberVehicle keeps the name, game and brand of a model; scopes are name
   assert.equal(scopeLabel(store, 'all'), 'all vehicles');
   assert.equal(scopeLabel(store, 'game:ats'), 'all ATS vehicles');
   assert.equal(scopeLabel(store, 'brand:ats/international'), 'all International');
-  assert.equal(scopeLabel(store, 'brand:ats/peterbilt'), 'all peterbilt'); // never driven: its id
+  assert.equal(scopeLabel(store, 'brand:ats/peterbilt'), 'all Peterbilt'); // never driven: its id
   assert.equal(scopeLabel(store, 'brand:ats/peterbilt', OTHER), 'all Peterbilt');
   assert.equal(scopeLabel(store, TRUCK.key), 'International 9900i');
   assert.equal(scopeLabel(store, variantKey(SLEEPER)), 'International 9900i, hook 3.2 m');
@@ -478,4 +478,45 @@ test('exportPreset: the preset that plays as a file to share', () => {
   assert.equal(exportPreset(withPreset(), 'p.2', null).data.vehicleName, 'International 9900i');
   const chassisOnly = storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } });
   assert.equal('vehicleName' in exportPreset(chassisOnly, 'p.2', null).data, false);
+});
+
+// The map, as text: "label = own" or "label (inherited)", ● on the vehicle's chain, ▶ what plays.
+const lines = (node, depth = 0) => [
+  `${'  '.repeat(depth)}${node.plays ? '▶ ' : node.current ? '● ' : ''}${node.label}${node.own ? ` = ${node.own.name}${node.own.file ? ' (file)' : ''}` : ` (${node.inherited})`}`,
+  ...node.children.flatMap((c) => lines(c, depth + 1)),
+];
+
+test('presetTree: scopes with presets, their parents and the chain of the vehicle in the game', () => {
+  let store = storeWith({
+    [variantKey(SLEEPER)]: { name: 'Sleeper' },
+    'brand:ats/peterbilt': { name: 'Petes' },
+    'vehicle.scania.r#AB-1': { name: 'My Scania' },
+  }, [{ name: 'Spare' }]);
+  store = rememberVehicle(store, TRUCK);
+  store = rememberVehicle(store, { key: 'vehicle.scania.r', name: 'Scania R', game: 'ets2', brand: 'scania', brandName: 'Scania' });
+  store = withCollection(store, MODEL_FILE, shared('loose.json', null));
+  const map = presetTree(store, { ...SHORT, plate: 'X-1' });
+  assert.deepEqual(lines(map.root), [
+    '● All vehicles = Default layout',
+    '  ● ATS (Default layout)',
+    '    ● International (Default layout)',
+    '      ▶ International 9900i = model (file)',
+    '        ● hook 2.1 m (model)',
+    '          ● X-1 (model)',
+    '        hook 3.2 m = Sleeper',
+    '    Peterbilt = Petes',
+    '  ETS2 (Default layout)',
+    '    Scania (Default layout)',
+    '      Scania R (Default layout)',
+    '        AB-1 = My Scania',
+  ]);
+  assert.deepEqual(map.unassigned, [{ key: 'p.5', name: 'Spare' }]);
+  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
+  // Without a game: only what holds presets; a model not driven yet is under "Unknown game".
+  const unknown = presetTree(storeWith({ 'vehicle.mack.anthem': { name: 'Anthem' } }), null);
+  assert.deepEqual(lines(unknown.root), [
+    '● All vehicles = Default layout',
+    '  Unknown game (Default layout)',
+    '    Anthem = Anthem',
+  ]);
 });

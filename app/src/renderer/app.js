@@ -12,11 +12,12 @@ import {
 } from '../shared/selection.js';
 import {
   adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
-  planScope, presetOptions, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
+  planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
+import { createPresetMap } from './preset-map.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -388,6 +389,17 @@ const actions = {
     if (await putAtScope(to)) state.selection = { mode: 'auto' };
     render();
   },
+  // The preset map over the views; open or closed, or the other way round.
+  toggleMap(open = !presetMap.open) {
+    presetMap.show(open);
+    render();
+  },
+  // Unassign in the map: frees that scope; the preset stays.
+  unassignScope(scope) {
+    const before = speakerIds();
+    state.store = unassign(state.store, scope);
+    afterScopeChange(before);
+  },
   // Unbind: frees the scope the preset that plays holds here; the preset stays.
   truckAction(action) {
     if (action !== 'unbind' || !state.truck) return;
@@ -527,6 +539,7 @@ const actions = {
 };
 
 const panel = createPanel(document.getElementById('panel'), actions);
+const presetMap = createPresetMap(actions);
 const views = createViews(document.getElementById('views'), actions);
 
 // three.js is loaded on demand; without it the app still works, only the 3D view is missing.
@@ -542,6 +555,7 @@ import('./overview3d.js')
   });
 
 function render() {
+  if (presetMap.open) presetMap.update(presetTree(state.store, state.truck, state.selection));
   const current = playing();
   const { layout } = current;
   const { ids } = state.picked;
@@ -675,6 +689,11 @@ const SHORTCUTS = {
 };
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof Element && event.target.closest('input, select, textarea')) return;
+  // The map hides the views: speaker keys would act unseen. Esc closes it.
+  if (presetMap.open) {
+    if (event.key === 'Escape') actions.toggleMap(false);
+    return;
+  }
   const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey && SHORTCUTS[event.key.toLowerCase()];
   if (shortcut) {
     event.preventDefault();

@@ -203,6 +203,11 @@ Done: 137 unit tests pass; the card driven in the app with a fake truck (`TRUCKE
 - The card's "Applies to" is the vehicle's ladder (this vehicle, this chassis, the model, the brand, the game, all vehicles), each scope saying which other preset holds it. Picking one moves the preset that plays; a dialog (`renderer/dialog.js`) asks first when the target is taken (that preset stays, unassigned), lists narrower presets that would keep playing (cleared by default), warns about a narrower shared file, and on the way down offers Move or Copy for here. All vehicles always keeps a preset: moving from it copies.
 - A preset picked in the list: "Use it in" with the same ladder adds a scope. "Unbind" frees the scope of what plays. The old "Own preset for this chassis" / "Only this vehicle" buttons are now entries of the ladder.
 
+### E2.19 — the preset map (step 3 of the preset scopes spec) ✓
+Done: 138 unit tests pass; the map checked in the app with a fake truck and the shipped collection (open, pick, Unassign, Esc).
+- "Preset map" under the preset list opens a tree over the views: all vehicles > game > brand > model > chassis > vehicle, every scope that holds a preset or a shared file, their parents and the chain of the vehicle in the game (●, ▶ what plays). A scope without its own shows what it inherits, grey. Clicking a preset picks it in the list; Unassign frees a scope. Below: Unassigned presets and files for no vehicle.
+- Later: dragging a preset onto a node.
+
 ### E3 — polish
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.

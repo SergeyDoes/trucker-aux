@@ -1,6 +1,6 @@
 # Preset Scopes and the Preset Map — Design
 
-Date: 2026-10-03. Status: steps 1 (data, migration, Auto) and 2 (moving on the card) done; step 3 (the map) to do. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
+Date: 2026-10-03. Status: done (steps 1–3). Dragging in the map is left for later. The user agreed on the direction in chat: a preset moves up and down a ladder of scopes, with a warning when that takes a scope from another preset (which stays, unassigned), and a choice between moving and copying when it goes down; a view of all presets as a tree. Open questions are at the end.
 
 ## Context
 
@@ -155,7 +155,9 @@ An overlay, not a second window: the state lives in the renderer, and a window w
    - when what plays is not on this vehicle's ladder (another chassis's, a shared file), the dropdown's first entry says where it comes from, and picking a scope makes a copy there;
    - the dialog also warns when a shared file for this chassis or the model is narrower than the target and would keep playing (files cannot be unassigned);
    - debug only: `TRUCKER_AUX_FAKE_TRUCK='{"key":…,"name":…,"variant":…}'` stands for the game (`main.js`), for trying the card without it.
-3. The preset map.
+3. The preset map. **Done** (`presetTree`, `renderer/preset-map.js`): an overlay over the views and the 3D view, opened with "Preset map" under the preset list; Esc or Close shuts it, and while it is open the speaker keys do nothing (the views are hidden). Also:
+   - the vehicle in the game sits under its chassis; other single vehicles under their model (their chassis is not known);
+   - models from shared files are named by the files' `vehicleName`; a brand never driven by its id with a capital letter.
 
 ## Open questions
 

@@ -192,12 +192,13 @@ export function rememberVehicle(store, truck) {
 
 const GAME_NAMES = { ats: 'ATS', ets2: 'ETS2' };
 
-// A model's name: what the game said, else the name of your preset for the model, else its
-// id made readable ("vehicle.peterbilt.389" -> "peterbilt 389").
+// A model's name: what the game said, else the name of your preset for the model, else a
+// shared file's vehicleName, else its id made readable ("vehicle.peterbilt.389" -> "peterbilt 389").
 function modelName(store, model, truck) {
   if (truck?.key === model) return truck.name;
   const own = store.presets[store.assignments[model]];
-  return store.vehicles?.[model]?.name ?? own?.name ?? readableId(model);
+  const file = Object.values(store.collection ?? {}).find((e) => e.vehicle && modelOf(e.vehicle) === model && e.vehicleName);
+  return store.vehicles?.[model]?.name ?? own?.name ?? file?.vehicleName ?? readableId(model);
 }
 
 const readableId = (model) => model.replace(/^vehicle\./, '').replace(/[._]/g, ' ');
@@ -205,7 +206,7 @@ const readableId = (model) => model.replace(/^vehicle\./, '').replace(/[._]/g, '
 function brandName(store, game, brand, truck) {
   if (truck?.game === game && truck?.brand === brand && truck.brandName) return truck.brandName;
   const known = Object.values(store.vehicles ?? {}).find((v) => v.game === game && v.brand === brand && v.brandName);
-  return known?.brandName ?? brand;
+  return known?.brandName ?? brand.charAt(0).toUpperCase() + brand.slice(1); // never driven: its id
 }
 
 // A scope as people read it: "all vehicles", "all ATS vehicles", "all Peterbilt",
@@ -454,6 +455,87 @@ export function presetOptions(store, truck) {
     ...(unassigned.length ? [{ group: 'Unassigned', options: unassigned.map(strip) }] : []),
     ...(files.length ? [{ group: 'Collection', options: files }] : []),
   ];
+}
+
+// The preset map: every scope that holds a preset (yours or a shared file's), their parents
+// and the chain of the vehicle in the game, as a tree:
+//   all vehicles > game > brand > model > chassis and single vehicles.
+// Node: { scope, label, own, inherited, current, plays, children }
+//   own        { key, name, file } the preset or file at this scope, or null
+//   inherited  the name of what a node without its own falls back to (the nearest parent's)
+//   current    on the chain of the vehicle in the game; plays: the scope whose preset plays
+// Models whose game or brand is not known yet sit under "Unknown game" / directly under the
+// game. Also gives the unassigned presets and the files that apply nowhere.
+const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
+
+export function presetTree(store, truck, selection = { mode: 'auto' }) {
+  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const ownAt = (scope) => {
+    const key = store.assignments[scope];
+    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key) };
+    const file = files.find((e) => e.vehicle === scope);
+    return file ? { key: file.key, name: file.name, file: true } : null;
+  };
+  // Where each model belongs: what the game said, else the scopes it appears in.
+  const placeOf = (model) => {
+    if (truck?.key === model) return { game: truck.game ?? null, brand: truck.brand ?? null };
+    const known = store.vehicles?.[model];
+    return { game: known?.game ?? null, brand: known?.brand ?? null };
+  };
+  const scopes = new Set([ALL_SCOPE, ...Object.keys(store.assignments), ...files.map((e) => e.vehicle)]);
+  if (truck) for (const r of scopeLadder(store, truck)) scopes.add(r.scope);
+  const chain = new Set(truck ? scopeLadder(store, truck).map((r) => r.scope) : [ALL_SCOPE]);
+  const auto = truck && selection.mode === 'auto' ? autoPreset(store, truck) : null;
+  const playsAt = auto && chain.has(auto.scope) ? auto.scope : null;
+
+  const nodes = new Map();
+  const node = (scope, label, parent) => {
+    if (!nodes.has(scope)) {
+      nodes.set(scope, { scope, label, own: ownAt(scope), inherited: null, current: chain.has(scope), plays: scope === playsAt, children: [], parent });
+    }
+    return nodes.get(scope);
+  };
+  const root = node(ALL_SCOPE, 'All vehicles', null);
+  const gameNode = (game) => (game ? node(`game:${game}`, GAME_NAMES[game] ?? game, root) : node('game:?', 'Unknown game', root));
+  const brandNode = (game, brand) => (game && brand
+    ? node(`brand:${game}/${brand}`, brandName(store, game, brand, truck), gameNode(game))
+    : gameNode(game));
+  const modelNode = (model) => {
+    const { game, brand } = placeOf(model);
+    return node(model, modelName(store, model, truck), brandNode(game, brand));
+  };
+  for (const scope of [...scopes].sort(byLevel).reverse()) {
+    const level = levelOf(scope);
+    if (level === 'game') gameNode(scope.slice(5));
+    else if (level === 'brand') {
+      const [game, brand] = scope.slice(6).split('/');
+      brandNode(game, brand);
+    } else if (level === 'model') modelNode(scope);
+    else if (level === 'chassis') node(scope, `hook ${scope.slice(scope.indexOf('@') + 1)} m`, modelNode(modelOf(scope)));
+    else if (level === 'vehicle') {
+      // The vehicle in the game sits under its chassis; others' chassis is not known.
+      const parent = truck && scope === plateKey(truck) && chassisKey(truck) ? nodes.get(chassisKey(truck)) : null;
+      node(scope, scope.slice(scope.indexOf('#') + 1), parent ?? modelNode(modelOf(scope)));
+    }
+  }
+  for (const n of nodes.values()) {
+    if (n.parent) n.parent.children.push(n);
+  }
+  const finish = (n, inherited) => {
+    n.inherited = n.own ? null : inherited;
+    n.children.sort((a, b) => MAP_ORDER.indexOf(levelOf(a.scope)) - MAP_ORDER.indexOf(levelOf(b.scope)) || a.label.localeCompare(b.label));
+    for (const c of n.children) finish(c, n.own?.name ?? inherited);
+    delete n.parent;
+    return n;
+  };
+  const used = new Set(Object.values(store.assignments));
+  return {
+    root: finish(root, null),
+    unassigned: Object.keys(store.presets).filter((k) => !used.has(k))
+      .map((key) => ({ key, name: store.presets[key].name })).sort((a, b) => a.name.localeCompare(b.name)),
+    files: Object.values(store.collection ?? {}).filter((e) => !e.vehicle && !used.has(e.key))
+      .map((e) => ({ key: e.key, name: collectionLabel(e) })).sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 // The preset that plays as a file to share (collection.js): { fileName, data }, or null
