@@ -4,6 +4,8 @@
   "vehicle": "vehicle.ford.bronco_24",
   "vehicleName": "Ford Bronco 2024",
   "game": "ats",
+  "brand": "ford",
+  "brandName": "Ford",
   "layout": {
     "width": 1,
     "bounds": {

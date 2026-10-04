@@ -4,6 +4,8 @@
   "vehicle": "vehicle.kenworth.w900@3.6",
   "vehicleName": "Kenworth W900",
   "game": "ats",
+  "brand": "kenworth",
+  "brandName": "Kenworth",
   "layout": {
     "width": 1,
     "bounds": {
