@@ -124,6 +124,7 @@ export function createKeyTree(root, actions) {
         item('Copy the current preset here', () => actions.copyCurrent(node.scope)),
       );
       if (node.own && !node.own.file && node.scope !== 'all') items.push(item('Unassign', () => actions.unassignScope(node.scope)));
+      items.push(item('Export this branch', () => actions.exportBranch(node.scope)));
       items.push(el('hr'));
     }
     if (node.children.length) {

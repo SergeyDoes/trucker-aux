@@ -247,6 +247,11 @@ Done: 146 unit tests pass; checked in the app (a new model's green "new", change
 Done: 147 unit tests pass; checked in the app (pick a key, back with the card's button and with the header's).
 - Picking a key in the tree or a preset in the list stops following the vehicle in the game. An "Auto" button in the tree's header brings it back: dim while Auto is on, highlighted while it is off. The card offers "Back to Auto" too.
 
+### E2.28 — exporting presets as sets ✓
+Done: 150 unit tests pass; checked in the app (Export this branch on a brand: two files in "presets/ATS, Kenworth", the plate's left out and said so).
+- Right-click a key, "Export this branch": every preset of yours on that key and under it goes into a new folder of `presets/` named by the key's path, one file per key (`exportBranch`, `writePresetSet`), and the folder opens. Presets for a single vehicle stay out (plates are personal); all vehicles' preset goes without a vehicle.
+- A file's `vehicle` may now be a brand (`brand:ats/kenworth`) or a game (`game:ats`): Auto plays such a file after your own preset there, before anything wider (`collectionBrand`, `collectionGame`).
+
 ### E3 — polish
 - **Turn look on an outside camera (bug).** The game's "look into turns" / "toward the blinker" only turn the cab camera, but the app adds them from the steering and the blinkers whatever the camera, so on an outside camera the sound turns wrongly. The telemetry does not tell the camera: head.offset freezes outside (R0, `docs/findings.md` item 7, recorded standing still). To check: a drive recorded with `py tools/shm_probe.py --hz 30 --csv docs/drive.csv` (speed, steering, full head and cab values, Enter marks each camera switch): cab with turns, outside with steering, cab again, standing still. If the head never stands exactly still in the cab while driving, an exactly frozen head.offset at speed means an outside camera: turn look off (and back on when it moves). Otherwise: a note that it follows the cab camera only.
 - Tray, autostart, the window can be closed while audio keeps playing.

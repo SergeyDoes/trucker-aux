@@ -87,9 +87,11 @@ export function autoPreset(store, truck) {
   if (sibling) return { key: assigned(sibling), how: 'sibling', scope: sibling };
   const ofSibling = file(isSibling);
   if (ofSibling) return { key: ofSibling, how: 'collectionSibling', scope: store.collection[ofSibling].vehicle };
+  // The brand, then the game: yours, then a shared file for it (a set exported from a
+  // branch of the key tree carries those, exportBranch).
   for (const [how, scope] of [['brand', brandKey(truck)], ['game', gameKey(truck)], ['all', ALL_SCOPE]]) {
-    const key = assigned(scope);
-    if (key) return { key, how, scope };
+    const key = assigned(scope) ?? (scope && how !== 'all' ? file((v) => v === scope) : null);
+    if (key) return { key, how: isCollectionKey(key) ? `collection${how[0].toUpperCase()}${how.slice(1)}` : how, scope };
   }
   return null;
 }
@@ -574,6 +576,8 @@ export function truckStatus(store, selection, truck) {
 }
 
 const AUTO_NOTE = {
+  collectionBrand: () => ' (collection)',
+  collectionGame: () => ' (collection)',
   vehicle: () => ' (this vehicle)',
   chassis: () => '',
   model: (truck) => (truck.variant ? ' (all chassis)' : ''),
@@ -746,6 +750,43 @@ export function exportPreset(store, key, truck) {
     fileName: presetFileName(layout.name),
     data: presetFile({ name: layout.name, vehicle, vehicleName, game: place.game, brand: place.game && place.brand, brandName: brandLabel, layout }),
   };
+}
+
+// A branch of the key tree as a set of files to share (collection.js): every preset of yours
+// on that key and the keys under it, one file per key, with the key in "vehicle" (a model, a
+// chassis, a brand or a game; all vehicles' preset goes without one). Presets for a single
+// vehicle stay out: plates are personal. { folder, files: [{ fileName, data }], skipped }.
+export function exportBranch(store, branch, truck = null) {
+  const files = [];
+  let skipped = 0;
+  for (const [scope, key] of Object.entries(store.assignments).sort(([a], [b]) => LEVELS.indexOf(levelOf(b)) - LEVELS.indexOf(levelOf(a)) || a.localeCompare(b))) {
+    if (isCollectionKey(key) || !store.presets[key]) continue;
+    if (scope !== branch && !chainOf(store, scope, truck).includes(branch)) continue;
+    const level = levelOf(scope);
+    if (level === 'vehicle') {
+      skipped++;
+      continue;
+    }
+    const layout = store.presets[key];
+    const vehicle = level === 'all' ? null : scope;
+    let place = {};
+    if (level === 'brand') {
+      const [game, brand] = scope.slice(6).split('/');
+      place = { game, brand, brandName: brandName(store, game, brand, truck) };
+    } else if (level === 'game') place = { game: scope.slice(5) };
+    else if (vehicle) {
+      const { game, brand } = placeOf(store, modelOf(scope), truck);
+      const name = modelName(store, modelOf(scope), truck);
+      place = {
+        vehicleName: name !== readableId(modelOf(scope)) ? name : null,
+        game,
+        brand: game && brand,
+        brandName: game && brand ? brandName(store, game, brand, truck) : null,
+      };
+    }
+    files.push({ fileName: presetFileName(layout.name), data: presetFile({ name: layout.name, vehicle, ...place, layout }) });
+  }
+  return { folder: presetFileName(keyPath(store, branch, truck)).replace(/\.json$/, ''), files, skipped };
 }
 
 export function selectionValue(selection) {

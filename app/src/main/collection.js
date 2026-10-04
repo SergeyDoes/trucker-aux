@@ -55,6 +55,25 @@ export function writePresetFile(dir, fileName, data) {
   return { file: warning ? null : file, warning };
 }
 
+// Writes a set of exported presets into a new folder under dir ("name", or "name (2)" and so
+// on when it is taken). Gives { folder, written, warning }.
+export function writePresetSet(dir, folderName, files) {
+  let folder = path.join(dir, folderName);
+  for (let n = 2; fs.existsSync(folder); n++) folder = path.join(dir, `${folderName} (${n})`);
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+  } catch (err) {
+    return { folder: null, written: 0, warning: `Cannot create ${folder}: ${err.message}` };
+  }
+  let written = 0;
+  for (const { fileName, data } of files) {
+    const { warning } = writePresetFile(folder, fileName, data);
+    if (warning) return { folder, written, warning };
+    written++;
+  }
+  return { folder, written, warning: null };
+}
+
 // Calls onChange delayMs after the last change in the folder (an editor saves in several
 // steps). The folder is created if it is missing. Gives a function that stops watching.
 export function watchCollection(dir, onChange, delayMs = 300) {
