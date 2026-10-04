@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
+  adoptNewModel, adoptPicked, allPresetKey, exportBranch, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -664,4 +664,42 @@ test('the card offers Back to Auto when a key or a preset is picked', () => {
   assert.deepEqual(truckStatus(store, PICK('p.2'), OWNED).buttons, [back]);
   assert.deepEqual(truckStatus(store, { mode: 'scope', scope: TRUCK.key }, OWNED).buttons, [back]);
   assert.equal(truckStatus(store, AUTO, OWNED).buttons.some((b) => b.action === 'auto'), false);
+});
+
+test('exportBranch: the presets on a key and under it, one file per key; plates stay out', () => {
+  let store = storeWith({
+    'game:ats': { name: 'ATS' },
+    'brand:ats/international': { name: 'International' },
+    [TRUCK.key]: { name: 'Model' },
+    [variantKey(SLEEPER)]: { name: 'Sleeper' },
+    [plateKey(OWNED)]: { name: 'Mine' },
+    'vehicle.peterbilt.579': { name: 'Pete' },
+  });
+  store = rememberVehicle(rememberVehicle(store, OWNED), OTHER);
+  const brand = exportBranch(store, 'brand:ats/international');
+  assert.equal(brand.folder, 'ATS, International');
+  assert.equal(brand.skipped, 1); // the plate
+  assert.deepEqual(brand.files.map((f) => [f.data.name, f.data.vehicle ?? null]), [
+    ['International', 'brand:ats/international'], ['Model', TRUCK.key], ['Sleeper', variantKey(SLEEPER)],
+  ]);
+  assert.deepEqual(
+    { game: brand.files[0].data.game, brand: brand.files[0].data.brand, brandName: brand.files[0].data.brandName },
+    { game: 'ats', brand: 'international', brandName: 'International' },
+  );
+  assert.equal(brand.files[2].data.vehicleName, 'International 9900i');
+  const all = exportBranch(store, 'all');
+  assert.equal(all.folder, 'All vehicles');
+  assert.deepEqual(all.files.map((f) => f.data.name), ['Default layout', 'ATS', 'International', 'Model', 'Pete', 'Sleeper']);
+  assert.equal('vehicle' in all.files[0].data, false); // all vehicles' preset: for no vehicle
+  assert.deepEqual(exportBranch(storeWith(), TRUCK.key).files, []);
+});
+
+test('shared files for a brand or a game play after yours there, before wider ones', () => {
+  const brandFile = shared('b.json', 'brand:ats/international');
+  const gameFile = shared('g.json', 'game:ats');
+  assert.deepEqual(autoPreset(withCollection(storeWith(), brandFile, gameFile), TRUCK), { key: 'file:b.json', how: 'collectionBrand', scope: 'brand:ats/international' });
+  assert.equal(autoPreset(withCollection(storeWith(), gameFile), TRUCK).how, 'collectionGame');
+  assert.equal(autoPreset(withCollection(storeWith({ 'brand:ats/international': { name: 'Mine' } }), brandFile), TRUCK).how, 'brand');
+  assert.equal(autoPreset(withCollection(storeWith(), gameFile), { ...TRUCK, game: 'ets2' }).how, 'all');
+  assert.equal(truckStatus(withCollection(storeWith(), brandFile), AUTO, TRUCK).appliesTo, 'all International, from the collection');
 });

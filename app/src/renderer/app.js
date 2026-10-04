@@ -11,7 +11,7 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportPreset, parseSelection,
+  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportBranch, exportPreset, parseSelection,
   planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
@@ -579,6 +579,19 @@ const actions = {
     afterScopeChange(before);
   },
   // Writes what plays as a file in presets/ to share it; main shows it in Explorer.
+  // The tree's menu: every preset of yours on a key and under it, as files in a new folder of
+  // presets/ (to zip and share). Presets for a single vehicle stay out: plates are personal.
+  async exportBranch(scope) {
+    const set = exportBranch(state.store, scope, state.truck);
+    if (!set.files.length) {
+      state.storeWarnings = [`No presets of yours on ${scopeLabel(state.store, scope, state.truck)} or under it to export.`];
+      return render();
+    }
+    const { folder, written, warning } = await window.aux.exportSet(set.folder, set.files);
+    const skipped = set.skipped ? ` ${set.skipped} for single vehicles stayed out (plates are personal).` : '';
+    state.storeWarnings = warning ? [warning] : [`Exported ${written} preset(s) to ${folder}.${skipped}`];
+    render();
+  },
   async exportPreset() {
     const shared = exportPreset(state.store, playing().key, state.truck);
     if (!shared) return;

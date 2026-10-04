@@ -25,6 +25,8 @@ files: edits go to your own presets in `data/layouts.json`.
 - `vehicle` is the game's truck id. Add `@` and the fifth-wheel position in metres for
   one chassis, as the app shows it ("hook 2.7 m"). Without `vehicle` the preset is only
   picked by hand.
+- `vehicle` may also be a whole brand of a game (`brand:ats/kenworth`) or a game (`game:ats`): such a preset plays for every vehicle of it without a preset of its own.
+- Sets: right-click a key in the app's preset tree, "Export this branch", writes every preset on that key and under it into a folder here ("ATS, Kenworth"), one file each; zip the folder to share it. Presets for one vehicle (a plate) stay out.
 - `vehicleName` and `author` are optional. Export leaves `author` out: add it by hand.
 - `layout.label` (optional): a short tag, up to 16 characters, shown beside the keys that use the preset in the preset map; `layout.labelColor`: `gray`, `orange`, `green` or `red` (blue when left out).
 - `game` (`ats` or `ets2`), `brand` (the game's brand id) and `brandName` are optional: they place the vehicle under its game and brand in the preset map before you have driven it. Export writes them when the game has told them; `npm run fill-presets` writes them into every file here whose vehicle you have driven (from `data/layouts.json`).

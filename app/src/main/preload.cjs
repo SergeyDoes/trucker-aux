@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('aux', {
   onPose: (listener) => ipcRenderer.on('pose', (_event, pose) => listener(pose)),
   // { collection, warnings } whenever presets/ changes (main/collection.js).
   onCollection: (listener) => ipcRenderer.on('collection', (_event, collection) => listener(collection)),
-  exportPreset: (fileName, data) => ipcRenderer.invoke('collection:export', fileName, data),});
+  exportPreset: (fileName, data) => ipcRenderer.invoke('collection:export', fileName, data),
+  exportSet: (folderName, files) => ipcRenderer.invoke('collection:export-set', folderName, files),
+});

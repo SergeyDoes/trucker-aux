@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings } from './store.js';
 import { openTelemetry } from './telemetry.js';
-import { presetsDirFor, readCollection, watchCollection, writePresetFile } from './collection.js';
+import { presetsDirFor, readCollection, watchCollection, writePresetFile, writePresetSet } from './collection.js';
 import { presetFileName } from '../shared/collection.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,13 @@ const presetsDir = presetsDirFor(dataDir);
 ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir), debug }));
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
+// A set of presets (a branch of the key tree) into a new folder of presets/; shown in Explorer.
+ipcMain.handle('collection:export-set', (_event, folderName, files) => {
+  const safe = presetFileName(String(folderName)).replace(/\.json$/i, '');
+  const result = writePresetSet(presetsDir, safe, files.map((f) => ({ fileName: presetFileName(String(f.fileName).replace(/\.json$/i, '')), data: f.data })));
+  if (result.folder && result.written) shell.openPath(result.folder);
+  return { ...result, folder: result.folder && path.relative(path.dirname(presetsDir), result.folder) };
+});
 ipcMain.handle('collection:export', (_event, fileName, data) => {
   // The name is made safe again here: a file goes into presets/ and nowhere else.
   const result = writePresetFile(presetsDir, presetFileName(String(fileName).replace(/\.json$/i, '')), data);
