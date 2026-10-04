@@ -74,6 +74,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Plain stereo headphones. Virtual surround (DTS Headphone:X, Windows Sonic, Dolby Atmos) would virtualize the binaural output a second time and may sound weird
 - **Setup**:
   - Make sure you set up the Virtual Audio Device and both Input and Output device appear in your system
+  - Download the [latest version](../../releases/latest) and *Extract* the archive
   - Place the **scs-telemetry.dll** at *[Game Folder]/bin/win_x64/plugins/*
     - Create the *plugins* folder if needed
    - Run the *Trucker AUX* application
