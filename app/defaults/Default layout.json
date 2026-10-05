@@ -1,6 +1,7 @@
 {
   "truckerAuxPreset": 1,
   "name": "Default layout",
+  "vehicle": "all",
   "layout": {
     "label": "default",
     "labelColor": "gray",

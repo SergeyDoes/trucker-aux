@@ -4,9 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings } from './store.js';
 import { openTelemetry } from './telemetry.js';
-import { presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
+import { defaultsDirFor, presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
 import { writeJsonAtomic } from './store.js';
 import { presetFileName } from '../shared/collection.js';
+import { importDefaults } from '../shared/presets.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
@@ -29,19 +30,28 @@ app.setPath('userData', path.join(dataDir, 'profile'));
 // folder changes.
 const presetsDir = presetsDirFor(dataDir);
 
-ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir), debug }));
+// The presets shipped in defaults/ become yours once, saved at once (importDefaults).
+ipcMain.handle('store:load', () => {
+  const data = loadData(dataDir);
+  if (!data.store.defaultsImported) {
+    const { collection, warnings } = readCollection(defaultsDirFor(dataDir));
+    data.store = importDefaults(data.store, Object.values(collection), data.fresh);
+    data.warnings.push(...warnings, saveLayouts(dataDir, data.store));
+  }
+  return { ...data, warnings: data.warnings.filter(Boolean), collection: readCollection(presetsDir), debug };
+});
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
 // Export (the export window's ticked presets, as files): where to, asked as Save As does;
-// one preset is a file, more a folder of them. Shown in Explorer. Offered first in Documents:
-// a file put in presets/ joins the collection at once.
+// one preset is a file, more a folder of them. Shown in Explorer. Offered first in presets/
+// (where it joins the collection at once), then where the last one went.
 let exportDir = null;
 ipcMain.handle('collection:export', async (event, files, name) => {
   const one = files.length === 1;
   const safe = presetFileName(String(one ? files[0].fileName : name).replace(/\.json$/i, ''));
   const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
     title: one ? 'Export the preset' : `Export ${files.length} presets into a folder`,
-    defaultPath: path.join(exportDir ?? app.getPath('documents'), one ? safe : safe.replace(/\.json$/i, '')),
+    defaultPath: path.join(exportDir ?? presetsDir, one ? safe : safe.replace(/\.json$/i, '')),
     buttonLabel: 'Export',
     filters: one ? [{ name: 'Trucker AUX preset', extensions: ['json'] }] : [],
     properties: ['createDirectory', 'showOverwriteConfirmation'],

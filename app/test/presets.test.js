@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, importDefaults,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -479,11 +479,11 @@ test('exportFiles: a preset as a file for the key it is on', () => {
   const plateOwn = plated.assignments[plateKey(OWNED)];
   assert.equal(exportPreset(plated, plateOwn, OWNED).data.vehicle, variantKey(OWNED));
   assert.equal(exportPreset(plated, plateOwn, null).data.vehicle, TRUCK.key);
-  // Unassigned and all vehicles' presets are for no vehicle; a shared file can go again.
+  // An unassigned preset is for no vehicle, all vehicles' for "all"; a shared file can go again.
   const custom = createPreset(store, store.presets['p.1']);
   assert.equal('vehicle' in exportPreset(custom.store, custom.key, SLEEPER).data, false);
   assert.equal(exportPreset(store, 'p.1', SLEEPER).data.name, 'Default layout');
-  assert.equal('vehicle' in exportPreset(store, 'p.1', SLEEPER).data, false);
+  assert.equal(exportPreset(store, 'p.1', SLEEPER).data.vehicle, 'all');
   assert.equal(exportFiles(withCollection(store, MODEL_FILE), [{ scope: TRUCK.key, key: 'file:model.json' }], SLEEPER).files[0].data.vehicle, TRUCK.key);
   // A model never driven is named after your preset for it; a chassis-only one has no name.
   assert.equal(exportPreset(withPreset(), 'p.2', null).data.vehicleName, 'International 9900i');
@@ -680,7 +680,7 @@ test('exportFiles: each ticked preset goes for its key; plates go for their chas
   const picks = ['brand:ats/international', 'game:ats', 'all'].map((scope) => ({ scope, key: store.assignments[scope] }));
   const set = exportFiles(store, picks, null);
   assert.deepEqual(set.files.map((f) => [f.data.name, f.data.vehicle ?? null]), [
-    ['International', 'brand:ats/international'], ['ATS', 'game:ats'], ['Default layout', null],
+    ['International', 'brand:ats/international'], ['ATS', 'game:ats'], ['Default layout', 'all'],
   ]);
   assert.deepEqual(
     { game: set.files[0].data.game, brand: set.files[0].data.brand, brandName: set.files[0].data.brandName },
@@ -696,6 +696,32 @@ test('exportFiles: each ticked preset goes for its key; plates go for their chas
   const loose = exportFiles(file, [{ scope: null, key: 'file:model.json' }], null).files[0].data;
   assert.equal(loose.author, 'Alex');
   assert.equal('vehicle' in loose, false);
+});
+
+test('importDefaults: the shipped presets made yours once, on their keys', () => {
+  const file = (name, vehicle, width = 1) => ({ ...shared(`${name}.json`, vehicle), name, layout: { ...defaultLayout(), name, width } });
+  const all = file('Default layout', 'all', 0.7);
+  const model = file('Model', TRUCK.key, 0.8);
+  const loose = file('Loose', null, 0.9);
+  const fresh = importDefaults(storeWith(), [all, model, loose], true);
+  assert.equal(fresh.defaultsImported, true);
+  assert.equal(at(fresh, 'all').name, 'Default layout');
+  assert.equal(at(fresh, 'all').width, 0.7);
+  assert.equal(Object.keys(fresh.presets).length, 3); // the new store's default layout is gone
+  assert.equal(at(fresh, TRUCK.key).name, 'Model');
+  assert.deepEqual(presetTree(fresh, null).unassigned.map((p) => p.name), ['Loose']);
+  // Where a file's vehicle is from stays known: the tree places it under its game and brand.
+  const placed = importDefaults(storeWith(), [{ ...model, game: 'ats', brand: 'international', brandName: 'International', vehicleName: 'International 9900i' }], true);
+  assert.deepEqual(lines(presetTree(placed, null).root).slice(1), ['  ATS (Default layout)', '    International (Default layout)', '      International 9900i = Model']);
+  // A store of yours: all vehicles' and a key with your preset stay; one the same as yours is
+  // not added again; a key that held the file gets the preset.
+  let mine = storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } });
+  mine = { ...mine, presets: { ...mine.presets, 'p.1': { ...mine.presets['p.1'], width: 0.9 } }, assignments: { ...mine.assignments, 'vehicle.other': 'file:Model.json' } };
+  const kept = importDefaults(mine, [all, model, loose], false);
+  assert.equal(at(kept, 'all').width, 0.9);
+  assert.equal(at(kept, TRUCK.key).name, 'Mine');
+  assert.equal(at(kept, 'vehicle.other').name, 'Model');
+  assert.deepEqual(presetTree(kept, null).unassigned.map((p) => p.name), ['Default layout copy']); // Loose is the same as p.1
 });
 
 test('shared files for a brand or a game play after yours there, before wider ones', () => {

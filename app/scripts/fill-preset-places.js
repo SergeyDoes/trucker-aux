@@ -1,5 +1,5 @@
 // Writes where each shared preset's vehicle is from (game, brand, brandName) into the files
-// in presets/, from what the game told the app (data/layouts.json, "vehicles"). Only facts:
+// in defaults/ (the presets shipped with the app), from what the game told the app (data/layouts.json, "vehicles"). Only facts:
 // a model never driven is left as it is. Run: npm run fill-presets [-- <data folder>]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { normalizeStore } from '../src/shared/layout.js';
 
 const app = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = process.argv[2] ?? path.join(app, 'data');
-const presetsDir = path.join(path.dirname(path.resolve(dataDir)), 'presets');
+const presetsDir = path.join(path.dirname(path.resolve(dataDir)), 'defaults');
 const layouts = path.join(dataDir, 'layouts.json');
 if (!fs.existsSync(layouts)) {
   console.error(`${layouts} is missing: drive the vehicles once with the app running.`);

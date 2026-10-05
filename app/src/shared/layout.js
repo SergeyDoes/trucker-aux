@@ -192,7 +192,8 @@ function normalizeV3(src) {
       vehicles[id] = info;
     }
   }
-  return { version: STORE_VERSION, presets, assignments, vehicles };
+  // The presets shipped with the app were made yours (presets.js importDefaults).
+  return { version: STORE_VERSION, presets, assignments, vehicles, ...(src.defaultsImported === true ? { defaultsImported: true } : {}) };
 }
 
 const PRESET_KEY = /^p\.\d+$/;

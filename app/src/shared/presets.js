@@ -187,6 +187,49 @@ export function createPreset(store, layout) {
   return { store: { ...store, presets: { ...store.presets, [key]: preset } }, key };
 }
 
+// What a file says of its model (name, game, brand), kept as if the model had been driven,
+// so the tree places it; what the game told is never overwritten.
+function learnPlace(store, entry) {
+  if (!entry.vehicle || !['model', 'chassis'].includes(levelOf(entry.vehicle))) return store;
+  const model = modelOf(entry.vehicle);
+  const known = store.vehicles?.[model] ?? { name: null, game: null, brand: null, brandName: null, chassis: [], plates: {} };
+  const info = {
+    ...known,
+    name: known.name ?? entry.vehicleName,
+    game: known.game ?? entry.game,
+    brand: known.brand ?? (entry.game && entry.brand),
+    brandName: known.brandName ?? (entry.game && entry.brandName),
+  };
+  if (levelOf(entry.vehicle) === 'chassis') info.chassis = [...new Set([...known.chassis, entry.vehicle.slice(entry.vehicle.indexOf('@') + 1)])].sort();
+  return { ...store, vehicles: { ...store.vehicles, [model]: info } };
+}
+
+// The presets shipped with the app (defaults/, read as collection.js entries) made yours,
+// once (store.defaultsImported). Each goes on the key its file says ("all": all vehicles,
+// only in a new store, fresh) when no preset of yours is there; else among the unused ones.
+// One the same as a preset of yours (speakers, bounds, width) is not added again: that one
+// takes its place. A key that held the file ("file:<path>", from when these were shared
+// files in presets/) gets the preset.
+export function importDefaults(store, entries, fresh) {
+  const sameLayout = (a, b) => JSON.stringify([a.width, a.bounds, a.speakers]) === JSON.stringify([b.width, b.bounds, b.speakers]);
+  let next = { ...store, assignments: { ...store.assignments }, defaultsImported: true };
+  // A new store's default layout gives way to the shipped one for all vehicles (its name too).
+  if (fresh && entries.some((e) => e.vehicle === ALL_SCOPE)) {
+    const { [next.assignments[ALL_SCOPE]]: _gone, ...presets } = next.presets;
+    next.presets = presets;
+  }
+  for (const entry of [...entries].sort((a, b) => (a.file < b.file ? -1 : 1))) {
+    let key = Object.keys(next.presets).find((k) => sameLayout(next.presets[k], entry.layout));
+    if (!key) ({ store: next, key } = createPreset(next, entry.layout));
+    const scope = entry.vehicle;
+    const held = scope && next.assignments[scope];
+    if (scope && (scope === ALL_SCOPE ? fresh : !held || held === entry.key)) next.assignments[scope] = key;
+    for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next.assignments[s] = key;
+    next = learnPlace(next, entry);
+  }
+  return next;
+}
+
 // A shared file picked in the list is never changed: before the first edit it becomes an
 // unassigned copy ("New preset"), chosen instead. Anything else is left as it is.
 export function adoptPicked(store, selection) {
@@ -731,9 +774,10 @@ export function planAssign(store, key, to) {
 
 // What a preset at a key is shared for, the key in the file's "vehicle": the key itself; a
 // vehicle's own (by plate) its chassis, or its model when that is not known, so the plate
-// stays private; all vehicles' and one on no key (scope null): no vehicle.
+// stays private; all vehicles' "all"; one on no key (scope null): no vehicle.
 function shareScope(store, scope, truck) {
-  if (!scope || scope === ALL_SCOPE || scope.startsWith('?')) return null;
+  if (!scope || scope.startsWith('?')) return null;
+  if (scope === ALL_SCOPE) return ALL_SCOPE;
   return levelOf(scope) === 'vehicle' ? plateChassis(store, scope, truck) ?? modelOf(scope) : scope;
 }
 
@@ -758,7 +802,7 @@ function placeOfScope(store, vehicle, truck) {
 
 // The presets ticked in the export window as files to share (collection.js). picks:
 // [{ scope, key }], a preset of yours or a shared file and the key it is on (null: on none),
-// each going for that key (shareScope). { files: [{ fileName, data }], clashes, plates }:
+// each going for that key (shareScope; all vehicles' as "all"). { files: [{ fileName, data }], clashes, plates }:
 // clashes, the keys that more than one file goes for (only one of them would play there);
 // plates, how many vehicles' own presets go for their chassis.
 export function exportFiles(store, picks, truck = null) {
@@ -771,10 +815,11 @@ export function exportFiles(store, picks, truck = null) {
     const vehicle = shareScope(store, scope, truck);
     if (scope && levelOf(scope) === 'vehicle') plates++;
     if (vehicle) targets.set(vehicle, (targets.get(vehicle) ?? 0) + 1);
+    const place = vehicle && vehicle !== ALL_SCOPE ? placeOfScope(store, vehicle, truck) : {};
     const author = isCollectionKey(key) ? store.collection[key].author : null;
     files.push({
       fileName: presetFileName(layout.name),
-      data: presetFile({ name: layout.name, vehicle, author, ...(vehicle ? placeOfScope(store, vehicle, truck) : {}), layout }),
+      data: presetFile({ name: layout.name, vehicle, author, ...place, layout }),
     });
   }
   const clashes = [...targets].filter(([, n]) => n > 1).map(([vehicle]) => scopeLabel(store, vehicle, truck));
