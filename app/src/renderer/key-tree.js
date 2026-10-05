@@ -17,7 +17,8 @@ export function createKeyTree(root, actions) {
   const auto = el('button', { className: 'reg-auto', textContent: 'Auto', onclick: () => actions.selectPreset('auto') });
   const undo = el('button', { textContent: '↶', title: 'Undo (Ctrl+Z)', onclick: () => actions.undo() });
   const redo = el('button', { textContent: '↷', title: 'Redo (Ctrl+Y)', onclick: () => actions.redo() });
-  const share = el('button', { className: 'reg-export', textContent: 'Export…', title: 'Pick presets to save as files to share', onclick: () => actions.exportPresets() });
+  const share = el('button', { className: 'reg-file', textContent: 'Export…', title: 'Pick presets to save as files to share', onclick: () => actions.exportPresets() });
+  const take = el('button', { className: 'reg-file', textContent: 'Import…', title: 'Make preset files your presets, on the keys they are for', onclick: () => actions.importPresets() });
   const tree = el('ul', { className: 'reg-tree', role: 'tree' });
   // Below the keys: presets on no key, to keep, rename and put on keys again.
   const unusedList = el('div', { className: 'reg-unused-list' });
@@ -28,7 +29,7 @@ export function createKeyTree(root, actions) {
   ]);
   const splitter = el('div', { className: 'reg-split', title: 'Drag to resize' });
   root.replaceChildren(
-    el('header', {}, [el('h2', { textContent: 'Presets' }), auto, share, undo, redo]),
+    el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
       textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',

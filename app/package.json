@@ -8,7 +8,6 @@
     "start": "electron .",
     "test": "node --test",
     "test:engine": "electron scripts/engine-check.js",
-    "fill-presets": "node scripts/fill-preset-places.js",
     "predist": "node scripts/check-plugin.js",
     "dist": "electron-builder --win zip --x64"
   },

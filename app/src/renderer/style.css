@@ -99,7 +99,7 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-loose.file { font-style: italic; color: var(--dim); }
 .reg-rename { width: 100%; font-size: 12px; }
 #tree header { display: flex; align-items: center; gap: 4px; }
-#tree header h2 { flex: 1; margin: 0; font-size: 14px; }
+#tree header h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin: 0; font-size: 14px; }
 #tree header button { padding: 0 6px; font-size: 14px; flex: none; }
 #tree header .reg-auto { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--front); background: #d08c0033; font-weight: 600; }
 #tree header .reg-auto.on { border-color: #8886; background: none; font-weight: 400; color: var(--dim); }
@@ -149,4 +149,4 @@ dialog.ask.export { width: min(560px, 90vw); max-width: none; font-size: 12px; }
 .export-notes p { margin: 6px 0 0; }
 .export-notes .warn { color: #c46900; }
 .ask-buttons .spacer { flex: 1; }
-#tree header .reg-export { font-size: 12px; padding: 1px 6px; }
+#tree header .reg-file { font-size: 12px; padding: 1px 6px; }

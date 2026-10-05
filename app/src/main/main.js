@@ -1,12 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
-import { loadData, saveLayouts, saveSettings } from './store.js';
+import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js';
 import { openTelemetry } from './telemetry.js';
 import { defaultsDirFor, presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
-import { writeJsonAtomic } from './store.js';
-import { presetFileName } from '../shared/collection.js';
+import { parsePresetFile, presetFileName } from '../shared/collection.js';
 import { importDefaults } from '../shared/presets.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -66,6 +66,35 @@ ipcMain.handle('collection:export', async (event, files, name) => {
   const result = writePresetSet(filePath, files.map((f) => ({ fileName: presetFileName(String(f.fileName).replace(/\.json$/i, '')), data: f.data })));
   if (result.written) shell.openPath(filePath);
   return { path: filePath, ...result };
+});
+
+// Import: preset files picked as Open does, parsed (collection.js). { entries, warnings }, or
+// { canceled }. The entries carry no "file:" key: they are not in the collection.
+let importDir = null;
+ipcMain.handle('collection:import', async (event) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Import presets',
+    defaultPath: importDir ?? presetsDir,
+    buttonLabel: 'Import',
+    filters: [{ name: 'Trucker AUX presets', extensions: ['json'] }],
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  importDir = path.dirname(filePaths[0]);
+  const entries = [];
+  const warnings = [];
+  for (const file of filePaths) {
+    const name = path.basename(file);
+    let parsed;
+    try {
+      parsed = parsePresetFile(JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')), name); // never changed, broken or not
+    } catch {
+      parsed = { warning: `${name} is not valid JSON.` };
+    }
+    if (parsed.entry) entries.push({ ...parsed.entry, key: null });
+    else warnings.push(parsed.warning.replace(`presets/${name}`, name));
+  }
+  return { entries, warnings };
 });
 
 // Debug only: TRUCKER_AUX_FAKE_TRUCK='{"key":"vehicle.x.y","name":"X Y","variant":"3.2",...}'
