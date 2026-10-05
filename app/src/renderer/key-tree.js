@@ -166,7 +166,7 @@ export function createKeyTree(root, actions) {
     }, [
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
-      el('span', { className: 'reg-name', textContent: node.label }),
+      el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
       ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : ''}`, textContent: badge })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
