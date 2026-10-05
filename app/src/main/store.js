@@ -61,6 +61,7 @@ export function loadData(dataDir) {
   const kept = keepOlderVersion(dataDir, layouts.value);
   return {
     dataDir,
+    fresh: layouts.value === null, // no layouts yet (or a broken file, moved aside)
     store: normalizeStore(layouts.value),
     settings: normalizeSettings(settings.value),
     warnings: [layouts.warning, kept, settings.warning].filter(Boolean),

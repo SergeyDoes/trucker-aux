@@ -4,9 +4,15 @@ Presets shared between people, one JSON file per preset. Trucker AUX reads every
 file here, in subfolders too, and lists them under **Collection**. It never changes these
 files: edits go to your own presets in `data/layouts.json`.
 
-- **Add a preset:** drop its file here. The app picks it up without a restart.
-- **Share yours:** press **Export** in the Layout panel. The preset that plays is saved
-  here, and Explorer shows the file.
+- **Add a preset:** drop its file here. The app picks it up without a restart and lists it
+  as a shared file: it plays, but stays the file's.
+- **Make presets yours:** press **Import…** in the Presets panel and pick the files. Each goes
+  on the key its file says; where you have a preset, the app asks which to replace.
+- **Share yours:** press **Export…** in the Presets panel (or in a key's right-click menu,
+  or on the preset card), tick the presets in the tree and save them: one preset as a file,
+  more as a folder. It is offered here first; zip a folder to share it.
+- The presets that come with the app are in `defaults/`, in this same format. On the first
+  run they become your own presets (in `data/layouts.json`), so this folder starts empty.
 - **Auto** plays your own presets first. Then it plays a file for this chassis, then one
   for the model, then one for another chassis of the model.
 
@@ -26,10 +32,11 @@ files: edits go to your own presets in `data/layouts.json`.
   one chassis, as the app shows it ("hook 2.7 m"). Without `vehicle` the preset is only
   picked by hand.
 - `vehicle` may also be a whole brand of a game (`brand:ats/kenworth`) or a game (`game:ats`): such a preset plays for every vehicle of it without a preset of its own.
-- Sets: right-click a key in the app's preset tree, "Export this branch", writes every preset on that key and under it into a folder here ("ATS, Kenworth"), one file each; zip the folder to share it. Presets for one vehicle (a plate) stay out.
-- `vehicleName` and `author` are optional. Export leaves `author` out: add it by hand.
+- `vehicle` may be `all`: the preset for all vehicles. Here it only plays when picked by hand (you always have your own for all vehicles); in `defaults/` it becomes yours for all vehicles on the first run.
+- A preset for one of your vehicles (by plate) is exported for its chassis: the plate stays private.
+- `vehicleName` and `author` are optional. Export leaves `author` out for your own presets (add it by hand) and keeps a shared file's.
 - `layout.label` (optional): a short tag, up to 16 characters, shown beside the keys that use the preset in the preset map; `layout.labelColor`: `gray`, `orange`, `green` or `red` (blue when left out).
-- `game` (`ats` or `ets2`), `brand` (the game's brand id) and `brandName` are optional: they place the vehicle under its game and brand in the preset map before you have driven it. Export writes them when the game has told them; `npm run fill-presets` writes them into every file here whose vehicle you have driven (from `data/layouts.json`).
+- `game` (`ats` or `ets2`), `brand` (the game's brand id) and `brandName` are optional: they place the vehicle under its game and brand in the preset map before you have driven it. Export writes them when the game has told them, or a file it came from did.
 - Coordinates are in metres:
   - X goes right from the vehicle's centre line;
   - Y goes up and Z goes back, from the driver's default head.

@@ -236,7 +236,7 @@ Done: 145 unit tests pass; checked in the app (a label typed in the panel shows 
 - A preset may have a short label (up to 16 characters, `layout.label`; the "Label" field under Name). The key tree shows it beside the keys that use the preset instead of "preset" (a shared file: its label, else "shared file"); unused presets show it beside their names. Export writes it into the file's layout. Changing it can be undone.
 
 ### E2.25 — filling game and brand into shared presets ✓
-- The tree put models you have driven under their brand, and the shipped presets' models (game known from the file, brand not) straight under ATS. `npm run fill-presets` (`scripts/fill-preset-places.js`) writes `game`, `brand`, `brandName` into each file in `presets/` whose vehicle the app has seen in the game (`data/layouts.json` "vehicles"); others are listed as not driven yet. Facts only.
+- The tree put models you have driven under their brand, and the shipped presets' models (game known from the file, brand not) straight under ATS. `npm run fill-presets` (`scripts/fill-preset-places.js`) writes `game`, `brand`, `brandName` into each file in `presets/` whose vehicle the app has seen in the game (`data/layouts.json` "vehicles"); others are listed as not driven yet. Facts only. (Removed in E2.32: Export writes these.)
 
 ### E2.26 — label colours; name and label edits make no copies ✓
 Done: 146 unit tests pass; checked in the app (a new model's green "new", changed to red; a grey label).
@@ -251,6 +251,30 @@ Done: 147 unit tests pass; checked in the app (pick a key, back with the card's 
 Done: 150 unit tests pass; checked in the app (Export this branch on a brand: two files in "presets/ATS, Kenworth", the plate's left out and said so).
 - Right-click a key, "Export this branch": every preset of yours on that key and under it goes into a new folder of `presets/` named by the key's path, one file per key (`exportBranch`, `writePresetSet`), and the folder opens. Presets for a single vehicle stay out (plates are personal); all vehicles' preset goes without a vehicle.
 - A file's `vehicle` may now be a brand (`brand:ats/kenworth`) or a game (`game:ats`): Auto plays such a file after your own preset there, before anything wider (`collectionBrand`, `collectionGame`).
+
+### E2.29 — resizable tree ✓
+- Drag the tree's right edge (200–700 px, kept in localStorage `truckerAux.treeWidth`; a double click resets it). The name and the label shrink with an ellipsis, so ● and ▶ always stay in view.
+
+### E2.30 — the export window ✓
+Done: 150 unit tests pass; checked in the app (the window from the header, the card and a key's menu; All, None, half-ticked folders; Esc and Cancel).
+- Replaces "Export this branch" and the card's one-preset Export. As a package export in Unity: the key tree with a box at every key that has a preset, yours or a shared file, and the unused presets and files below (`renderer/export-dialog.js`). A folder's box ticks everything under it.
+- Ticked at first: from the header, your presets on keys but vehicles' own; from a key's menu, that branch (a vehicle's own only when it is the key); from the card, the preset that plays.
+- Each ticked preset becomes a file for the key it is on (`exportFiles`); a vehicle's own goes for its chassis (the plate stays private); a shared file keeps its author. The window warns when two ticked presets go for one key.
+- Where to: Save As (main), first in `presets/`, then the last folder. One preset: a .json file; more: a folder of them.
+
+### E2.31 — the shipped presets become yours ✓
+Done: 151 unit tests pass; checked in the app (a new data folder: 13 presets on their keys under ATS and the brands; an existing store: the presets on keys without one of yours, the shipped default among the unused).
+- The presets that come with the app moved from `presets/` to `defaults/` (same file format; shipped next to `presets/`, which now starts empty: a drop folder for presets from others).
+- Once per store (`defaultsImported`, kept by `normalizeStore`), loading imports them as your own presets (`importDefaults`, main `store:load`, saved at once): each on the key its file says when no preset of yours is there, else among the unused; one the same as a preset of yours (speakers, bounds, width) is not added again. A key that held one of those files (`file:…`) gets the preset. In a new store (no `layouts.json`) the shipped "Default layout" (`"vehicle": "all"`) takes all vehicles.
+- What a file says of its vehicle (name, game, brand) goes into `vehicles`, so the tree places models never driven.
+- Export writes all vehicles' preset with `"vehicle": "all"`, so importing it puts it back there.
+- Updated shipped presets in a later build do not reach a store that has imported them: Import (E2.32) covers that.
+
+### E2.32 — Import ✓
+Done: 152 unit tests pass; checked in the app (the header's Import…, the clash dialog).
+- "Import…" in the tree's header: preset files picked (Open, main `collection:import`, first in `presets/`) become your presets (`importPresets`), each on the key its file says. Keys that already have a preset of yours are listed (`importClashes`): the ticked ones get the file's (yours stays among the unused), the rest go among the unused. A layout the same as one of yours is not added again. One undo step.
+- The import's summary stays until the next edit (`remember`); an autosave no longer wipes the messages, only its own failed-save warning.
+- `npm run fill-presets` is gone: the shipped presets are updated by exporting them into `app/defaults/` (Export writes game, brand and "all"), and `npm run dist` ships that folder as it is. Old files there are removed by hand: two files for one key would both be imported, one of them among the unused.
 
 ### E3 — polish
 - **Turn look on an outside camera (bug).** The game's "look into turns" / "toward the blinker" only turn the cab camera, but the app adds them from the steering and the blinkers whatever the camera, so on an outside camera the sound turns wrongly. The telemetry does not tell the camera: head.offset freezes outside (R0, `docs/findings.md` item 7, recorded standing still). To check: a drive recorded with `py tools/shm_probe.py --hz 30 --csv docs/drive.csv` (speed, steering, full head and cab values, Enter marks each camera switch): cab with turns, outside with steering, cab again, standing still. If the head never stands exactly still in the cab while driving, an exactly frozen head.offset at speed means an outside camera: turn look off (and back on when it moves). Otherwise: a note that it follows the cab camera only.

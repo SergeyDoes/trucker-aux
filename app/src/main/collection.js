@@ -4,10 +4,15 @@ import { parsePresetFile } from '../shared/collection.js';
 import { writeJsonAtomic } from './store.js';
 
 // The preset collection on disk (shared/collection.js): presets/ next to the data
-// folder, read only, except that Export writes new files into it.
+// folder, read only (Export writes where it is told, see main.js).
 
 export function presetsDirFor(dataDir) {
   return path.join(path.dirname(dataDir), 'presets');
+}
+
+// The presets shipped with the app, in the same format: made yours on the first run.
+export function defaultsDirFor(dataDir) {
+  return path.join(path.dirname(dataDir), 'defaults');
 }
 
 // Paths of the .json files under dir, relative, with "/", sorted.
@@ -55,23 +60,21 @@ export function writePresetFile(dir, fileName, data) {
   return { file: warning ? null : file, warning };
 }
 
-// Writes a set of exported presets into a new folder under dir ("name", or "name (2)" and so
-// on when it is taken). Gives { folder, written, warning }.
-export function writePresetSet(dir, folderName, files) {
-  let folder = path.join(dir, folderName);
-  for (let n = 2; fs.existsSync(folder); n++) folder = path.join(dir, `${folderName} (${n})`);
+// Writes a set of exported presets into folder (made when missing); a name taken there gets
+// " (2)" and so on. Gives { written, warning }.
+export function writePresetSet(folder, files) {
   try {
     fs.mkdirSync(folder, { recursive: true });
   } catch (err) {
-    return { folder: null, written: 0, warning: `Cannot create ${folder}: ${err.message}` };
+    return { written: 0, warning: `Cannot create ${folder}: ${err.message}` };
   }
   let written = 0;
   for (const { fileName, data } of files) {
     const { warning } = writePresetFile(folder, fileName, data);
-    if (warning) return { folder, written, warning };
+    if (warning) return { written, warning };
     written++;
   }
-  return { folder, written, warning: null };
+  return { written, warning: null };
 }
 
 // Calls onChange delayMs after the last change in the folder (an editor saves in several

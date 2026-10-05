@@ -17,6 +17,8 @@ export function createKeyTree(root, actions) {
   const auto = el('button', { className: 'reg-auto', textContent: 'Auto', onclick: () => actions.selectPreset('auto') });
   const undo = el('button', { textContent: '↶', title: 'Undo (Ctrl+Z)', onclick: () => actions.undo() });
   const redo = el('button', { textContent: '↷', title: 'Redo (Ctrl+Y)', onclick: () => actions.redo() });
+  const share = el('button', { className: 'reg-file', textContent: 'Export…', title: 'Pick presets to save as files to share', onclick: () => actions.exportPresets() });
+  const take = el('button', { className: 'reg-file', textContent: 'Import…', title: 'Make preset files your presets, on the keys they are for', onclick: () => actions.importPresets() });
   const tree = el('ul', { className: 'reg-tree', role: 'tree' });
   // Below the keys: presets on no key, to keep, rename and put on keys again.
   const unusedList = el('div', { className: 'reg-unused-list' });
@@ -27,7 +29,7 @@ export function createKeyTree(root, actions) {
   ]);
   const splitter = el('div', { className: 'reg-split', title: 'Drag to resize' });
   root.replaceChildren(
-    el('header', {}, [el('h2', { textContent: 'Presets' }), auto, undo, redo]),
+    el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
       textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
@@ -36,6 +38,36 @@ export function createKeyTree(root, actions) {
     splitter,
     unused,
   );
+  // The right edge sets the panel's width (kept in this browser profile, between runs).
+  const WIDTH_KEY = 'truckerAux.treeWidth';
+  const setWidth = (px) => {
+    const width = Math.round(Math.max(200, Math.min(700, px)));
+    document.documentElement.style.setProperty('--tree-width', `${width}px`);
+    return width;
+  };
+  const saved = Number(localStorage.getItem(WIDTH_KEY));
+  if (saved) setWidth(saved);
+  const edge = el('div', { className: 'reg-width', title: 'Drag to resize' });
+  root.append(edge);
+  edge.addEventListener('pointerdown', (event) => {
+    edge.setPointerCapture(event.pointerId);
+    edge.classList.add('dragging');
+    const left = root.getBoundingClientRect().left;
+    const move = (e) => setWidth(e.clientX - left);
+    const stop = (e) => {
+      localStorage.setItem(WIDTH_KEY, String(setWidth(e.clientX - left)));
+      edge.classList.remove('dragging');
+      edge.removeEventListener('pointermove', move);
+      edge.removeEventListener('pointerup', stop);
+    };
+    edge.addEventListener('pointermove', move);
+    edge.addEventListener('pointerup', stop);
+  });
+  edge.ondblclick = () => {
+    document.documentElement.style.removeProperty('--tree-width');
+    localStorage.removeItem(WIDTH_KEY);
+  };
+
   // The splitter sets the height of the unused presets (remembered for this session).
   splitter.addEventListener('pointerdown', (event) => {
     splitter.setPointerCapture(event.pointerId);
@@ -124,7 +156,7 @@ export function createKeyTree(root, actions) {
         item('Copy the current preset here', () => actions.copyCurrent(node.scope)),
       );
       if (node.own && !node.own.file && node.scope !== 'all') items.push(item('Unassign', () => actions.unassignScope(node.scope)));
-      items.push(item('Export this branch', () => actions.exportBranch(node.scope)));
+      items.push(item('Export…', () => actions.exportPresets(node.scope)));
       items.push(el('hr'));
     }
     if (node.children.length) {
@@ -166,7 +198,7 @@ export function createKeyTree(root, actions) {
     }, [
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
-      el('span', { className: 'reg-name', textContent: node.label }),
+      el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
       ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : ''}`, textContent: badge })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);

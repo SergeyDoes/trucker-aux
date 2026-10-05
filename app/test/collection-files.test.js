@@ -64,16 +64,15 @@ test('watchCollection calls back once the folder settles after a change', async 
   assert.equal(calls, 1);
 });
 
-test('writePresetSet writes a set into a new folder, "name (2)" when taken, and the files are read back', () => {
+test('writePresetSet writes a set into a folder, made when missing; a taken name gets " (2)"', () => {
   const dir = tempDir();
+  const folder = path.join(dir, 'ATS, Kenworth');
   const files = [
     { fileName: 'A.json', data: JSON.parse(preset('A', 'brand:ats/kenworth')) },
     { fileName: 'A.json', data: JSON.parse(preset('A again', 'vehicle.kenworth.t680')) },
   ];
-  const first = writePresetSet(dir, 'ATS, Kenworth', files);
-  assert.deepEqual([path.basename(first.folder), first.written, first.warning], ['ATS, Kenworth', 2, null]);
-  assert.deepEqual(fs.readdirSync(first.folder).sort(), ['A (2).json', 'A.json']);
-  assert.equal(path.basename(writePresetSet(dir, 'ATS, Kenworth', files).folder), 'ATS, Kenworth (2)');
+  assert.deepEqual(writePresetSet(folder, files), { written: 2, warning: null });
+  assert.deepEqual(fs.readdirSync(folder).sort(), ['A (2).json', 'A.json']);
   const { collection, warnings } = readCollection(dir);
   assert.deepEqual(warnings, []);
   assert.equal(collection['file:ATS, Kenworth/A.json'].vehicle, 'brand:ats/kenworth');

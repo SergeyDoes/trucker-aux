@@ -146,8 +146,7 @@ export function createPanel(root, actions) {
   });
   const deletePreset = el('button', { textContent: 'Delete preset' });
   // Shared presets: one file each in presets/, listed under Collection (collection.js).
-  const exportButton = el('button', { textContent: 'Export' });
-  const EXPORT_TITLE = 'Save this preset as a file in the presets folder to share it. Files in that folder show up under Collection.';
+  const exportButton = el('button', { textContent: 'Export…', title: 'Save presets as files to share, this one ticked' });
   const width = el('input', {
     type: 'range', min: 0, max: 2, step: 0.05, title: 'How different the left and right channels are before they reach the speakers',
   });
@@ -271,7 +270,7 @@ export function createPanel(root, actions) {
   };
   preset.onchange = () => actions.selectPreset(preset.value);
   deletePreset.onclick = () => actions.deleteCurrentPreset();
-  exportButton.onclick = () => actions.exportPreset();
+  exportButton.onclick = () => actions.exportPresets('playing');
   newPreset.onclick = () => {
     actions.newPreset();
     presetName.focus();
@@ -372,8 +371,6 @@ export function createPanel(root, actions) {
     cardButtons.hidden = !card.buttons.length;
     cardUseInLabel.hidden = !card.useIn;
     deletePreset.disabled = !view.canDelete;
-    exportButton.disabled = !view.canExport;
-    exportButton.title = view.canExport ? EXPORT_TITLE : 'This preset is a file in the collection already.';
     presetName.disabled = !view.canRename; // a shared file keeps its name
     setValue(presetName, view.presetName);
     presetLabel.disabled = !view.canRename;

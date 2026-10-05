@@ -1,11 +1,13 @@
-import { app, BrowserWindow, ipcMain, Menu, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
-import { loadData, saveLayouts, saveSettings } from './store.js';
+import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js';
 import { openTelemetry } from './telemetry.js';
-import { presetsDirFor, readCollection, watchCollection, writePresetFile, writePresetSet } from './collection.js';
-import { presetFileName } from '../shared/collection.js';
+import { defaultsDirFor, presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
+import { parsePresetFile, presetFileName } from '../shared/collection.js';
+import { importDefaults } from '../shared/presets.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
@@ -25,24 +27,74 @@ const dataDir = resolveDataDir({
 app.setPath('userData', path.join(dataDir, 'profile'));
 
 // Shared presets, one file each (collection.js): read with the store, again when the
-// folder changes; Export writes a new file there and shows it in Explorer.
+// folder changes.
 const presetsDir = presetsDirFor(dataDir);
 
-ipcMain.handle('store:load', () => ({ ...loadData(dataDir), collection: readCollection(presetsDir), debug }));
+// The presets shipped in defaults/ become yours once, saved at once (importDefaults).
+ipcMain.handle('store:load', () => {
+  const data = loadData(dataDir);
+  if (!data.store.defaultsImported) {
+    const { collection, warnings } = readCollection(defaultsDirFor(dataDir));
+    data.store = importDefaults(data.store, Object.values(collection), data.fresh);
+    data.warnings.push(...warnings, saveLayouts(dataDir, data.store));
+  }
+  return { ...data, warnings: data.warnings.filter(Boolean), collection: readCollection(presetsDir), debug };
+});
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
-// A set of presets (a branch of the key tree) into a new folder of presets/; shown in Explorer.
-ipcMain.handle('collection:export-set', (_event, folderName, files) => {
-  const safe = presetFileName(String(folderName)).replace(/\.json$/i, '');
-  const result = writePresetSet(presetsDir, safe, files.map((f) => ({ fileName: presetFileName(String(f.fileName).replace(/\.json$/i, '')), data: f.data })));
-  if (result.folder && result.written) shell.openPath(result.folder);
-  return { ...result, folder: result.folder && path.relative(path.dirname(presetsDir), result.folder) };
+// Export (the export window's ticked presets, as files): where to, asked as Save As does;
+// one preset is a file, more a folder of them. Shown in Explorer. Offered first in presets/
+// (where it joins the collection at once), then where the last one went.
+let exportDir = null;
+ipcMain.handle('collection:export', async (event, files, name) => {
+  const one = files.length === 1;
+  const safe = presetFileName(String(one ? files[0].fileName : name).replace(/\.json$/i, ''));
+  const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: one ? 'Export the preset' : `Export ${files.length} presets into a folder`,
+    defaultPath: path.join(exportDir ?? presetsDir, one ? safe : safe.replace(/\.json$/i, '')),
+    buttonLabel: 'Export',
+    filters: one ? [{ name: 'Trucker AUX preset', extensions: ['json'] }] : [],
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  exportDir = path.dirname(filePath);
+  if (one) {
+    const warning = writeJsonAtomic(filePath, files[0].data);
+    if (!warning) shell.showItemInFolder(filePath);
+    return { path: filePath, written: warning ? 0 : 1, warning };
+  }
+  const result = writePresetSet(filePath, files.map((f) => ({ fileName: presetFileName(String(f.fileName).replace(/\.json$/i, '')), data: f.data })));
+  if (result.written) shell.openPath(filePath);
+  return { path: filePath, ...result };
 });
-ipcMain.handle('collection:export', (_event, fileName, data) => {
-  // The name is made safe again here: a file goes into presets/ and nowhere else.
-  const result = writePresetFile(presetsDir, presetFileName(String(fileName).replace(/\.json$/i, '')), data);
-  if (result.file) shell.showItemInFolder(result.file);
-  return result;
+
+// Import: preset files picked as Open does, parsed (collection.js). { entries, warnings }, or
+// { canceled }. The entries carry no "file:" key: they are not in the collection.
+let importDir = null;
+ipcMain.handle('collection:import', async (event) => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Import presets',
+    defaultPath: importDir ?? presetsDir,
+    buttonLabel: 'Import',
+    filters: [{ name: 'Trucker AUX presets', extensions: ['json'] }],
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  importDir = path.dirname(filePaths[0]);
+  const entries = [];
+  const warnings = [];
+  for (const file of filePaths) {
+    const name = path.basename(file);
+    let parsed;
+    try {
+      parsed = parsePresetFile(JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')), name); // never changed, broken or not
+    } catch {
+      parsed = { warning: `${name} is not valid JSON.` };
+    }
+    if (parsed.entry) entries.push({ ...parsed.entry, key: null });
+    else warnings.push(parsed.warning.replace(`presets/${name}`, name));
+  }
+  return { entries, warnings };
 });
 
 // Debug only: TRUCKER_AUX_FAKE_TRUCK='{"key":"vehicle.x.y","name":"X Y","variant":"3.2",...}'
