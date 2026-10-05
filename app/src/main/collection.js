@@ -10,10 +10,6 @@ export function presetsDirFor(dataDir) {
   return path.join(path.dirname(dataDir), 'presets');
 }
 
-// The presets shipped with the app, in the same format: made yours on the first run.
-export function defaultsDirFor(dataDir) {
-  return path.join(path.dirname(dataDir), 'defaults');
-}
 
 // Paths of the .json files under dir, relative, with "/", sorted.
 function jsonFiles(dir, prefix = '') {

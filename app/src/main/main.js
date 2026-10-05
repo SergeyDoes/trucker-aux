@@ -5,9 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js';
 import { openTelemetry } from './telemetry.js';
-import { defaultsDirFor, presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
+import { presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
 import { parsePresetFile, presetFileName } from '../shared/collection.js';
-import { importDefaults } from '../shared/presets.js';
+import { dropImportedDefaults, seedAll } from '../shared/presets.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
@@ -30,15 +30,18 @@ app.setPath('userData', path.join(dataDir, 'profile'));
 // folder changes.
 const presetsDir = presetsDirFor(dataDir);
 
-// The presets shipped in defaults/ become yours once, saved at once (importDefaults).
+// A new store (no layouts.json yet) starts with the default preset for all vehicles (seedAll);
+// one from 0.1.1 lets its copies of the defaults give way to them (dropImportedDefaults).
 ipcMain.handle('store:load', () => {
   const data = loadData(dataDir);
-  if (!data.store.defaultsImported) {
-    const { collection, warnings } = readCollection(defaultsDirFor(dataDir));
-    data.store = importDefaults(data.store, Object.values(collection), data.fresh);
-    data.warnings.push(...warnings, saveLayouts(dataDir, data.store));
+  const shared = readCollection(presetsDir);
+  if (data.fresh) data.store = seedAll(data.store, shared.collection);
+  if (data.store.defaultsImported) {
+    data.store = dropImportedDefaults(data.store, shared.collection);
+    const warning = saveLayouts(dataDir, data.store);
+    if (warning) data.warnings.push(warning);
   }
-  return { ...data, warnings: data.warnings.filter(Boolean), collection: readCollection(presetsDir), debug };
+  return { ...data, collection: shared, debug };
 });
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));

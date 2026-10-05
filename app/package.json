@@ -45,10 +45,6 @@
         "to": "presets"
       },
       {
-        "from": "defaults",
-        "to": "defaults"
-      },
-      {
         "from": "plugin",
         "to": "plugin"
       },

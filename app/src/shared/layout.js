@@ -192,7 +192,7 @@ function normalizeV3(src) {
       vehicles[id] = info;
     }
   }
-  // The presets shipped with the app were made yours (presets.js importDefaults).
+  // Set by 0.1.1, which imported the shipped presets: presets.js dropImportedDefaults.
   return { version: STORE_VERSION, presets, assignments, vehicles, ...(src.defaultsImported === true ? { defaultsImported: true } : {}) };
 }
 

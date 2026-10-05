@@ -11,8 +11,11 @@ files: edits go to your own presets in `data/layouts.json`.
 - **Share yours:** press **Export…** in the Presets panel (or in a key's right-click menu,
   or on the preset card), tick the presets in the tree and save them: one preset as a file,
   more as a folder. It is offered here first; zip a folder to share it.
-- The presets that come with the app are in `defaults/`, in this same format. On the first
-  run they become your own presets (in `data/layouts.json`), so this folder starts empty.
+- **Defaults:** the presets that come with the app are in `default/`, in this same format.
+  They are the bottom layer: on each key Auto plays your preset first, then a file from others
+  (here, outside `default/`), then the default. The tree marks them "default". Editing one
+  gives that key a copy of yours; the file is never changed, so a newer build's defaults
+  reach every key you have not set up. Don't edit `default/`: a new version replaces it.
 - **Auto** plays your own presets first. Then it plays a file for this chassis, then one
   for the model, then one for another chassis of the model.
 
@@ -32,7 +35,7 @@ files: edits go to your own presets in `data/layouts.json`.
   one chassis, as the app shows it ("hook 2.7 m"). Without `vehicle` the preset is only
   picked by hand.
 - `vehicle` may also be a whole brand of a game (`brand:ats/kenworth`) or a game (`game:ats`): such a preset plays for every vehicle of it without a preset of its own.
-- `vehicle` may be `all`: the preset for all vehicles. Here it only plays when picked by hand (you always have your own for all vehicles); in `defaults/` it becomes yours for all vehicles on the first run.
+- `vehicle` may be `all`: the preset for all vehicles. You always have your own for all vehicles, so such a file only plays when picked by hand; the one in `default/` is what a new install starts with.
 - A preset for one of your vehicles (by plate) is exported for its chassis: the plate stays private.
 - `vehicleName` and `author` are optional. Export leaves `author` out for your own presets (add it by hand) and keeps a shared file's.
 - `layout.label` (optional): a short tag, up to 16 characters, shown beside the keys that use the preset in the preset map; `layout.labelColor`: `gray`, `orange`, `green` or `red` (blue when left out).

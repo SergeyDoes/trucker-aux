@@ -59,15 +59,20 @@ function presetLayout(store, key) {
 
 const kindOf = (key) => (isCollectionKey(key) ? 'collection' : 'preset');
 
+// The shared files for a vehicle (or a brand, a game), in the order Auto tries them: the
+// files from others first, then the defaults (presets/default/, the bottom layer), each by path.
+const sharedFiles = (store) => Object.values(store.collection ?? {}).filter((e) => e.vehicle)
+  .sort((a, b) => Number(a.default) - Number(b.default) || (a.key < b.key ? -1 : 1));
+
 // The preset Auto plays in a truck: { key, how, scope }. how: vehicle, chassis,
 // collectionChassis, model, collectionModel, sibling (another chassis), collectionSibling,
-// brand, game, all. Several files for one scope: the first by path.
+// brand, game, all. Several files for one scope: others' before the defaults, then by path.
 export function autoPreset(store, truck) {
   const assigned = (scope) => {
     const key = scope && store.assignments[scope];
     return key && presetLayout(store, key) ? key : null;
   };
-  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const files = sharedFiles(store);
   const file = (match) => files.find((e) => match(e.vehicle))?.key ?? null;
   const steps = [
     ['vehicle', plateKey(truck), assigned],
@@ -106,7 +111,7 @@ function ownsEdits(auto, truck) {
 // What a key of the map plays: { key, at } its own preset or file, else what it inherits up
 // its chain (chainOf; a chassis or model also from a shared file for it).
 export function scopePreset(store, scope, truck = null) {
-  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const files = sharedFiles(store);
   for (const at of chainOf(store, scope, truck)) {
     const key = store.assignments[at];
     if (key && presetLayout(store, key)) return { key, at };
@@ -244,18 +249,30 @@ export function importClashes(store, entries, truck = null) {
   });
 }
 
-// The presets shipped with the app (defaults/) made yours, once (store.defaultsImported),
-// as importPresets does. In a new store (fresh) the shipped preset for all vehicles ("all")
-// takes the place of the default layout, and its name.
-export function importDefaults(store, entries, fresh) {
-  let start = store;
-  const replace = new Set();
-  if (fresh && entries.some((e) => e.vehicle === ALL_SCOPE)) {
-    const { [store.assignments[ALL_SCOPE]]: _gone, ...presets } = store.presets;
-    start = { ...store, presets };
-    replace.add(ALL_SCOPE);
+// A new store's preset for all vehicles: a copy of the default one (presets/default/, a file
+// for "all") when there is one. All vehicles always has a preset of yours, so that default
+// only starts a new store; the other defaults stay files under your presets.
+export function seedAll(store, collection) {
+  const entry = Object.values(collection ?? {}).filter((e) => e.default && e.vehicle === ALL_SCOPE).sort((a, b) => (a.key < b.key ? -1 : 1))[0];
+  if (!entry) return store;
+  return { ...store, presets: { ...store.presets, [store.assignments[ALL_SCOPE]]: structuredClone(entry.layout) } };
+}
+
+// 0.1.1 made the shipped presets yours (defaultsImported); they are the bottom layer now.
+// Your copies the same as the default on their key (layout, name and label) give way to it,
+// so the defaults of a newer build reach those keys; copies you changed stay yours.
+export function dropImportedDefaults(store, collection) {
+  if (!store.defaultsImported) return store;
+  const { defaultsImported: _done, ...next } = store;
+  next.assignments = { ...store.assignments };
+  const same = (a, b) => sameLayout(a, b) && a.name === b.name && (a.label ?? null) === (b.label ?? null);
+  for (const [scope, key] of Object.entries(store.assignments)) {
+    const def = Object.values(collection ?? {}).find((e) => e.default && e.vehicle === scope);
+    if (scope !== ALL_SCOPE && def && store.presets[key] && same(store.presets[key], def.layout)) delete next.assignments[scope];
   }
-  return { ...importPresets(start, entries, replace).store, defaultsImported: true };
+  const used = new Set(Object.values(next.assignments));
+  next.presets = Object.fromEntries(Object.entries(store.presets).filter(([key]) => used.has(key) || !Object.values(collection ?? {}).some((e) => e.default && same(store.presets[key], e.layout))));
+  return next;
 }
 
 // A shared file picked in the list is never changed: before the first edit it becomes an
@@ -667,7 +684,8 @@ export function presetOptions(store, truck, selection = { mode: 'auto' }) {
   let auto = 'Auto — no game';
   if (truck) {
     const playing = autoPreset(store, truck);
-    auto = playing ? `Auto — ${displayName(store, playing.key, truck)}${AUTO_NOTE[playing.how](truck)}` : 'Auto';
+    const note = isCollectionKey(playing?.key) && store.collection[playing.key].default ? ' (default)' : AUTO_NOTE[playing?.how]?.(truck);
+    auto = playing ? `Auto — ${displayName(store, playing.key, truck)}${note}` : 'Auto';
   }
   const own = Object.keys(store.presets).map((key) => ({ value: `truck:${key}`, label: displayName(store, key, truck), key }));
   const byLabel = (a, b) => a.label.localeCompare(b.label);
@@ -698,7 +716,8 @@ const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 // A model whose game is not known yet (not driven since presets got scopes) sits under
 // "Game not known yet (drive a vehicle once)"; that folder is no scope (pseudo).
 // Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
-//   own        { key, name, file, label, labelColor } the preset or file at this key, or null
+//   own        { key, name, file, default, label, labelColor } the preset or file at this key
+//              (default: a file of presets/default/), or null
 //   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
 //   current    on the chain of the vehicle in the game; plays: the key whose preset plays in
 //              Auto; picked: the key picked in the map (selection mode 'scope')
@@ -706,13 +725,14 @@ const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
 //              keys under it
 // Also gives the unassigned presets and the files that apply nowhere.
 export function presetTree(store, truck, selection = { mode: 'auto' }) {
-  const files = Object.values(store.collection ?? {}).filter((e) => e.vehicle).sort((a, b) => (a.key < b.key ? -1 : 1));
+  const files = sharedFiles(store);
   const ownAt = (scope) => {
     const key = store.assignments[scope];
     const tag = (layout) => ({ label: layout?.label ?? null, labelColor: layout?.labelColor ?? 'blue' });
-    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key), ...tag(presetLayout(store, key)) };
+    const isDefault = (k) => Boolean(isCollectionKey(k) && store.collection?.[k]?.default);
+    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key), default: isDefault(key), ...tag(presetLayout(store, key)) };
     const file = files.find((e) => e.vehicle === scope);
-    return file ? { key: file.key, name: file.name, file: true, ...tag(file.layout) } : null;
+    return file ? { key: file.key, name: file.name, file: true, default: Boolean(file.default), ...tag(file.layout) } : null;
   };
   // Every key to show: the vehicles driven with their chassis and plates, scopes with
   // presets or files, and the vehicle in the game.
@@ -785,7 +805,7 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
       .map((key) => ({ key, name: store.presets[key].name, label: store.presets[key].label ?? null, labelColor: store.presets[key].labelColor ?? 'blue' }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     files: Object.values(store.collection ?? {}).filter((e) => !e.vehicle && !used.has(e.key))
-      .map((e) => ({ key: e.key, name: collectionLabel(e) })).sort((a, b) => a.name.localeCompare(b.name)),
+      .map((e) => ({ key: e.key, name: collectionLabel(e), default: Boolean(e.default) })).sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 

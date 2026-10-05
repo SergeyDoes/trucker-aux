@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importDefaults, importPresets,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -533,7 +533,7 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
   assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null, labelColor: 'blue' }]);
-  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
+  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose', default: false }]);
   // A model not driven goes up only to all vehicles: its game is not known.
   const anthem = map.root.children.at(-1).children[0];
   assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
@@ -698,30 +698,47 @@ test('exportFiles: each ticked preset goes for its key; plates go for their chas
   assert.equal('vehicle' in loose, false);
 });
 
-test('importDefaults: the shipped presets made yours once, on their keys', () => {
-  const file = (name, vehicle, width = 1) => ({ ...shared(`${name}.json`, vehicle), name, layout: { ...defaultLayout(), name, width } });
-  const all = file('Default layout', 'all', 0.7);
-  const model = file('Model', TRUCK.key, 0.8);
-  const loose = file('Loose', null, 0.9);
-  const fresh = importDefaults(storeWith(), [all, model, loose], true);
-  assert.equal(fresh.defaultsImported, true);
-  assert.equal(at(fresh, 'all').name, 'Default layout');
-  assert.equal(at(fresh, 'all').width, 0.7);
-  assert.equal(Object.keys(fresh.presets).length, 3); // the new store's default layout is gone
-  assert.equal(at(fresh, TRUCK.key).name, 'Model');
-  assert.deepEqual(presetTree(fresh, null).unassigned.map((p) => p.name), ['Loose']);
-  // Where a file's vehicle is from stays known: the tree places it under its game and brand.
-  const placed = importDefaults(storeWith(), [{ ...model, game: 'ats', brand: 'international', brandName: 'International', vehicleName: 'International 9900i' }], true);
-  assert.deepEqual(lines(presetTree(placed, null).root).slice(1), ['  ATS (Default layout)', '    International (Default layout)', '      International 9900i = Model']);
-  // A store of yours: all vehicles' and a key with your preset stay; one the same as yours is
-  // not added again; a key that held the file gets the preset.
-  let mine = storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } });
-  mine = { ...mine, presets: { ...mine.presets, 'p.1': { ...mine.presets['p.1'], width: 0.9 } }, assignments: { ...mine.assignments, 'vehicle.other': 'file:Model.json' } };
-  const kept = importDefaults(mine, [all, model, loose], false);
-  assert.equal(at(kept, 'all').width, 0.9);
-  assert.equal(at(kept, TRUCK.key).name, 'Mine');
-  assert.equal(at(kept, 'vehicle.other').name, 'Model');
-  assert.deepEqual(presetTree(kept, null).unassigned.map((p) => p.name), ['Default layout copy']); // Loose is the same as p.1
+test('defaults (presets/default/): the bottom layer, under yours and others\' files', () => {
+  const file = (path, vehicle, width) => ({ ...shared(path, vehicle), layout: { ...defaultLayout(), name: path, width } });
+  const def = file('default/model.json', TRUCK.key, 0.8);
+  const theirs = file('z-theirs.json', TRUCK.key, 0.6);
+  assert.equal(def.default, true);
+  assert.equal(theirs.default, false);
+  // Another file for the model plays before the default, though "default/" sorts first by path.
+  assert.equal(autoPreset(withCollection(storeWith(), def, theirs), SHORT).key, 'file:z-theirs.json');
+  assert.equal(autoPreset(withCollection(storeWith(), def), SHORT).key, 'file:default/model.json');
+  // Yours plays before it; the tree marks it a default.
+  const mine = withCollection(storeWith({ [TRUCK.key]: { name: 'Mine' } }), def);
+  assert.equal(autoPreset(mine, SHORT).how, 'model');
+  const node = (function find(n) { return n.scope === TRUCK.key ? n : n.children.map(find).find(Boolean); })(presetTree(withCollection(storeWith(), def), null).root);
+  assert.deepEqual([node.own.file, node.own.default], [true, true]);
+  // Editing the key it plays on gives the key a copy of yours; the file stays.
+  const KEY = { mode: 'scope', scope: TRUCK.key };
+  const edited = editLayout(withCollection(storeWith(), def), KEY, null, widen);
+  assert.equal(at(edited, TRUCK.key).width, 1.5);
+  assert.equal(edited.collection['file:default/model.json'].layout.width, 0.8);
+  // A new store starts with the default for all vehicles.
+  const all = file('default/all.json', 'all', 0.7);
+  const seeded = seedAll(storeWith(), { [all.key]: all });
+  assert.equal(at(seeded, 'all').width, 0.7);
+  const empty = storeWith();
+  assert.equal(seedAll(empty, {}), empty); // no default for all vehicles: the built-in layout
+});
+
+test('dropImportedDefaults: 0.1.1\'s copies of the defaults give way to them; changed ones stay', () => {
+  const def = (path, vehicle, width) => ({ ...shared(path, vehicle), default: true, layout: { ...defaultLayout(), name: path, width } });
+  const model = def('default/model.json', TRUCK.key, 0.8);
+  const chassis = def('default/chassis.json', variantKey(SLEEPER), 0.6);
+  const collection = { [model.key]: model, [chassis.key]: chassis };
+  let store = storeWith({ [TRUCK.key]: { name: 'default/model.json', width: 0.8 }, [variantKey(SLEEPER)]: { name: 'default/chassis.json', width: 0.9 } }, [{ name: 'default/model.json', width: 0.8 }]);
+  store = { ...store, defaultsImported: true };
+  const done = dropImportedDefaults(store, collection);
+  assert.equal('defaultsImported' in done, false);
+  assert.equal(done.assignments[TRUCK.key], undefined); // the same as the default: it plays again
+  assert.equal(at(done, variantKey(SLEEPER)).width, 0.9); // changed: yours
+  assert.equal(Object.keys(done.presets).length, 2); // the unused copy went too
+  assert.equal(dropImportedDefaults(done, collection), done);
+  assert.equal(normalizeStore(store).defaultsImported, true);
 });
 
 test('importPresets: files on their keys; a key of yours is replaced only when asked', () => {

@@ -274,7 +274,15 @@ Done: 151 unit tests pass; checked in the app (a new data folder: 13 presets on 
 Done: 152 unit tests pass; checked in the app (the header's Import…, the clash dialog).
 - "Import…" in the tree's header: preset files picked (Open, main `collection:import`, first in `presets/`) become your presets (`importPresets`), each on the key its file says. Keys that already have a preset of yours are listed (`importClashes`): the ticked ones get the file's (yours stays among the unused), the rest go among the unused. A layout the same as one of yours is not added again. One undo step.
 - The import's summary stays until the next edit (`remember`); an autosave no longer wipes the messages, only its own failed-save warning.
-- `npm run fill-presets` is gone: the shipped presets are updated by exporting them into `app/defaults/` (Export writes game, brand and "all"), and `npm run dist` ships that folder as it is. Old files there are removed by hand: two files for one key would both be imported, one of them among the unused.
+- `npm run fill-presets` is gone: the shipped presets are updated by exporting them into `app/defaults/` (Export writes game, brand and "all"), and `npm run dist` ships that folder as it is. Old files there are removed by hand.
+
+### E2.33 — defaults as the bottom layer ✓ (replaces the import of E2.31)
+Done: 153 unit tests pass; checked in the app (a new data folder: every default on its key under ATS and the brands, marked "default").
+- The shipped presets live in `app/presets/default/` (shipped inside `presets/`); `defaults/` and the first-run import are gone. Entries from there carry `default: true` (`parsePresetFile`).
+- They are never imported: on each key Auto plays yours, then others' files, then the default (`sharedFiles` sorts the defaults last). A newer build's defaults reach every key you have not set up. The tree and the export window badge them "default" (gray), the list's Auto says "(default)". Editing one gives the key a copy of yours (as for any key that inherits); the file stays.
+- All vehicles always has a preset of yours, so the default for "all" only starts a new store (`seedAll`, main, when there is no `layouts.json`).
+- A store from 0.1.1 (`defaultsImported`): its copies the same as the default on their key (layout, name, label) give way to it, once (`dropImportedDefaults`); copies changed stay yours.
+- Updating the defaults: Export into `app/presets/default/`, remove the old files, `npm run dist`.
 
 ### E3 — polish
 - **Turn look on an outside camera (bug).** The game's "look into turns" / "toward the blinker" only turn the cab camera, but the app adds them from the steering and the blinkers whatever the camera, so on an outside camera the sound turns wrongly. The telemetry does not tell the camera: head.offset freezes outside (R0, `docs/findings.md` item 7, recorded standing still). To check: a drive recorded with `py tools/shm_probe.py --hz 30 --csv docs/drive.csv` (speed, steering, full head and cab values, Enter marks each camera switch): cab with turns, outside with steering, cab again, standing still. If the head never stands exactly still in the cab while driving, an exactly frozen head.offset at speed means an outside camera: turn look off (and back on when it moves). Otherwise: a note that it follows the cab camera only.
