@@ -533,7 +533,7 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
   assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null, labelColor: 'blue' }]);
-  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose', default: false }]);
+  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose', default: false, label: null, labelColor: 'blue' }]);
   // A model not driven goes up only to all vehicles: its game is not known.
   const anthem = map.root.children.at(-1).children[0];
   assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
@@ -657,6 +657,9 @@ test('the map shows a preset\'s label beside its keys', () => {
   assert.equal(map.root.own.label, null);
   assert.deepEqual(map.unassigned, [{ key: 'p.3', name: 'Spare', label: 'Test', labelColor: 'blue' }]);
   assert.equal(model.own.labelColor, 'blue');
+  // A shared file on no key shows its label among the unused too.
+  const loose = withCollection(store, { ...shared('loose.json', null), layout: { ...defaultLayout(), name: 'loose', label: 'Spare', labelColor: 'red' } });
+  assert.deepEqual([presetTree(loose, null).files[0].label, presetTree(loose, null).files[0].labelColor], ['Spare', 'red']);
   // A shared file carries its label too, and Export writes it.
   assert.equal(exportPreset(store, 'p.2', null).data.layout.label, 'Day cab');
 });

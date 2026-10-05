@@ -301,7 +301,7 @@ export function createKeyTree(root, actions) {
     if (renaming) return; // a redraw would drop the name being typed
     unusedList.replaceChildren(
       ...map.unassigned.map((p) => unusedItem(p, false)),
-      ...map.files.map((f) => unusedItem({ ...f, label: null }, true)),
+      ...map.files.map((f) => unusedItem(f, true)),
     );
     if (!map.unassigned.length && !map.files.length) unusedList.append(el('p', { className: 'hint', textContent: 'None.' }));
   }

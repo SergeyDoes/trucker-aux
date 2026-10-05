@@ -97,7 +97,7 @@ export function chooseExport({ map, checked, check }) {
 
   function draw() {
     tree.replaceChildren(...[row(map.root)].filter(Boolean));
-    const unused = [...map.unassigned.map((p) => ({ ...p, file: false })), ...map.files.map((f) => ({ ...f, label: null, file: true }))];
+    const unused = [...map.unassigned.map((p) => ({ ...p, file: false })), ...map.files.map((f) => ({ ...f, file: true }))];
     loose.replaceChildren(...(unused.length ? [
       el('h3', { textContent: 'Unused presets' }),
       ...unused.map((p) => el('label', { className: `reg-row export-pick${p.file ? ' file' : ''}`, title: p.file ? 'A shared file' : '' }, [
