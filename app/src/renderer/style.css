@@ -100,7 +100,7 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-rename { width: 100%; font-size: 12px; }
 #tree header { display: flex; align-items: center; gap: 4px; }
 #tree header h2 { flex: 1; margin: 0; font-size: 14px; }
-#tree header button { padding: 0 6px; font-size: 14px; }
+#tree header button { padding: 0 6px; font-size: 14px; flex: none; }
 #tree header .reg-auto { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--front); background: #d08c0033; font-weight: 600; }
 #tree header .reg-auto.on { border-color: #8886; background: none; font-weight: 400; color: var(--dim); }
 #tree .hint { margin: 4px 0 6px; }
@@ -139,3 +139,14 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .tag-red { background: #d9463b22; color: var(--right); }
 select.label-color { width: 84px; flex: none; }
 .reg-mark { flex: none; margin-left: auto; padding-left: 8px; color: var(--front); }
+
+/* The export window: the key tree with boxes, as a package export in Unity. */
+dialog.ask.export { width: min(560px, 90vw); max-width: none; font-size: 12px; }
+.export-tree { height: min(60vh, 520px); overflow: auto; border: 1px solid #8884; border-radius: 4px; padding: 4px; }
+.export-tree h3 { margin: 10px 0 2px; font-size: 12px; }
+.export-pick { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; cursor: pointer; }
+.export-pick input { margin: 0; flex: none; }
+.export-notes p { margin: 6px 0 0; }
+.export-notes .warn { color: #c46900; }
+.ask-buttons .spacer { flex: 1; }
+#tree header .reg-export { font-size: 12px; padding: 1px 6px; }

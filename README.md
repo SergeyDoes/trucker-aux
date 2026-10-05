@@ -93,7 +93,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - `app/data/layouts.json`: your presets;
   - `app/data/settings.json`: devices and options;
   - `app/data/profile/`: Chromium's profile;
-  - `app/presets/`: the shared preset collection, read only. Export writes new files there.
+  - `app/presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them where you choose.
  
  - Presets included:
   

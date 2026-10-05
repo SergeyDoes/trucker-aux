@@ -87,8 +87,8 @@ export function autoPreset(store, truck) {
   if (sibling) return { key: assigned(sibling), how: 'sibling', scope: sibling };
   const ofSibling = file(isSibling);
   if (ofSibling) return { key: ofSibling, how: 'collectionSibling', scope: store.collection[ofSibling].vehicle };
-  // The brand, then the game: yours, then a shared file for it (a set exported from a
-  // branch of the key tree carries those, exportBranch).
+  // The brand, then the game: yours, then a shared file for it (a file exported from a
+  // key of the tree carries those, exportFiles).
   for (const [how, scope] of [['brand', brandKey(truck)], ['game', gameKey(truck)], ['all', ALL_SCOPE]]) {
     const key = assigned(scope) ?? (scope && how !== 'all' ? file((v) => v === scope) : null);
     if (key) return { key, how: isCollectionKey(key) ? `collection${how[0].toUpperCase()}${how.slice(1)}` : how, scope };
@@ -729,64 +729,56 @@ export function planAssign(store, key, to) {
   return { mode: 'use', key, from: null, to, direction: null, mustCopy: false, taken, shadow: [], fallback: null, outplayed: null };
 }
 
-// The preset that plays as a file to share (collection.js): { fileName, data }, or null
-// for a shared file, which is one already. vehicle: its narrowest model or chassis scope;
-// a preset for one vehicle (by plate) is shared for that vehicle's chassis, so the plate
-// stays private; wider or no scopes: for no vehicle.
-export function exportPreset(store, key, truck) {
-  if (!key || isCollectionKey(key)) return null;
-  const layout = store.presets[key];
-  if (!layout) return null;
-  const scope = scopesOf(store, key).find((s) => ['vehicle', 'chassis', 'model'].includes(levelOf(s)));
-  let vehicle = null;
-  if (scope && levelOf(scope) !== 'vehicle') vehicle = scope;
-  else if (scope) vehicle = truck && plateKey(truck) === scope ? variantKey(truck) : modelOf(scope);
-  const name = vehicle && modelName(store, modelOf(vehicle), truck);
-  const vehicleName = name && name !== readableId(modelOf(vehicle)) ? name : null; // an id is no name
-  // Where the vehicle is from, if the game has told: the map places it before it is driven.
-  const place = vehicle ? placeOf(store, modelOf(vehicle), truck) : {};
-  const brandLabel = place.game && place.brand ? brandName(store, place.game, place.brand, truck) : null;
+// What a preset at a key is shared for, the key in the file's "vehicle": the key itself; a
+// vehicle's own (by plate) its chassis, or its model when that is not known, so the plate
+// stays private; all vehicles' and one on no key (scope null): no vehicle.
+function shareScope(store, scope, truck) {
+  if (!scope || scope === ALL_SCOPE || scope.startsWith('?')) return null;
+  return levelOf(scope) === 'vehicle' ? plateChassis(store, scope, truck) ?? modelOf(scope) : scope;
+}
+
+// Where a key is from, as a file says it: a brand's or a game's place, a model's name and
+// place (placeOf); nothing that is not known.
+function placeOfScope(store, vehicle, truck) {
+  const level = levelOf(vehicle);
+  if (level === 'brand') {
+    const [game, brand] = vehicle.slice(6).split('/');
+    return { game, brand, brandName: brandName(store, game, brand, truck) };
+  }
+  if (level === 'game') return { game: vehicle.slice(5) };
+  const { game, brand } = placeOf(store, modelOf(vehicle), truck);
+  const name = modelName(store, modelOf(vehicle), truck);
   return {
-    fileName: presetFileName(layout.name),
-    data: presetFile({ name: layout.name, vehicle, vehicleName, game: place.game, brand: place.game && place.brand, brandName: brandLabel, layout }),
+    vehicleName: name !== readableId(modelOf(vehicle)) ? name : null, // an id is no name
+    game,
+    brand: game && brand,
+    brandName: game && brand ? brandName(store, game, brand, truck) : null,
   };
 }
 
-// A branch of the key tree as a set of files to share (collection.js): every preset of yours
-// on that key and the keys under it, one file per key, with the key in "vehicle" (a model, a
-// chassis, a brand or a game; all vehicles' preset goes without one). Presets for a single
-// vehicle stay out: plates are personal. { folder, files: [{ fileName, data }], skipped }.
-export function exportBranch(store, branch, truck = null) {
+// The presets ticked in the export window as files to share (collection.js). picks:
+// [{ scope, key }], a preset of yours or a shared file and the key it is on (null: on none),
+// each going for that key (shareScope). { files: [{ fileName, data }], clashes, plates }:
+// clashes, the keys that more than one file goes for (only one of them would play there);
+// plates, how many vehicles' own presets go for their chassis.
+export function exportFiles(store, picks, truck = null) {
   const files = [];
-  let skipped = 0;
-  for (const [scope, key] of Object.entries(store.assignments).sort(([a], [b]) => LEVELS.indexOf(levelOf(b)) - LEVELS.indexOf(levelOf(a)) || a.localeCompare(b))) {
-    if (isCollectionKey(key) || !store.presets[key]) continue;
-    if (scope !== branch && !chainOf(store, scope, truck).includes(branch)) continue;
-    const level = levelOf(scope);
-    if (level === 'vehicle') {
-      skipped++;
-      continue;
-    }
-    const layout = store.presets[key];
-    const vehicle = level === 'all' ? null : scope;
-    let place = {};
-    if (level === 'brand') {
-      const [game, brand] = scope.slice(6).split('/');
-      place = { game, brand, brandName: brandName(store, game, brand, truck) };
-    } else if (level === 'game') place = { game: scope.slice(5) };
-    else if (vehicle) {
-      const { game, brand } = placeOf(store, modelOf(scope), truck);
-      const name = modelName(store, modelOf(scope), truck);
-      place = {
-        vehicleName: name !== readableId(modelOf(scope)) ? name : null,
-        game,
-        brand: game && brand,
-        brandName: game && brand ? brandName(store, game, brand, truck) : null,
-      };
-    }
-    files.push({ fileName: presetFileName(layout.name), data: presetFile({ name: layout.name, vehicle, ...place, layout }) });
+  const targets = new Map();
+  let plates = 0;
+  for (const { scope, key } of picks) {
+    const layout = presetLayout(store, key);
+    if (!layout) continue;
+    const vehicle = shareScope(store, scope, truck);
+    if (scope && levelOf(scope) === 'vehicle') plates++;
+    if (vehicle) targets.set(vehicle, (targets.get(vehicle) ?? 0) + 1);
+    const author = isCollectionKey(key) ? store.collection[key].author : null;
+    files.push({
+      fileName: presetFileName(layout.name),
+      data: presetFile({ name: layout.name, vehicle, author, ...(vehicle ? placeOfScope(store, vehicle, truck) : {}), layout }),
+    });
   }
-  return { folder: presetFileName(keyPath(store, branch, truck)).replace(/\.json$/, ''), files, skipped };
+  const clashes = [...targets].filter(([, n]) => n > 1).map(([vehicle]) => scopeLabel(store, vehicle, truck));
+  return { files, clashes, plates };
 }
 
 export function selectionValue(selection) {

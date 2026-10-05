@@ -11,13 +11,14 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportBranch, exportPreset, parseSelection,
+  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportFiles, keyPath, levelOf, parseSelection,
   planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
 import { createKeyTree } from './key-tree.js';
+import { branchIds, chooseExport, exportItems } from './export-dialog.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -578,25 +579,27 @@ const actions = {
     state.store = unassign(state.store, from);
     afterScopeChange(before);
   },
-  // Writes what plays as a file in presets/ to share it; main shows it in Explorer.
-  // The tree's menu: every preset of yours on a key and under it, as files in a new folder of
-  // presets/ (to zip and share). Presets for a single vehicle stay out: plates are personal.
-  async exportBranch(scope) {
-    const set = exportBranch(state.store, scope, state.truck);
-    if (!set.files.length) {
-      state.storeWarnings = [`No presets of yours on ${scopeLabel(state.store, scope, state.truck)} or under it to export.`];
-      return render();
-    }
-    const { folder, written, warning } = await window.aux.exportSet(set.folder, set.files);
-    const skipped = set.skipped ? ` ${set.skipped} for single vehicles stayed out (plates are personal).` : '';
-    state.storeWarnings = warning ? [warning] : [`Exported ${written} preset(s) to ${folder}.${skipped}`];
-    render();
-  },
-  async exportPreset() {
-    const shared = exportPreset(state.store, playing().key, state.truck);
-    if (!shared) return;
-    const { warning } = await window.aux.exportPreset(shared.fileName, shared.data);
-    state.storeWarnings = warning ? [warning] : [];
+  // The export window, ticked at first: from: a key of the tree (its presets and those under
+  // it, a vehicle's own only when that is the key), 'playing' (the preset that plays), or
+  // nothing (all your presets on keys but vehicles' own). Then Save As in main.
+  async exportPresets(from = null) {
+    const map = presetTree(state.store, state.truck, state.selection);
+    const items = exportItems(map);
+    const notPlate = (n) => levelOf(n.scope) !== 'vehicle';
+    const find = (n, scope) => (n.scope === scope ? n : n.children.map((c) => find(c, scope)).find(Boolean));
+    let checked;
+    if (from === 'playing') checked = [...items].filter(([, item]) => item.key === playing().key).map(([id]) => id);
+    else if (from) {
+      const node = find(map.root, from);
+      checked = node ? branchIds(node, (n) => n === node || notPlate(n)) : [];
+    } else checked = branchIds(map.root, (n) => notPlate(n) && !n.own.file);
+    const picks = await chooseExport({ map, checked, check: (p) => exportFiles(state.store, p, state.truck) });
+    if (!picks) return;
+    const set = exportFiles(state.store, picks, state.truck);
+    const name = from && from !== 'playing' && !from.startsWith('?') ? keyPath(state.store, from, state.truck) : 'Trucker AUX presets';
+    const result = await window.aux.exportPresets(set.files, name);
+    if (result.canceled) return;
+    state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
     render();
   },
   deleteCurrentPreset() {
@@ -764,7 +767,6 @@ function render() {
     preset: selectionValue(state.selection),
     canDelete: current.kind === 'preset' && current.key !== allPresetKey(state.store), // all vehicles' preset and files stay
     canRename: current.kind === 'preset',
-    canExport: current.kind !== 'collection', // a shared file is one already
     presetName: layout.name,
     presetLabel: layout.label ?? '',
     presetLabelColor: layout.labelColor ?? 'blue',

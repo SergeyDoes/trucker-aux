@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, exportBranch, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportPreset,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -461,7 +461,10 @@ test('collection: the card and the list', () => {
   });
 });
 
-test('exportPreset: the preset that plays as a file to share', () => {
+// One preset as the export window gives it: for the narrowest key it is on.
+const exportPreset = (store, key, truck) => exportFiles(store, [{ scope: scopesOf(store, key)[0] ?? null, key }], truck).files[0];
+
+test('exportFiles: a preset as a file for the key it is on', () => {
   const store = editLayout(rememberVehicle(withPreset(), TRUCK), AUTO, SLEEPER, widen); // p.2 the model's, p.3 the sleeper's
   const chassis = exportPreset(store, 'p.3', SLEEPER);
   assert.equal(chassis.fileName, 'ATS, International, International 9900i, hook 3.2 m.json');
@@ -476,12 +479,12 @@ test('exportPreset: the preset that plays as a file to share', () => {
   const plateOwn = plated.assignments[plateKey(OWNED)];
   assert.equal(exportPreset(plated, plateOwn, OWNED).data.vehicle, variantKey(OWNED));
   assert.equal(exportPreset(plated, plateOwn, null).data.vehicle, TRUCK.key);
-  // Unassigned, all vehicles and wider presets are for no vehicle; a file is a file already.
+  // Unassigned and all vehicles' presets are for no vehicle; a shared file can go again.
   const custom = createPreset(store, store.presets['p.1']);
   assert.equal('vehicle' in exportPreset(custom.store, custom.key, SLEEPER).data, false);
   assert.equal(exportPreset(store, 'p.1', SLEEPER).data.name, 'Default layout');
   assert.equal('vehicle' in exportPreset(store, 'p.1', SLEEPER).data, false);
-  assert.equal(exportPreset(withCollection(store, MODEL_FILE), 'file:model.json', SLEEPER), null);
+  assert.equal(exportFiles(withCollection(store, MODEL_FILE), [{ scope: TRUCK.key, key: 'file:model.json' }], SLEEPER).files[0].data.vehicle, TRUCK.key);
   // A model never driven is named after your preset for it; a chassis-only one has no name.
   assert.equal(exportPreset(withPreset(), 'p.2', null).data.vehicleName, 'International 9900i');
   const chassisOnly = storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } });
@@ -666,32 +669,33 @@ test('the card offers Back to Auto when a key or a preset is picked', () => {
   assert.equal(truckStatus(store, AUTO, OWNED).buttons.some((b) => b.action === 'auto'), false);
 });
 
-test('exportBranch: the presets on a key and under it, one file per key; plates stay out', () => {
+test('exportFiles: each ticked preset goes for its key; plates go for their chassis; clashes are told', () => {
   let store = storeWith({
     'game:ats': { name: 'ATS' },
     'brand:ats/international': { name: 'International' },
-    [TRUCK.key]: { name: 'Model' },
     [variantKey(SLEEPER)]: { name: 'Sleeper' },
     [plateKey(OWNED)]: { name: 'Mine' },
-    'vehicle.peterbilt.579': { name: 'Pete' },
   });
-  store = rememberVehicle(rememberVehicle(store, OWNED), OTHER);
-  const brand = exportBranch(store, 'brand:ats/international');
-  assert.equal(brand.folder, 'ATS, International');
-  assert.equal(brand.skipped, 1); // the plate
-  assert.deepEqual(brand.files.map((f) => [f.data.name, f.data.vehicle ?? null]), [
-    ['International', 'brand:ats/international'], ['Model', TRUCK.key], ['Sleeper', variantKey(SLEEPER)],
+  store = rememberVehicle(store, OWNED);
+  const picks = ['brand:ats/international', 'game:ats', 'all'].map((scope) => ({ scope, key: store.assignments[scope] }));
+  const set = exportFiles(store, picks, null);
+  assert.deepEqual(set.files.map((f) => [f.data.name, f.data.vehicle ?? null]), [
+    ['International', 'brand:ats/international'], ['ATS', 'game:ats'], ['Default layout', null],
   ]);
   assert.deepEqual(
-    { game: brand.files[0].data.game, brand: brand.files[0].data.brand, brandName: brand.files[0].data.brandName },
+    { game: set.files[0].data.game, brand: set.files[0].data.brand, brandName: set.files[0].data.brandName },
     { game: 'ats', brand: 'international', brandName: 'International' },
   );
-  assert.equal(brand.files[2].data.vehicleName, 'International 9900i');
-  const all = exportBranch(store, 'all');
-  assert.equal(all.folder, 'All vehicles');
-  assert.deepEqual(all.files.map((f) => f.data.name), ['Default layout', 'ATS', 'International', 'Model', 'Pete', 'Sleeper']);
-  assert.equal('vehicle' in all.files[0].data, false); // all vehicles' preset: for no vehicle
-  assert.deepEqual(exportBranch(storeWith(), TRUCK.key).files, []);
+  assert.deepEqual([set.clashes, set.plates], [[], 0]);
+  // A vehicle's own goes for its chassis: with the chassis' own, two files for one key.
+  const both = exportFiles(store, [variantKey(SLEEPER), plateKey(OWNED)].map((scope) => ({ scope, key: store.assignments[scope] })), null);
+  assert.deepEqual(both.files.map((f) => f.data.vehicle), [variantKey(OWNED), variantKey(OWNED)]);
+  assert.deepEqual([both.clashes, both.plates], [['International 9900i, hook 3.2 m'], 1]);
+  // A shared file keeps its author; one on no key goes for none.
+  const file = withCollection(store, { ...MODEL_FILE, author: 'Alex' });
+  const loose = exportFiles(file, [{ scope: null, key: 'file:model.json' }], null).files[0].data;
+  assert.equal(loose.author, 'Alex');
+  assert.equal('vehicle' in loose, false);
 });
 
 test('shared files for a brand or a game play after yours there, before wider ones', () => {

@@ -54,10 +54,11 @@ export function collectionLabel(entry) {
 }
 
 // The file to share a layout; fields without a value are left out.
-export function presetFile({ name, vehicle, vehicleName, game, brand, brandName, layout }) {
+export function presetFile({ name, author, vehicle, vehicleName, game, brand, brandName, layout }) {
   return {
     truckerAuxPreset: PRESET_FORMAT,
     name,
+    ...(author ? { author } : {}),
     ...(vehicle ? { vehicle } : {}),
     ...(vehicleName ? { vehicleName } : {}),
     ...(game ? { game } : {}),
