@@ -36,6 +36,36 @@ export function createKeyTree(root, actions) {
     splitter,
     unused,
   );
+  // The right edge sets the panel's width (kept in this browser profile, between runs).
+  const WIDTH_KEY = 'truckerAux.treeWidth';
+  const setWidth = (px) => {
+    const width = Math.round(Math.max(200, Math.min(700, px)));
+    document.documentElement.style.setProperty('--tree-width', `${width}px`);
+    return width;
+  };
+  const saved = Number(localStorage.getItem(WIDTH_KEY));
+  if (saved) setWidth(saved);
+  const edge = el('div', { className: 'reg-width', title: 'Drag to resize' });
+  root.append(edge);
+  edge.addEventListener('pointerdown', (event) => {
+    edge.setPointerCapture(event.pointerId);
+    edge.classList.add('dragging');
+    const left = root.getBoundingClientRect().left;
+    const move = (e) => setWidth(e.clientX - left);
+    const stop = (e) => {
+      localStorage.setItem(WIDTH_KEY, String(setWidth(e.clientX - left)));
+      edge.classList.remove('dragging');
+      edge.removeEventListener('pointermove', move);
+      edge.removeEventListener('pointerup', stop);
+    };
+    edge.addEventListener('pointermove', move);
+    edge.addEventListener('pointerup', stop);
+  });
+  edge.ondblclick = () => {
+    document.documentElement.style.removeProperty('--tree-width');
+    localStorage.removeItem(WIDTH_KEY);
+  };
+
   // The splitter sets the height of the unused presets (remembered for this session).
   splitter.addEventListener('pointerdown', (event) => {
     splitter.setPointerCapture(event.pointerId);
