@@ -204,30 +204,58 @@ function learnPlace(store, entry) {
   return { ...store, vehicles: { ...store.vehicles, [model]: info } };
 }
 
-// The presets shipped with the app (defaults/, read as collection.js entries) made yours,
-// once (store.defaultsImported). Each goes on the key its file says ("all": all vehicles,
-// only in a new store, fresh) when no preset of yours is there; else among the unused ones.
-// One the same as a preset of yours (speakers, bounds, width) is not added again: that one
-// takes its place. A key that held the file ("file:<path>", from when these were shared
-// files in presets/) gets the preset.
-export function importDefaults(store, entries, fresh) {
-  const sameLayout = (a, b) => JSON.stringify([a.width, a.bounds, a.speakers]) === JSON.stringify([b.width, b.bounds, b.speakers]);
-  let next = { ...store, assignments: { ...store.assignments }, defaultsImported: true };
-  // A new store's default layout gives way to the shipped one for all vehicles (its name too).
-  if (fresh && entries.some((e) => e.vehicle === ALL_SCOPE)) {
-    const { [next.assignments[ALL_SCOPE]]: _gone, ...presets } = next.presets;
-    next.presets = presets;
-  }
-  for (const entry of [...entries].sort((a, b) => (a.file < b.file ? -1 : 1))) {
+const sameLayout = (a, b) => JSON.stringify([a.width, a.bounds, a.speakers]) === JSON.stringify([b.width, b.bounds, b.speakers]);
+
+// Preset files (collection.js entries) made your presets. Each goes on the key its file says
+// when no preset of yours is there, or the key is in replace (the one there stays, among the
+// unused if it is on no other key); else among the unused ones. One the same as a preset of
+// yours (speakers, bounds, width) is not added again: that one goes on the key instead. A key
+// that held the file itself ("file:<path>") gets the preset. What a file says of its vehicle
+// is kept (learnPlace). { store, placed, unused, same }: how many went on keys, among the
+// unused, and were yours already.
+export function importPresets(store, entries, replace = new Set()) {
+  let next = { ...store, assignments: { ...store.assignments } };
+  const counts = { placed: 0, unused: 0, same: 0 };
+  for (const entry of [...entries].sort((a, b) => ((a.file ?? '') < (b.file ?? '') ? -1 : 1))) {
     let key = Object.keys(next.presets).find((k) => sameLayout(next.presets[k], entry.layout));
-    if (!key) ({ store: next, key } = createPreset(next, entry.layout));
+    if (key) counts.same++;
+    else ({ store: next, key } = createPreset(next, entry.layout));
     const scope = entry.vehicle;
     const held = scope && next.assignments[scope];
-    if (scope && (scope === ALL_SCOPE ? fresh : !held || held === entry.key)) next.assignments[scope] = key;
-    for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next.assignments[s] = key;
+    if (scope && (!held || held === key || (entry.key && held === entry.key) || replace.has(scope))) {
+      next.assignments[scope] = key;
+      counts.placed++;
+    } else if (!Object.values(next.assignments).includes(key)) counts.unused++;
+    if (entry.key) for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next.assignments[s] = key;
     next = learnPlace(next, entry);
   }
-  return next;
+  return { store: next, ...counts };
+}
+
+// The keys where an import would meet a preset of yours (importPresets' replace): [{ scope,
+// label, yours, theirs }]. A key holding the same layout, or the file itself, is no clash.
+export function importClashes(store, entries, truck = null) {
+  return entries.flatMap((entry) => {
+    const scope = entry.vehicle;
+    const held = scope && store.assignments[scope];
+    const yours = held && presetLayout(store, held);
+    if (!yours || held === entry.key || sameLayout(yours, entry.layout)) return [];
+    return [{ scope, label: scopeLabel(store, scope, truck), yours: yours.name, theirs: entry.name }];
+  });
+}
+
+// The presets shipped with the app (defaults/) made yours, once (store.defaultsImported),
+// as importPresets does. In a new store (fresh) the shipped preset for all vehicles ("all")
+// takes the place of the default layout, and its name.
+export function importDefaults(store, entries, fresh) {
+  let start = store;
+  const replace = new Set();
+  if (fresh && entries.some((e) => e.vehicle === ALL_SCOPE)) {
+    const { [store.assignments[ALL_SCOPE]]: _gone, ...presets } = store.presets;
+    start = { ...store, presets };
+    replace.add(ALL_SCOPE);
+  }
+  return { ...importPresets(start, entries, replace).store, defaultsImported: true };
 }
 
 // A shared file picked in the list is never changed: before the first edit it becomes an

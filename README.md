@@ -94,7 +94,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - `app/data/settings.json`: devices and options;
   - `app/data/profile/`: Chromium's profile;
   - `app/presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
-  - `app/defaults/`: the presets that come with the app. On the first run they become your own presets, on their vehicles.
+  - `app/defaults/`: the presets that come with the app. On the first run they become your own presets, on their vehicles. To update them for a build: Export the presets into this folder (and remove the old files); `npm run dist` ships it as it is.
  
  - Presets included (made yours on the first run):
   

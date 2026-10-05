@@ -11,7 +11,7 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportFiles, keyPath, levelOf, parseSelection,
+  adoptNewModel, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importPresets, keyPath, levelOf, parseSelection,
   planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
   unassign, variantKey,
 } from '../shared/presets.js';
@@ -129,12 +129,15 @@ function applySilence() {
 }
 
 let saveTimer = null;
+let saveWarning = null; // a save that failed: the next one that works takes only it away
 function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     const { collection, ...own } = state.store;
     const warning = await window.aux.saveLayouts(own);
-    state.storeWarnings = warning ? [warning] : [];
+    if (warning === saveWarning) return;
+    state.storeWarnings = [...state.storeWarnings.filter((w) => w !== saveWarning), ...(warning ? [warning] : [])];
+    saveWarning = warning;
     render();
   }, SAVE_DELAY_MS);
 }
@@ -158,6 +161,8 @@ const ownStore = () => {
   return structuredClone(own);
 };
 function remember(tag = null) {
+  // An edit puts away what was said (an import's summary and so on), not a failed save.
+  state.storeWarnings = state.storeWarnings.filter((w) => w === saveWarning);
   const now = performance.now();
   if (tag && tag === history.tag && now - history.at < COALESCE_MS) {
     history.at = now;
@@ -601,6 +606,33 @@ const actions = {
     if (result.canceled) return;
     state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
     render();
+  },
+  // Import: preset files (main asks which) become your presets, each on the key its file
+  // says (importPresets). Keys that have a preset of yours are listed: the ticked ones get the
+  // file's, the others' file goes among the unused presets. Undo takes it all back.
+  async importPresets() {
+    const result = await window.aux.importPresets();
+    if (result.canceled) return;
+    const { entries, warnings } = result;
+    let replace = new Set();
+    const clashes = importClashes(state.store, entries, state.truck);
+    if (clashes.length) {
+      const answer = await ask({
+        title: `Import ${entries.length} preset(s)`,
+        lines: ['These keys have a preset of yours. Tick the ones to get the imported preset (yours stays among the unused presets); the others\' import goes among the unused presets.'],
+        checks: clashes.map((c) => ({ value: c.scope, label: `${c.label}: ${c.yours} → ${c.theirs}`, checked: false })),
+        buttons: [{ value: null, label: 'Cancel' }, { value: 'import', label: 'Import', primary: true }],
+      });
+      if (!answer) return;
+      replace = new Set(answer.checked);
+    }
+    const before = speakerIds();
+    remember();
+    const done = importPresets(state.store, entries, replace);
+    state.store = done.store;
+    const parts = [`${done.placed} on their keys`, `${done.unused} among the unused`, ...(done.same ? [`${done.same} yours already`] : [])];
+    state.storeWarnings = [...warnings, ...(entries.length ? [`Imported ${entries.length} preset(s): ${parts.join(', ')}.`] : [])];
+    afterScopeChange(before);
   },
   deleteCurrentPreset() {
     const current = playing();

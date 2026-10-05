@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, importDefaults,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importDefaults, importPresets,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -722,6 +722,26 @@ test('importDefaults: the shipped presets made yours once, on their keys', () =>
   assert.equal(at(kept, TRUCK.key).name, 'Mine');
   assert.equal(at(kept, 'vehicle.other').name, 'Model');
   assert.deepEqual(presetTree(kept, null).unassigned.map((p) => p.name), ['Default layout copy']); // Loose is the same as p.1
+});
+
+test('importPresets: files on their keys; a key of yours is replaced only when asked', () => {
+  const file = (name, vehicle, width) => ({ ...shared(`${name}.json`, vehicle), key: null, name, layout: { ...defaultLayout(), name, width } });
+  const store = rememberVehicle(storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } }), TRUCK);
+  const model = file('Theirs', TRUCK.key, 0.8);
+  const chassis = file('Sleeper', variantKey(SLEEPER), 0.6);
+  assert.deepEqual(importClashes(store, [model, chassis]), [{ scope: TRUCK.key, label: 'International 9900i', yours: 'Mine', theirs: 'Theirs' }]);
+  const kept = importPresets(store, [model, chassis]);
+  assert.deepEqual([kept.placed, kept.unused, kept.same], [1, 1, 0]);
+  assert.equal(at(kept.store, TRUCK.key).name, 'Mine');
+  assert.equal(at(kept.store, variantKey(SLEEPER)).name, 'Sleeper');
+  assert.deepEqual(presetTree(kept.store, null).unassigned.map((p) => p.name), ['Theirs']);
+  const replaced = importPresets(store, [model], new Set([TRUCK.key]));
+  assert.equal(at(replaced.store, TRUCK.key).name, 'Theirs');
+  assert.deepEqual(presetTree(replaced.store, null).unassigned.map((p) => p.name), ['Mine']); // yours stays, unused
+  // The same layout as yours: no copy, no clash.
+  const again = importPresets(kept.store, [chassis]);
+  assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(kept.store.presets).length]);
+  assert.deepEqual(importClashes(kept.store, [chassis]), []);
 });
 
 test('shared files for a brand or a game play after yours there, before wider ones', () => {
