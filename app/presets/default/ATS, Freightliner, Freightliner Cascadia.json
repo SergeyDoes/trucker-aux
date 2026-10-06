@@ -7,8 +7,6 @@
   "brand": "freightliner",
   "brandName": "Freightliner",
   "layout": {
-    "label": "new",
-    "labelColor": "green",
     "width": 1,
     "bounds": {
       "min": [
