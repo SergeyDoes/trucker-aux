@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CAB_CAMERA, CAB_RADIUS, FREE_CAMERA, cameraPoint, cameraView, createCameraWatch, eulerToQuaternion, expectedHead, headOffset, quaternionToEuler,
+  CAB_CAMERA, CAB_RADIUS, FREE_CAMERA, cameraPoint, cameraView, createCameraWatch, createFallbackWatch, eulerToQuaternion, expectedHead, headOffset, quaternionToEuler,
   qmul, withCameraView,
 } from '../src/shared/camera.js';
 
@@ -133,6 +133,27 @@ test('cameraPoint: the free camera in layout coordinates (X from the truck axis)
   assert.equal(cameraPoint({ source: 'game', heading: 0, pitch: 0, roll: 0 }, -0.5), null);
   assert.equal(cameraPoint({ source: 'outside' }, -0.5), null);
   assert.equal(cameraPoint({ source: null }, -0.5), null);
+});
+
+test('createFallbackWatch: confirmed after 3 s in the world with a vehicle and no camera; off once the camera works', () => {
+  const watch = createFallbackWatch(3000);
+  const world = (source, inWorld = true, truck = true) => ({ inWorld, truck: truck ? { key: 'vehicle.x' } : null, source });
+  assert.equal(watch(world(null, false), 0), false); // the menu: nothing known yet
+  assert.equal(watch(world(null, true, false), 500), false); // no vehicle yet
+  assert.equal(watch(world(null), 1000), false); // the world: the camera may still be on its way
+  assert.equal(watch(world(null), 3900), false);
+  assert.equal(watch(world(null), 4000), true); // 3 s without the camera
+  assert.equal(watch(world(null, false), 9000), true); // and it holds through the menus
+  assert.equal(watch(world('game'), 9500), false); // the camera works: hidden at once
+  assert.equal(watch(world('outside'), 9600), false);
+  // A short gap in the camera does not confirm it.
+  assert.equal(watch(world(null), 10000), false);
+  assert.equal(watch(world('game'), 11000), false);
+  assert.equal(watch(world(null), 12000), false);
+  // Leaving the world restarts the count.
+  assert.equal(watch(world(null, false), 14000), false);
+  assert.equal(watch(world(null), 14500), false);
+  assert.equal(watch(world(null), 17500), true);
 });
 
 test('createCameraWatch: fresh while the sequence moves; stale after a second without a new frame', () => {

@@ -77,7 +77,8 @@ function toggleButton(text, action, on, title) {
   return button;
 }
 
-export function createPanel(root, actions) {
+// boundsRoot: where the Bounds fieldset goes (under the 3D overview).
+export function createPanel(root, actions, boundsRoot) {
   const status = el('div', { className: 'status', textContent: 'Starting…' });
   const warnings = el('ul', { className: 'warnings' });
 
@@ -99,11 +100,6 @@ export function createPanel(root, actions) {
   });
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });
-  // Shown while the view comes from the game's camera (trucker_aux_camera.dll, shared/camera.js).
-  const cameraNote = el('p', {
-    className: 'hint',
-    textContent: 'The game\'s camera is read (trucker_aux_camera.dll): the sound turns with it, so these settings are not used now.',
-  });
   const turnLookPercent = el('input', {
     type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 35° at full lock',
   });
@@ -205,6 +201,22 @@ export function createPanel(root, actions) {
     return { ...wall, input, label: el('label', {}, [wall.label, input]) };
   });
   const headNote = el('p', { className: 'hint' });
+  // Shown only once the app has seen the game without trucker_aux_camera.dll's camera
+  // (view.cameraFallback, shared/camera.js createFallbackWatch): with it the sound takes the
+  // game's own camera and these are not used.
+  const cameraForm = el('fieldset', {}, [
+    el('legend', { textContent: 'Game camera' }),
+    row('Into turns', el('div', { className: 'inline' }, [
+      turnLookOn,
+      el('label', { className: 'inline' }, [turnLookPercent, '%']),
+    ])),
+    row('In reverse', turnLookReverse),
+    row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
+    el('p', {
+      className: 'hint',
+      textContent: 'trucker_aux_camera.dll does not read the game\'s camera (it is missing, or does not know this game version). Set these as in the game\'s Accessibility options: the game turns its camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.',
+    }),
+  ]);
   const boundsForm = el('fieldset', {}, [
     el('legend', { textContent: 'Bounds, cm' }),
     el('div', { className: 'walls' }, walls.map((w) => w.label)),
@@ -224,20 +236,7 @@ export function createPanel(root, actions) {
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
     ]),
-    el('fieldset', {}, [
-      el('legend', { textContent: 'Game camera' }),
-      row('Into turns', el('div', { className: 'inline' }, [
-        turnLookOn,
-        el('label', { className: 'inline' }, [turnLookPercent, '%']),
-      ])),
-      row('In reverse', turnLookReverse),
-      row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
-      cameraNote,
-      el('p', {
-        className: 'hint',
-        textContent: 'Set these as in the game\'s Accessibility options: the game turns the camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.',
-      }),
-    ]),
+    cameraForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Layout' }),
       row('Preset', preset),
@@ -252,7 +251,6 @@ export function createPanel(root, actions) {
         title: 'Every preset plays as loud as the default two doors, whatever its number and kind of speakers. Speaker levels still apply on top.',
       }, [matchLoudness, 'Match loudness across presets', loudnessNote]),
     ]),
-    boundsForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Speakers' }),
       list,
@@ -261,6 +259,7 @@ export function createPanel(root, actions) {
     ]),
     speakerForm,
   );
+  boundsRoot.replaceChildren(boundsForm);
 
   input.onchange = () => actions.selectInput(input.value);
   output.onchange = () => actions.selectOutput(output.value);
@@ -344,16 +343,13 @@ export function createPanel(root, actions) {
     fillSelect(muteWhen, MUTE_OPTIONS, view.muteWhen);
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);
     const look = view.turnLook;
-    const fromGame = Boolean(view.cameraSource);
+    cameraForm.hidden = !view.cameraFallback;
     turnLookOn.checked = look.on;
-    turnLookOn.disabled = fromGame;
     setValue(turnLookPercent, look.percent);
-    turnLookPercent.disabled = !look.on || fromGame;
+    turnLookPercent.disabled = !look.on;
     fillSelect(turnLookReverse, REVERSE_OPTIONS, look.reverse);
-    turnLookReverse.disabled = !look.on || fromGame;
+    turnLookReverse.disabled = !look.on;
     turnLookBlinkers.checked = look.blinkers;
-    turnLookBlinkers.disabled = fromGame;
-    cameraNote.hidden = !fromGame;
     if (playerSlot.firstChild !== view.player) playerSlot.replaceChildren(...(view.player ? [view.player] : []));
 
     fillSelect(preset, view.presets, view.preset);

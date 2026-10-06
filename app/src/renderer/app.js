@@ -24,7 +24,9 @@ import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
 import { trimFromLevels } from '../shared/loudness.js';
 import { measureLoudness } from './loudness-meter.js';
-import { cameraPoint, cameraView, createCameraWatch, withCameraView } from '../shared/camera.js';
+import {
+  cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
+} from '../shared/camera.js';
 import {
   DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
@@ -47,6 +49,7 @@ const state = {
   inWorld: false,  // game frames are coming (not the main menu or loading)
   turn: 0,          // the game's look into turns and toward the blinker, added to the head, in turns
   view: { source: null }, // the game camera's view (shared/camera.js), when trucker_aux_camera.dll runs
+  cameraFallback: false, // seen in the game without the camera: the Game camera settings are shown
   heard: null,      // the pose the engine and the views were given last
   picked: EMPTY,   // selected speakers { ids, primary } (state.selection is the preset choice)
   loudnessDb: null, // the playing layout's loudness-matching trim, once measured
@@ -763,7 +766,7 @@ const actions = {
   },
 };
 
-const panel = createPanel(document.getElementById('panel'), actions);
+const panel = createPanel(document.getElementById('panel'), actions, document.getElementById('bounds'));
 const keyTree = createKeyTree(document.getElementById('tree'), actions);
 const views = createViews(document.getElementById('views'), actions);
 
@@ -800,6 +803,7 @@ function render() {
     muteWhen: state.settings.muteWhen,
     turnLook: state.settings.turnLook,
     cameraSource: state.view.source,
+    cameraFallback: state.cameraFallback,
     pauseBehavior: state.settings.pauseBehavior,
     player: audio?.player ?? null,
     presets: presetOptions(state.store, state.truck, state.selection),
@@ -852,6 +856,7 @@ const frameWatch = createFrameWatch();
 const rampBlinker = createRamp();
 const holdPause = createPauseHold();
 const cameraWatch = createCameraWatch();
+const fallbackWatch = createFallbackWatch();
 // presets/ changed: new, edited or removed shared files. A picked file that is gone
 // leaves the choice to Auto.
 window.aux.onCollection(({ collection, warnings }) => {
@@ -900,9 +905,11 @@ window.aux.onPose((pose) => {
   // step ramped in.
   const headX = headRestX(state.truck);
   const view = cameraView(pose, pose?.camera, cameraWatch(pose?.camera, performance.now()));
-  if (view.source !== state.view.source) {
+  const fallback = fallbackWatch({ inWorld: state.inWorld, truck: pose?.truck, source: view.source }, performance.now());
+  if (view.source !== state.view.source || fallback !== state.cameraFallback) {
     state.view = view;
-    render(); // the Game camera fieldset says where the view comes from
+    state.cameraFallback = fallback;
+    render(); // "+ Speaker" goes to the free camera; the Game camera fieldset shows without the camera
   }
   state.view = view;
   let heard;

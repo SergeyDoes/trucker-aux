@@ -106,7 +106,8 @@ Player ─► virtual cable                          Game audio ─────�
     fly up to a speaker to hear it up close. "+ Speaker" and "+ Pair" then put the new
     speakers at the camera, a way to place them by looking.
   - Without it, set the same options in the app's "Game camera" fieldset and the turn
-    is emulated from the steering and the blinkers.
+    is emulated from the steering and the blinkers. The fieldset shows up only once the
+    app has seen the game (a vehicle in the world for 3 s) without the camera.
 - **Safe with the game:**
   - the telemetry's shared memory is only opened for reading, never created;
   - `trucker_aux_camera.dll` only reads the game's memory, and every read is guarded:
@@ -148,7 +149,7 @@ Player ─► virtual cable                          Game audio ─────�
    - set Input to the cable's output;
    - set Output to your headphones;
    - if `trucker_aux_camera.dll` is not used, set "Game camera" as in the game's
-     Accessibility options.
+     Accessibility options. The fieldset appears once you drive without it.
 
 To run from source instead:
 
@@ -168,9 +169,10 @@ Build the plugins in Visual Studio 2022:
 
 - **The window:** from left to right:
   - the **key tree** with "Unused presets" below it;
-  - the **panel**: audio, game camera, the preset and its card, bounds, speakers;
+  - the **panel**: audio, game camera (without the camera plugin), the preset and its
+    card, speakers;
   - the **top and side views**;
-  - the **3D overview**.
+  - the **3D overview**, with the **bounds** under it.
 - **Auto** follows the vehicle in the game. Picking a key or a preset stops that; the
   Auto button above the tree or "Back to Auto" on the card brings it back.
 - **The card** under the preset list:

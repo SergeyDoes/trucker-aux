@@ -257,7 +257,7 @@ Window 1280×800, resizable, English strings.
 
 **Panel:**
 - status (truck, yaw / pitch, or `Game not running`);
-- device lists, source, "Mute when", "Pause behavior" (Always active / Always muted / Active vehicle); a "Game camera" fieldset set as in the game: Into turns [x] [100] %, In reverse [Off / On / Inverted], Blinkers [x] Look toward them; preset selector with New preset, Delete preset and Export (disabled for a shared file, whose name cannot be edited either), stereo width slider with a hint (0 mono, 1 as recorded, 2 extra wide; mono speakers are not affected);
+- device lists, source, "Mute when", "Pause behavior" (Always active / Always muted / Active vehicle); a "Game camera" fieldset set as in the game, shown only once the app has seen the game without `trucker_aux_camera.dll`'s camera (`docs/superpowers/specs/2026-10-06-camera-plugin-design.md`): Into turns [x] [100] %, In reverse [Off / On / Inverted], Blinkers [x] Look toward them; preset selector with New preset, Delete preset and Export (disabled for a shared file, whose name cannot be edited either), stereo width slider with a hint (0 mono, 1 as recorded, 2 extra wide; mono speakers are not affected);
 - speaker list with S (solo) and M (mute);
 - selected speaker properties: name, channel, type, level, pair link / unlink, X / Y / Z in cm (editable), delete;
 - warnings.
@@ -274,7 +274,7 @@ Both views:
 
 **Interactions.**
 - Drag a speaker: top view changes X/Z, side view changes Z/Y, snapped to 1 cm. A mirrored partner follows (X mirrored about X = 0, Y/Z equal).
-- Drag the walls of the bounds to resize them; the side walls move together, symmetric about X = 0. The Bounds panel has Width, Bottom, Top, Front, Back and shows where the driver's head is; it says the bounds do not change the sound, they only frame the views. In the top view the "Vehicle axis" label sits just inside the front wall, clear of the wall's name.
+- Drag the walls of the bounds to resize them; the side walls move together, symmetric about X = 0. The Bounds fieldset, under the 3D view, has Width, Bottom, Top, Front, Back and shows where the driver's head is; it says the bounds do not change the sound, they only frame the views. In the top view the "Vehicle axis" label sits just inside the front wall, clear of the wall's name.
 - The truck's axis comes from the game: `truck.centerX = −(cabinPosition.x + headPosition.x)` (@1640, @1652), the head's offset from the vehicle's centre line. Width, height and depth stay manual: the game does not give them.
 - Wheel zooms both views together; `Fit` button.
 - Selection (`selection.js`, unit-tested) is shared between the list, both views and the 3D view; it holds several speakers and a primary one (the last clicked):

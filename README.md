@@ -80,7 +80,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
    - Run the *Trucker AUX* application
      - Set your *Virtual Output Device* into **Input** field
      - Set your *Headset (or Default) Device* into **Output** field
-     - Optionally fill in the *Game camera* settings to match in-game ones (not needed while *trucker_aux_camera.dll* reads the game's camera)
+     - Optionally fill in the *Game camera* settings to match in-game ones (the fieldset shows up only once the app has seen the game without *trucker_aux_camera.dll* reading its camera)
    - Set your audio *content* **Output** device to *Virtual Input Device*
      - Open Windows Audio Mixer, locate your audio playing application and assign a device
    - Done!

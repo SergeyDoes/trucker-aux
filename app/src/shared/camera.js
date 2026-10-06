@@ -134,3 +134,25 @@ export function createCameraWatch(timeoutMs = 1000) {
     return now - since <= timeoutMs;
   };
 }
+
+// Whether the app has seen that the game's camera is not there: the game world up with a vehicle
+// for confirmMs on end while the camera gave nothing (no plugin, a game version it does not know,
+// a fault), so the view falls back to the telemetry and the Game camera settings are needed. It
+// holds through the menus; it goes off as soon as the camera works, and a short gap does not
+// confirm it (the camera may still be on its way into a new world).
+export function createFallbackWatch(confirmMs = 3000) {
+  let confirmed = false;
+  let since = null;
+  return ({ inWorld, truck, source }, now) => {
+    if (source) {
+      confirmed = false;
+      since = null;
+    } else if (!inWorld || !truck) {
+      since = null;
+    } else {
+      if (since === null) since = now;
+      if (now - since >= confirmMs) confirmed = true;
+    }
+    return confirmed;
+  };
+}
