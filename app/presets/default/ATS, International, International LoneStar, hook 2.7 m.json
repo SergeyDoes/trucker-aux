@@ -1,0 +1,79 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › International › International LoneStar › hook 2.7 m",
+  "vehicle": "vehicle.intnational.lonestar@2.7",
+  "vehicleName": "International LoneStar",
+  "game": "ats",
+  "brand": "intnational",
+  "brandName": "International",
+  "layout": {
+    "label": "day cab",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s3",
+        "name": "Tweeter L",
+        "position": [
+          -0.7,
+          0.16,
+          -0.42
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R",
+        "position": [
+          0.7,
+          0.16,
+          -0.42
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      },
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.88,
+          -0.89,
+          -0.74
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.88,
+          -0.89,
+          -0.74
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      }
+    ]
+  }
+}

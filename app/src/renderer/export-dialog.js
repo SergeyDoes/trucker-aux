@@ -68,8 +68,8 @@ export function chooseExport({ map, checked, check }) {
     return input;
   };
   const badge = (own) => {
-    const text = own.label || (own.file ? 'shared file' : 'preset');
-    return el('span', { className: `reg-badge${own.label ? ` tag-${own.labelColor}` : ''}`, textContent: text });
+    const text = own.label || (own.default ? 'default' : own.file ? 'shared file' : 'preset');
+    return el('span', { className: `reg-badge${own.label ? ` tag-${own.labelColor}` : own.default ? ' tag-gray' : ''}`, textContent: text });
   };
 
   function row(node) {
@@ -83,7 +83,7 @@ export function chooseExport({ map, checked, check }) {
       else collapsed.delete(node.scope);
       draw();
     };
-    const line = el('div', { className: `reg-row${node.own ? ` ${node.own.file ? 'file' : 'own'}` : ''}`, title: node.own?.name ?? '' }, [
+    const line = el('div', { className: `reg-row${node.own ? ` ${node.own.default ? 'default' : node.own.file ? 'file' : 'own'}` : ''}`, title: node.own?.name ?? '' }, [
       toggle,
       el('label', { className: 'export-pick' }, [
         box(ids),
@@ -97,7 +97,7 @@ export function chooseExport({ map, checked, check }) {
 
   function draw() {
     tree.replaceChildren(...[row(map.root)].filter(Boolean));
-    const unused = [...map.unassigned.map((p) => ({ ...p, file: false })), ...map.files.map((f) => ({ ...f, label: null, file: true }))];
+    const unused = [...map.unassigned.map((p) => ({ ...p, file: false })), ...map.files.map((f) => ({ ...f, file: true }))];
     loose.replaceChildren(...(unused.length ? [
       el('h3', { textContent: 'Unused presets' }),
       ...unused.map((p) => el('label', { className: `reg-row export-pick${p.file ? ' file' : ''}`, title: p.file ? 'A shared file' : '' }, [

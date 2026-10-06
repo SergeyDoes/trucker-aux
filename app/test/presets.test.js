@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importDefaults, importPresets,
+  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -533,7 +533,7 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
   assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null, labelColor: 'blue' }]);
-  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose' }]);
+  assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose', default: false, label: null, labelColor: 'blue' }]);
   // A model not driven goes up only to all vehicles: its game is not known.
   const anthem = map.root.children.at(-1).children[0];
   assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
@@ -606,16 +606,22 @@ test('a shared file may say the game and brand of its vehicle: the map places it
   assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
 });
 
-test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit', () => {
+test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit, on its chassis', () => {
   const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
   const adopted = adoptNewModel(store, SLEEPER);
-  assert.equal(adopted.assignments[TRUCK.key], 'p.3');
-  assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
-  assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
-  assert.equal(at(adopted, TRUCK.key).label, 'new'); // stands out in the tree until labelled
-  assert.equal(at(adopted, TRUCK.key).labelColor, 'green');
-  assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
-  assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
+  const chassis32 = variantKey(SLEEPER);
+  assert.equal(adopted.assignments[chassis32], 'p.3');
+  assert.equal(adopted.assignments[TRUCK.key], undefined); // not the model's: each chassis gets its own
+  assert.equal(at(adopted, chassis32).name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(at(adopted, chassis32).width, 0.4); // the brand's, copied
+  assert.equal(at(adopted, chassis32).label, 'new'); // stands out in the tree until labelled
+  assert.equal(at(adopted, chassis32).labelColor, 'green');
+  assert.notEqual(at(adopted, chassis32).speakers, store.presets['p.2'].speakers);
+  // Another chassis of the model has a key of the model now: it plays that chassis's preset
+  // until it is edited, which gives it a copy of its own.
+  assert.equal(adoptNewModel(adopted, SHORT), adopted);
+  assert.equal(autoPreset(adopted, SHORT).how, 'sibling');
+  // The game reports no chassis: the model gets it.
   assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
   // A key for a chassis or a vehicle of the model, or a shared file for it: nothing new.
   const chassis = storeWith({ [variantKey(SHORT)]: { name: 'Day cab' } });
@@ -657,6 +663,9 @@ test('the map shows a preset\'s label beside its keys', () => {
   assert.equal(map.root.own.label, null);
   assert.deepEqual(map.unassigned, [{ key: 'p.3', name: 'Spare', label: 'Test', labelColor: 'blue' }]);
   assert.equal(model.own.labelColor, 'blue');
+  // A shared file on no key shows its label among the unused too.
+  const loose = withCollection(store, { ...shared('loose.json', null), layout: { ...defaultLayout(), name: 'loose', label: 'Spare', labelColor: 'red' } });
+  assert.deepEqual([presetTree(loose, null).files[0].label, presetTree(loose, null).files[0].labelColor], ['Spare', 'red']);
   // A shared file carries its label too, and Export writes it.
   assert.equal(exportPreset(store, 'p.2', null).data.layout.label, 'Day cab');
 });
@@ -698,30 +707,47 @@ test('exportFiles: each ticked preset goes for its key; plates go for their chas
   assert.equal('vehicle' in loose, false);
 });
 
-test('importDefaults: the shipped presets made yours once, on their keys', () => {
-  const file = (name, vehicle, width = 1) => ({ ...shared(`${name}.json`, vehicle), name, layout: { ...defaultLayout(), name, width } });
-  const all = file('Default layout', 'all', 0.7);
-  const model = file('Model', TRUCK.key, 0.8);
-  const loose = file('Loose', null, 0.9);
-  const fresh = importDefaults(storeWith(), [all, model, loose], true);
-  assert.equal(fresh.defaultsImported, true);
-  assert.equal(at(fresh, 'all').name, 'Default layout');
-  assert.equal(at(fresh, 'all').width, 0.7);
-  assert.equal(Object.keys(fresh.presets).length, 3); // the new store's default layout is gone
-  assert.equal(at(fresh, TRUCK.key).name, 'Model');
-  assert.deepEqual(presetTree(fresh, null).unassigned.map((p) => p.name), ['Loose']);
-  // Where a file's vehicle is from stays known: the tree places it under its game and brand.
-  const placed = importDefaults(storeWith(), [{ ...model, game: 'ats', brand: 'international', brandName: 'International', vehicleName: 'International 9900i' }], true);
-  assert.deepEqual(lines(presetTree(placed, null).root).slice(1), ['  ATS (Default layout)', '    International (Default layout)', '      International 9900i = Model']);
-  // A store of yours: all vehicles' and a key with your preset stay; one the same as yours is
-  // not added again; a key that held the file gets the preset.
-  let mine = storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } });
-  mine = { ...mine, presets: { ...mine.presets, 'p.1': { ...mine.presets['p.1'], width: 0.9 } }, assignments: { ...mine.assignments, 'vehicle.other': 'file:Model.json' } };
-  const kept = importDefaults(mine, [all, model, loose], false);
-  assert.equal(at(kept, 'all').width, 0.9);
-  assert.equal(at(kept, TRUCK.key).name, 'Mine');
-  assert.equal(at(kept, 'vehicle.other').name, 'Model');
-  assert.deepEqual(presetTree(kept, null).unassigned.map((p) => p.name), ['Default layout copy']); // Loose is the same as p.1
+test('defaults (presets/default/): the bottom layer, under yours and others\' files', () => {
+  const file = (path, vehicle, width) => ({ ...shared(path, vehicle), layout: { ...defaultLayout(), name: path, width } });
+  const def = file('default/model.json', TRUCK.key, 0.8);
+  const theirs = file('z-theirs.json', TRUCK.key, 0.6);
+  assert.equal(def.default, true);
+  assert.equal(theirs.default, false);
+  // Another file for the model plays before the default, though "default/" sorts first by path.
+  assert.equal(autoPreset(withCollection(storeWith(), def, theirs), SHORT).key, 'file:z-theirs.json');
+  assert.equal(autoPreset(withCollection(storeWith(), def), SHORT).key, 'file:default/model.json');
+  // Yours plays before it; the tree marks it a default.
+  const mine = withCollection(storeWith({ [TRUCK.key]: { name: 'Mine' } }), def);
+  assert.equal(autoPreset(mine, SHORT).how, 'model');
+  const node = (function find(n) { return n.scope === TRUCK.key ? n : n.children.map(find).find(Boolean); })(presetTree(withCollection(storeWith(), def), null).root);
+  assert.deepEqual([node.own.file, node.own.default], [true, true]);
+  // Editing the key it plays on gives the key a copy of yours; the file stays.
+  const KEY = { mode: 'scope', scope: TRUCK.key };
+  const edited = editLayout(withCollection(storeWith(), def), KEY, null, widen);
+  assert.equal(at(edited, TRUCK.key).width, 1.5);
+  assert.equal(edited.collection['file:default/model.json'].layout.width, 0.8);
+  // A new store starts with the default for all vehicles.
+  const all = file('default/all.json', 'all', 0.7);
+  const seeded = seedAll(storeWith(), { [all.key]: all });
+  assert.equal(at(seeded, 'all').width, 0.7);
+  const empty = storeWith();
+  assert.equal(seedAll(empty, {}), empty); // no default for all vehicles: the built-in layout
+});
+
+test('dropImportedDefaults: 0.1.1\'s copies of the defaults give way to them; changed ones stay', () => {
+  const def = (path, vehicle, width) => ({ ...shared(path, vehicle), default: true, layout: { ...defaultLayout(), name: path, width } });
+  const model = def('default/model.json', TRUCK.key, 0.8);
+  const chassis = def('default/chassis.json', variantKey(SLEEPER), 0.6);
+  const collection = { [model.key]: model, [chassis.key]: chassis };
+  let store = storeWith({ [TRUCK.key]: { name: 'default/model.json', width: 0.8 }, [variantKey(SLEEPER)]: { name: 'default/chassis.json', width: 0.9 } }, [{ name: 'default/model.json', width: 0.8 }]);
+  store = { ...store, defaultsImported: true };
+  const done = dropImportedDefaults(store, collection);
+  assert.equal('defaultsImported' in done, false);
+  assert.equal(done.assignments[TRUCK.key], undefined); // the same as the default: it plays again
+  assert.equal(at(done, variantKey(SLEEPER)).width, 0.9); // changed: yours
+  assert.equal(Object.keys(done.presets).length, 2); // the unused copy went too
+  assert.equal(dropImportedDefaults(done, collection), done);
+  assert.equal(normalizeStore(store).defaultsImported, true);
 });
 
 test('importPresets: files on their keys; a key of yours is replaced only when asked', () => {
@@ -742,6 +768,25 @@ test('importPresets: files on their keys; a key of yours is replaced only when a
   const again = importPresets(kept.store, [chassis]);
   assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(kept.store.presets).length]);
   assert.deepEqual(importClashes(kept.store, [chassis]), []);
+});
+
+test('importPresets: a file keeps its name and label; only the very same preset of yours is reused', () => {
+  const file = (name, extra) => ({ ...shared(`${name}.json`, variantKey(SLEEPER)), key: null, name, layout: { ...defaultLayout(), name, ...extra } });
+  // The same speakers as all vehicles' "Default layout", but a name and a label of its own.
+  const tagged = file('Kenworth T680', { label: 'SLEEPER', labelColor: 'green' });
+  const done = importPresets(storeWith(), [tagged]);
+  assert.equal(done.same, 0);
+  const placed = at(done.store, variantKey(SLEEPER));
+  assert.deepEqual([placed.name, placed.label, placed.labelColor], ['Kenworth T680', 'SLEEPER', 'green']);
+  assert.equal(at(done.store, 'all').name, 'Default layout');
+  // Imported again: the very same preset, so no copy and no clash.
+  const again = importPresets(done.store, [tagged]);
+  assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(done.store.presets).length]);
+  assert.deepEqual(importClashes(done.store, [tagged]), []);
+  // Your key with the same speakers but another label: a clash, replaced only when asked.
+  const relabelled = file('Kenworth T680', { label: 'DAY CAB' });
+  assert.equal(importClashes(done.store, [relabelled]).length, 1);
+  assert.equal(at(importPresets(done.store, [relabelled], new Set([variantKey(SLEEPER)])).store, variantKey(SLEEPER)).label, 'DAY CAB');
 });
 
 test('shared files for a brand or a game play after yours there, before wider ones', () => {

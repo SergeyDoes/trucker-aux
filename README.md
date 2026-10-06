@@ -75,12 +75,12 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 - **Setup**:
   - Make sure you set up the Virtual Audio Device and both Input and Output device appear in your system
   - Download the [latest version](../../releases/latest) and *Extract* the archive
-  - Place the **scs-telemetry.dll** at *[Game Folder]/bin/win_x64/plugins/*
+  - Place the **scs-telemetry.dll** and **trucker_aux_camera.dll** at *[Game Folder]/bin/win_x64/plugins/*
     - Create the *plugins* folder if needed
    - Run the *Trucker AUX* application
      - Set your *Virtual Output Device* into **Input** field
      - Set your *Headset (or Default) Device* into **Output** field
-     - Optionally fill in the *Game camera* settings to match in-game ones
+     - Optionally fill in the *Game camera* settings to match in-game ones (the fieldset shows up only once the app has seen the game without *trucker_aux_camera.dll* reading its camera)
    - Set your audio *content* **Output** device to *Virtual Input Device*
      - Open Windows Audio Mixer, locate your audio playing application and assign a device
    - Done!
@@ -107,9 +107,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - `app/data/settings.json`: devices and options;
   - `app/data/profile/`: Chromium's profile;
   - `app/presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
-  - `app/defaults/`: the presets that come with the app. On the first run they become your own presets, on their vehicles. To update them for a build: Export the presets into this folder (and remove the old files); `npm run dist` ships it as it is.
+  - `app/presets/default/`: the presets that come with the app, the bottom layer under yours and others' files. To update them for a build: Export the presets into this folder (and remove the old files); `npm run dist` ships it as it is.
  
- - Presets included (made yours on the first run):
+ - Presets included (`app/presets/default/`):
   
 
    | Vehicle | Notes
@@ -136,6 +136,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.
   - The **current camera mode** is not reported by the game either, the head position is just defaulted when not in FPV. The above-mentioned behavior is processed directly from the trucks steer and turn signal states, and *it keep affect the head's position even in third person camera modes.*
+- **trucker_aux_camera.dll** (comes with the app) reads the game's own camera instead, so the steering and blinker camera rotation are taken as they are and outside cameras leave the sound alone; the status line then says *camera: game*. In the game's free camera (developer mode, key 0) the sound is heard from where the camera is (*camera: free*), and *+ Speaker* / *+ Pair* put new speakers at the camera. It reads the camera from the game's memory (the way ETS2LA does), so a game update may switch it off until it is updated: the *Game camera* settings above are the fallback.
 
 <br>
 <br>

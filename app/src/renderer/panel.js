@@ -77,7 +77,8 @@ function toggleButton(text, action, on, title) {
   return button;
 }
 
-export function createPanel(root, actions) {
+// boundsRoot: where the Bounds fieldset goes (under the 3D overview).
+export function createPanel(root, actions, boundsRoot) {
   const status = el('div', { className: 'status', textContent: 'Starting…' });
   const warnings = el('ul', { className: 'warnings' });
 
@@ -100,11 +101,11 @@ export function createPanel(root, actions) {
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });
   const turnLookPercent = el('input', {
-    type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 45° at full lock',
+    type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 35° at full lock',
   });
   const turnLookReverse = el('select', { title: '"Look into turns" on the reverse gear, as in the game' });
   const turnLookBlinkers = el('input', {
-    type: 'checkbox', title: 'The game\'s "look toward the blinker": 30° left or 45° right while a blinker is on',
+    type: 'checkbox', title: 'The game\'s "look toward the blinker": while a blinker is on, 20° toward the driver\'s side or 40° across (in a left-hand-drive cab 20° left, 40° right)',
   });
 
   const preset = el('select');
@@ -200,6 +201,22 @@ export function createPanel(root, actions) {
     return { ...wall, input, label: el('label', {}, [wall.label, input]) };
   });
   const headNote = el('p', { className: 'hint' });
+  // Shown only once the app has seen the game without trucker_aux_camera.dll's camera
+  // (view.cameraFallback, shared/camera.js createFallbackWatch): with it the sound takes the
+  // game's own camera and these are not used.
+  const cameraForm = el('fieldset', {}, [
+    el('legend', { textContent: 'Game camera' }),
+    row('Into turns', el('div', { className: 'inline' }, [
+      turnLookOn,
+      el('label', { className: 'inline' }, [turnLookPercent, '%']),
+    ])),
+    row('In reverse', turnLookReverse),
+    row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
+    el('p', {
+      className: 'hint',
+      textContent: 'trucker_aux_camera.dll does not read the game\'s camera (it is missing, or does not know this game version). Set these as in the game\'s Accessibility options: the game turns its camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.',
+    }),
+  ]);
   const boundsForm = el('fieldset', {}, [
     el('legend', { textContent: 'Bounds, cm' }),
     el('div', { className: 'walls' }, walls.map((w) => w.label)),
@@ -219,19 +236,7 @@ export function createPanel(root, actions) {
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
     ]),
-    el('fieldset', {}, [
-      el('legend', { textContent: 'Game camera' }),
-      row('Into turns', el('div', { className: 'inline' }, [
-        turnLookOn,
-        el('label', { className: 'inline' }, [turnLookPercent, '%']),
-      ])),
-      row('In reverse', turnLookReverse),
-      row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
-      el('p', {
-        className: 'hint',
-        textContent: 'Set these as in the game\'s Accessibility options: the game turns the camera without telling the telemetry, so the sound is turned here. 100 % is 45° at full lock; blinkers 30° left, 45° right.',
-      }),
-    ]),
+    cameraForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Layout' }),
       row('Preset', preset),
@@ -246,7 +251,6 @@ export function createPanel(root, actions) {
         title: 'Every preset plays as loud as the default two doors, whatever its number and kind of speakers. Speaker levels still apply on top.',
       }, [matchLoudness, 'Match loudness across presets', loudnessNote]),
     ]),
-    boundsForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Speakers' }),
       list,
@@ -255,6 +259,7 @@ export function createPanel(root, actions) {
     ]),
     speakerForm,
   );
+  boundsRoot.replaceChildren(boundsForm);
 
   input.onchange = () => actions.selectInput(input.value);
   output.onchange = () => actions.selectOutput(output.value);
@@ -338,6 +343,7 @@ export function createPanel(root, actions) {
     fillSelect(muteWhen, MUTE_OPTIONS, view.muteWhen);
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);
     const look = view.turnLook;
+    cameraForm.hidden = !view.cameraFallback;
     turnLookOn.checked = look.on;
     setValue(turnLookPercent, look.percent);
     turnLookPercent.disabled = !look.on;
@@ -397,6 +403,9 @@ export function createPanel(root, actions) {
     list.replaceChildren(...view.speakers.map((s) => speakerItem(s, view)));
     add.disabled = view.speakers.length >= view.maxSpeakers;
     addPair.disabled = view.speakers.length + 2 > view.maxSpeakers;
+    const atCamera = view.cameraSource === 'free';
+    add.title = atCamera ? 'Adds a speaker where the game\'s free camera is' : '';
+    addPair.title = atCamera ? 'Adds a pair: the speaker on the free camera\'s side where the camera is, the other mirrored' : '';
     duplicate.disabled = !view.canDuplicate;
     copy.disabled = !view.selected.length;
     paste.disabled = !view.canPaste;

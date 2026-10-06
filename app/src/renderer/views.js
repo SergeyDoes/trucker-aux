@@ -182,7 +182,7 @@ export function createViews(root, actions) {
   }
 
   function drawHead() {
-    const active = pose && pose.sdkActive && !pose.paused;
+    const active = pose && pose.sdkActive;
     const position = active ? [headX + pose.head.x, pose.head.y, pose.head.z] : [headX, 0, 0];
     const { forward } = active ? listenerVectors(pose.head.heading, pose.head.pitch, pose.head.roll) : listenerVectors(0, 0, 0);
     const tip = position.map((c, i) => c + forward[i] * GAZE);

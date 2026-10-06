@@ -32,7 +32,7 @@ export function createKeyTree(root, actions) {
     el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
-      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
+      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
     }),
     el('div', { className: 'reg-keys' }, [tree]),
     splitter,
@@ -188,18 +188,20 @@ export function createKeyTree(root, actions) {
       flip();
     };
     let kind = 'inherited';
-    if (node.own) kind = node.own.file ? 'file' : 'own';
+    if (node.own) kind = node.own.default ? 'default' : node.own.file ? 'file' : 'own';
     // No preset names in the tree: a key's own preset shows its label, else "preset" (a shared
-    // file: its label, else "shared file"); a key that inherits shows nothing.
-    const badge = node.own ? node.own.label || (node.own.file ? 'shared file' : 'preset') : '';
+    // file: its label, else "shared file"; a default, one from presets/default/: "default");
+    // a key that inherits shows nothing.
+    const KIND_BADGE = { default: 'default', file: 'shared file', own: 'preset' };
+    const badge = node.own ? node.own.label || KIND_BADGE[kind] : '';
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.picked ? ' selected' : ''}${node.pseudo ? ' pseudo' : ''}`,
-      title: node.own ? node.own.name : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
+      title: node.own ? `${node.own.name}${node.own.default ? ' (comes with the app; editing gives the key a copy of yours)' : ''}` : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
     }, [
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
-      ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : ''}`, textContent: badge })] : []),
+      ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`, textContent: badge })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
@@ -244,7 +246,7 @@ export function createKeyTree(root, actions) {
   function unusedItem(p, file) {
     const name = el('span', { textContent: p.name });
     const tag = p.label ? [el('span', { className: `reg-badge tag-${p.labelColor ?? 'blue'}`, textContent: p.label })] : [];
-    const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? 'A shared file for no vehicle' : 'Click to play; drag onto a key' }, [name, ...tag]);
+    const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? `${p.default ? 'A default' : 'A shared file'} for no vehicle` : 'Click to play; drag onto a key' }, [name, ...tag]);
     dragSource(item, { from: null, key: p.key, file });
     const rename = () => {
       if (file) return;
@@ -299,7 +301,7 @@ export function createKeyTree(root, actions) {
     if (renaming) return; // a redraw would drop the name being typed
     unusedList.replaceChildren(
       ...map.unassigned.map((p) => unusedItem(p, false)),
-      ...map.files.map((f) => unusedItem({ ...f, label: null }, true)),
+      ...map.files.map((f) => unusedItem(f, true)),
     );
     if (!map.unassigned.length && !map.files.length) unusedList.append(el('p', { className: 'hint', textContent: 'None.' }));
   }

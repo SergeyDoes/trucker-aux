@@ -12,7 +12,11 @@
 body { margin: 0; display: grid; grid-template-columns: var(--tree-width, 300px) 340px 1fr 340px; grid-template-rows: minmax(0, 1fr); height: 100vh; overflow: hidden; }
 #panel { overflow-y: auto; padding: 8px; border-right: 1px solid #8884; }
 #views { display: grid; grid-template-rows: 1fr 1fr; min-width: 0; min-height: 0; }
-#overview { position: relative; overflow: hidden; border-left: 1px solid #8884; min-height: 0; color: var(--dim); }
+/* The right column: the 3D overview, the Bounds fieldset under it. */
+#side { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-left: 1px solid #8884; }
+#overview { position: relative; overflow: hidden; flex: 1; min-height: 0; color: var(--dim); }
+#bounds { flex: none; padding: 8px; border-top: 1px solid #8884; }
+#bounds fieldset { margin: 0; }
 .placeholder { margin: 8px; }
 .view { display: grid; grid-template-rows: auto 1fr; min-height: 0; border-bottom: 1px solid #8884; }
 .view header { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-weight: 600; }

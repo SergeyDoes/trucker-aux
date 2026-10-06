@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePose, SNAPSHOT_SIZE, truckKey } from '../src/main/telemetry.js';
+import { CAMERA_SIZE, cameraRecord, parsePose, SNAPSHOT_SIZE, truckKey } from '../src/main/telemetry.js';
 
 function put(view, offset, value) {
   new Uint8Array(view.buffer).set(new TextEncoder().encode(value), offset);
@@ -99,6 +99,50 @@ test('engineEnabled is read at its own offset', () => {
   const pose = parsePose(view);
   assert.equal(pose.engineOn, true);
   assert.equal(pose.electricOn, false);
+});
+
+test('the plugin revision: the layout these offsets belong to', () => {
+  const view = new DataView(new ArrayBuffer(SNAPSHOT_SIZE));
+  view.setUint32(40, 12, true); // scs_values.telemetry_plugin_revision
+  assert.equal(parsePose(view).pluginRevision, 12);
+});
+
+test('the truck in the world and the cab on its suspension, for the game camera', () => {
+  const view = new DataView(new ArrayBuffer(SNAPSHOT_SIZE));
+  [1000.5, 50.25, -2000.75, 0.25, 0.01, -0.02].forEach((v, i) => view.setFloat64(2200 + 8 * i, v, true)); // truck_dp
+  [0.01, 0.02, 0.03, 0.001, 0.002, 0.003].forEach((v, i) => view.setFloat32(2000 + 4 * i, v, true)); // cabin offset
+  [0, 3, -2].forEach((v, i) => view.setFloat32(1640 + 4 * i, v, true)); // cabinPosition
+  [-0.477, -0.604, 1.196].forEach((v, i) => view.setFloat32(1652 + 4 * i, v, true)); // headPosition
+  const pose = parsePose(view);
+  assert.deepEqual(pose.world, { x: 1000.5, y: 50.25, z: -2000.75, heading: 0.25, pitch: 0.01, roll: -0.02 });
+  const near = (actual, expected) => Object.entries(expected).forEach(([k, v]) => assert.ok(Math.abs(actual[k] - v) < 1e-6, `${k}: ${actual[k]} != ${v}`));
+  near(pose.cabin, { x: 0.01, y: 0.02, z: 0.03, heading: 0.001, pitch: 0.002, roll: 0.003 });
+  near(pose.cabinPosition, [0, 3, -2]);
+  near(pose.headPosition, [-0.477, -0.604, 1.196]);
+});
+
+// Local\TruckerAuxCamera as native/camera-plugin/camera_block.h lays it out.
+function cameraBlock({ layout = 1, sequence = 4, state = 1 } = {}) {
+  const block = Buffer.alloc(CAMERA_SIZE);
+  block.writeUInt32LE(layout, 0);
+  block.writeUInt32LE(sequence, 4);
+  block.writeUInt32LE(state, 8);
+  block.writeUInt32LE(1, 12); // the current camera
+  block.writeFloatLE(65, 16); // fov
+  [1000.25, 50.5, -2000.75].forEach((v, i) => block.writeDoubleLE(v, 24 + 8 * i));
+  [0.5, 0.5, 0.5, 0.5].forEach((v, i) => block.writeFloatLE(v, 48 + 4 * i));
+  return block;
+}
+
+test('cameraRecord: the camera block, only when copied whole', () => {
+  const block = cameraBlock();
+  assert.deepEqual(cameraRecord(block, Buffer.from(block)), {
+    sequence: 4, state: 1, camera: 1, fov: 65, x: 1000.25, y: 50.5, z: -2000.75, rotation: [0.5, 0.5, 0.5, 0.5],
+  });
+  // Being written (odd), changed between the two copies, or another layout: not used.
+  assert.equal(cameraRecord(cameraBlock({ sequence: 5 }), cameraBlock({ sequence: 5 })), null);
+  assert.equal(cameraRecord(cameraBlock({ sequence: 4 }), cameraBlock({ sequence: 6 })), null);
+  assert.equal(cameraRecord(cameraBlock({ layout: 2 }), cameraBlock({ layout: 2 })), null);
 });
 
 test('truckKey falls back to brand id and model name', () => {

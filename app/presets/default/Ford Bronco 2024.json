@@ -11,8 +11,8 @@
     "bounds": {
       "min": [
         -0.83,
-        -0.92,
-        -0.81
+        -0.68,
+        -1.23
       ],
       "max": [
         0.83,
@@ -26,8 +26,8 @@
         "name": "Dash Corner L",
         "position": [
           -0.5,
-          -0.14,
-          -0.66
+          -0.1,
+          -0.74
         ],
         "channel": "L",
         "gainDb": 0,
@@ -39,8 +39,8 @@
         "name": "Dash Corner R",
         "position": [
           0.5,
-          -0.14,
-          -0.66
+          -0.1,
+          -0.74
         ],
         "channel": "R",
         "gainDb": 0,
@@ -48,41 +48,15 @@
         "pair": "s1"
       },
       {
-        "id": "s3",
-        "name": "Midbass L",
-        "position": [
-          -0.44,
-          -0.6,
-          -0.54
-        ],
-        "channel": "L",
-        "gainDb": 0,
-        "type": "midbass",
-        "pair": "s4"
-      },
-      {
-        "id": "s4",
-        "name": "Midbass R",
-        "position": [
-          0.44,
-          -0.6,
-          -0.54
-        ],
-        "channel": "R",
-        "gainDb": 0,
-        "type": "midbass",
-        "pair": "s3"
-      },
-      {
         "id": "s5",
         "name": "Full range L",
         "position": [
-          -0.47,
-          0.14,
-          1.15
+          -0.35,
+          0.13,
+          1.3
         ],
         "channel": "L",
-        "gainDb": 0,
+        "gainDb": 1,
         "type": "full",
         "pair": "s6"
       },
@@ -90,14 +64,40 @@
         "id": "s6",
         "name": "Full range R",
         "position": [
-          0.47,
-          0.14,
-          1.15
+          0.35,
+          0.13,
+          1.3
+        ],
+        "channel": "R",
+        "gainDb": 1,
+        "type": "full",
+        "pair": "s5"
+      },
+      {
+        "id": "s7",
+        "name": "Midbass L 2",
+        "position": [
+          -0.69,
+          -0.42,
+          -1.19
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s8"
+      },
+      {
+        "id": "s8",
+        "name": "Midbass R 2",
+        "position": [
+          0.69,
+          -0.42,
+          -1.19
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "full",
-        "pair": "s5"
+        "type": "midbass",
+        "pair": "s7"
       }
     ]
   }

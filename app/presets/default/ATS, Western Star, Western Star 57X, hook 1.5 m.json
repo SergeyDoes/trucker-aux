@@ -1,0 +1,79 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Western Star › Western Star 57X › hook 1.5 m",
+  "vehicle": "vehicle.westernstar.57x@1.5",
+  "vehicleName": "Western Star 57X",
+  "game": "ats",
+  "brand": "westernstar",
+  "brandName": "Western Star",
+  "layout": {
+    "label": "day cab",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.93,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.93,
+        0.52,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -0.83,
+          -0.57,
+          -0.68
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          0.83,
+          -0.57,
+          -0.68
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Small full range L",
+        "position": [
+          -0.88,
+          0.09,
+          0.12
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Small full range R",
+        "position": [
+          0.88,
+          0.09,
+          0.12
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s1"
+      }
+    ]
+  }
+}

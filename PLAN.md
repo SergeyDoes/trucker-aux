@@ -22,7 +22,7 @@ Player ─► CABLE Input (VB-Cable)                 Game audio ─────�
 - **Cable only.** No built-in browser and no sign-ins: an app offering logins looks suspicious.
 - **One graph.** A speaker is a `PannerNode` (HRTF) at its position in the cab; the listener is the head (position and rotation from head.offset). SCS and Web Audio axes match (X right, Y up, Z back); the origin is the default head position.
 - **Head pose** comes straight from the RenCloud plugin's shared memory. No own DLL, no OSC.
-- **No game** (no memory or `sdkActive` = 0) or pause: the listener is neutral and music plays from the speakers as usual.
+- **No game** (no memory or `sdkActive` = 0): the listener is neutral and music plays from the speakers as usual. On pause the head stays where it was in the game (E2.38).
 
 ## Known facts
 
@@ -274,10 +274,65 @@ Done: 151 unit tests pass; checked in the app (a new data folder: 13 presets on 
 Done: 152 unit tests pass; checked in the app (the header's Import…, the clash dialog).
 - "Import…" in the tree's header: preset files picked (Open, main `collection:import`, first in `presets/`) become your presets (`importPresets`), each on the key its file says. Keys that already have a preset of yours are listed (`importClashes`): the ticked ones get the file's (yours stays among the unused), the rest go among the unused. A layout the same as one of yours is not added again. One undo step.
 - The import's summary stays until the next edit (`remember`); an autosave no longer wipes the messages, only its own failed-save warning.
-- `npm run fill-presets` is gone: the shipped presets are updated by exporting them into `app/defaults/` (Export writes game, brand and "all"), and `npm run dist` ships that folder as it is. Old files there are removed by hand: two files for one key would both be imported, one of them among the unused.
+- `npm run fill-presets` is gone: the shipped presets are updated by exporting them into `app/defaults/` (Export writes game, brand and "all"), and `npm run dist` ships that folder as it is. Old files there are removed by hand.
+
+### E2.33 — defaults as the bottom layer ✓ (replaces the import of E2.31)
+Done: 153 unit tests pass; checked in the app (a new data folder: every default on its key under ATS and the brands, marked "default").
+- The shipped presets live in `app/presets/default/` (shipped inside `presets/`); `defaults/` and the first-run import are gone. Entries from there carry `default: true` (`parsePresetFile`).
+- They are never imported: on each key Auto plays yours, then others' files, then the default (`sharedFiles` sorts the defaults last). A newer build's defaults reach every key you have not set up. The tree and the export window badge them "default" (gray), the list's Auto says "(default)". Editing one gives the key a copy of yours (as for any key that inherits); the file stays.
+- All vehicles always has a preset of yours, so the default for "all" only starts a new store (`seedAll`, main, when there is no `layouts.json`).
+- A store from 0.1.1 (`defaultsImported`): its copies the same as the default on their key (layout, name, label) give way to it, once (`dropImportedDefaults`); copies changed stay yours.
+- Updating the defaults: Export into `app/presets/default/`, remove the old files, `npm run dist`.
+
+### E2.34 — Import keeps a file's name and label ✓
+Done: 154 unit tests pass.
+- Import took a file for one of your presets when the speakers, bounds and width matched, and put yours on the key: the file's name and label were lost (a file with a label and the stock speakers even put all vehicles' "Default layout" on its key). Restoring with `layouts.json` copied in and Import… on the exported folders hit this, as those layouts were already there without labels. Now only the very same preset is reused (`samePreset`: layout, name, label, label colour); the same speakers under another name or label become a preset of their own, and on a key of yours they are a clash (ticked: the file's goes on the key, yours stays among the unused).
+
+### E2.35 — the game camera for the sound (spec: `docs/superpowers/specs/2026-10-06-camera-plugin-design.md`) ✓
+Done: 163 unit tests pass; `trucker_aux_camera.dll` builds with no warnings (exports `scs_telemetry_init` / `scs_telemetry_shutdown`, needs only KERNEL32); with the live game (revision 12, a Cascadia) and no camera DLL the app works as before, without the revision warning. With the DLL in ATS 1.61 the user confirmed it works in the game (2026-10-06): the camera manager found, "camera: game" in the cab, the sound turning with the game's camera.
+Tasks:
+1. The plugin revision: `parsePose` reads `telemetry_plugin_revision` @40; an unknown one (not 12) adds a warning in the panel; tests.
+2. Telemetry for the view: the truck's world placement (`truck_dp` @2200), the cabin offset with its rotation (@2000), `cabinPosition` and `headPosition` in full; tests.
+3. `native/camera-plugin/`: `trucker_aux_camera.dll` (SDK plugin, `frame_end`, the ETS2LA camera-manager pattern, reads under SEH, checks, `Local\TruckerAuxCamera` with a sequence); `build.cmd` with Visual Studio 2022; compiled here.
+4. The app: the camera block read with each pose (read only, sequence rules); `shared/camera.js` (cab rotation, expected head, cab or outside camera, heading / pitch / roll in the cab, stale); the listener and turn look by its source; the status line and the Game camera fieldset; tests.
+5. `tools/fake_shm.py --camera`; `npm run dist` ships the DLL; `plugin/LICENSE.txt` with ETS2LA's notice; README; a check in the game by the user.
+
+### E2.36 — the emulated turn look by the measured camera ✓
+Done: 164 unit tests and 17 engine checks pass.
+- Without `trucker_aux_camera.dll` the turn look is emulated with the angles the game's camera showed (`docs/findings.md`, 2026-10-06) instead of the ones guessed by eye: 35° at full lock per 100 % (was 45°); a blinker at least 20° toward the driver's side and 40° across (was 30° left, 45° right), ramped in and out at 80°/s as the camera turns (was eased with a 0.25 s time constant).
+- A right-hand-drive cab (the driver's rest right of the axis, `truck.centerX` < 0) takes the blinker limits mirrored: 40° left, 20° right. Not measured in the game yet.
+- The Game camera fieldset's hints say the new angles.
+
+### E2.37 — the free camera ✓
+Done: 168 unit tests pass; checked in a sandbox with `tools/fake_shm.py --camera free`: "camera: free" in the status line, "+ Speaker" at the camera (X 75 cm, Y −30, Z −40), "+ Pair" with R at the camera and L mirrored. The cameras' indices measured in ATS (`docs/findings.md`): the free camera 0, the cab 2. Not yet checked in the game: the sound and "+ Speaker" in the free camera.
+- The game's free (developer) camera is told apart by the camera manager's index (`tools/camera_block.py` prints it), not by distance. It puts the listener where it is, in the cab or out of it, turned as it is (`headOffset`, the inverse of the expected head); the views and the 3D overview show the head there; "camera: free" in the status line; no emulated turn look.
+- In the free camera "+ Speaker" adds the speaker at the camera, "+ Pair" the half on the camera's side there and the other mirrored (`addSpeaker(layout, at)`, `addPair(layout, at)`, `cameraPoint`).
+- `tools/fake_shm.py --camera free`; the fake camera indices follow the game's.
+- The cab camera is told by its index too (`CAB_CAMERA` = 2, and within `CAB_RADIUS`): the camera leaning out of the window (index 4) is 0.9 m from the head and was taken for the cab camera.
+- Version 0.2.0 (E2.34–E2.37): `out/Trucker AUX-0.2.0-win-x64.zip` built, with both plugins in `plugin/`.
+
+### E2.38 — the head stays put on pause ✓
+Done: 169 unit tests and 17 engine checks pass; in the 0.2.0 build.
+- The engine, the views and the 3D overview put the head at rest on pause; now it stays where it was in the game: the last head before the pause is held (`createPauseHold`), whatever the camera or the telemetry say while paused (the pause menu may show another camera; the camera block may go stale). Paused before any play, the pose is taken as it is.
+- The emulated turn look is kept on pause too (it was off), as the game keeps its camera.
+
+### E2.39 — new defaults ✓
+- `app/presets/default/` is the user's export of 2026-10-06: 26 presets (13 before). New: Freightliner Cascadia 2019 and 2024, International 9900i (hook 2.7 m), LoneStar, LT, Mack Pinnacle, Volvo VNR Electric, Western Star 49X (hook 3.1 m) and 57X; changed: Ford Bronco 2024, Ford F150 2023, Kenworth T680 2014 (hook 1.3 m). The " copy" the app had given the user's copies of the old defaults was taken off their names and file names. In the 0.2.0 build.
+
+### E2.40 — the Game camera fieldset only without the camera; Bounds under the 3D view ✓
+Done: 170 unit tests pass; checked in a sandbox: with `tools/fake_shm.py` and no camera the fieldset shows after 3 s; with `--camera cab` it hides at once; Bounds sits under the 3D view.
+- The Game camera fieldset shows only once the app has seen the game without the camera (`createFallbackWatch` in `shared/camera.js`: a vehicle in the game world for 3 s on end with no view from the camera); it holds through the menus and hides as soon as the camera works. Its note and the disabled fields for the camera case are gone.
+- The Bounds fieldset moved from the panel to the right column, under the 3D overview (`#side`: `#overview` and `#bounds`), as the first sketch of the window had it.
+
+### E2.41 — a new model's copy goes on its chassis ✓
+Done: 170 unit tests pass.
+- A model seen for the first time got its copy ("new") on the model's key; a second chassis then got a copy of its own when edited, while the first chassis kept playing the model's. Now the copy goes on this chassis (`variantKey`: the model only when the game reports no chassis); another chassis plays it as "another chassis" until edited.
+- The leftovers of the old way went: the defaults lost the four untouched "new" copies on a model's key beside a tuned chassis of it (International LoneStar, Mack Pinnacle, Volvo VNR Electric, Western Star 57X; 22 defaults now), so another chassis of those models plays the tuned one; International 9900i's preset for the model stays (a real one). Version 0.2.1.
 
 ### E3 — polish
 - **Turn look on an outside camera (bug).** The game's "look into turns" / "toward the blinker" only turn the cab camera, but the app adds them from the steering and the blinkers whatever the camera, so on an outside camera the sound turns wrongly. The telemetry does not tell the camera: head.offset freezes outside (R0, `docs/findings.md` item 7, recorded standing still). To check: a drive recorded with `py tools/shm_probe.py --hz 30 --csv docs/drive.csv` (speed, steering, full head and cab values, Enter marks each camera switch): cab with turns, outside with steering, cab again, standing still. If the head never stands exactly still in the cab while driving, an exactly frozen head.offset at speed means an outside camera: turn look off (and back on when it moves). Otherwise: a note that it follows the cab camera only.
+- **Seeing speaker positions in the game (R, branch `camera-probe`).** The ETS2LA game plugin (github.com/ETS2LA/plugin, MIT, a DLL like scs-telemetry; no published builds, CMake in Visual Studio; game 1.61.x, reads the game by memory patterns) shares the camera the game renders with: `Local\ETS2LACameraProps`, 128 bytes (`src/core.hpp` CameraMemData): FOV, position in the sector + sector cx/cz (world = x + cx·512, z + cz·512), rotation quaternion, the 4×4 projection matrix, and the truck's box centre (world) and rotation, interpolated to the camera's frame. `tools/camera_probe.py` turns that into the camera's place in the truck's axes (X right, Y up, Z back), from an origin set in the cab camera (Ctrl+F9 in the game: the driver's default head, as in the app; Ctrl+F10 a mark). To record: cab camera with the head still, `z`; head moved (compare with the SDK head offset printed beside); the free camera (`g_developer`, 0) flown to a speaker grille or two, a mark at each; an outside camera; driving with cab and outside cameras. Then: does the free camera report its place, is the origin steady while driving (the cab moves on its suspension), how far an outside camera sits. If it holds: a debug hotkey to put the selected speaker where the camera is, an overlay drawing the speakers over the game (projection matrix, borderless window), and the outside camera told by distance (the turn-look bug above).
+  - First recording (`docs/camera.csv`, 2026-10-06, a stationary truck): the plugin works. Cab camera after the origin is set: steady within 1 cm across and 2.5 cm along while the head turns (the neck); it looks along -Z. The free camera reports its place: marks at (-0.37, -0.64, -0.81) and (+1.16, -0.16, -0.91) m from the head. An outside camera sits 5.7–6.3 m away, so distance tells it from the cab at once (the free camera inside the cab is 1–1.5 m). The truck's box centre is on the truck's axis (the chase camera is at x = 0.004 from it) and the head is 0.46 m left of it, the app's centerX: app X = probe X − centerX. FOV: 65 in the cab (65–66.6 while looking around), 60 for the free and outside cameras; the projection matrix is 16:9, about 75° across. Not seen yet: the SDK head and cabin offsets were zero throughout (scs-telemetry not active?), so no side-by-side check; and no driving, so the cab's sway on its suspension is not known.
 - Tray, autostart, the window can be closed while audio keeps playing.
 - Any virtual cable, not only VB-Cable (VAC, Steam Streaming Speakers work too). On first run the input is picked by the label `'CABLE Output'` (`renderer/app.js`, `pickDevice` in `shared/devices.js`); without VB-Cable it falls back to the default recording device, usually the microphone, so the user hears themselves through the HRTF. To do: look for a list of known cable labels (`CABLE Output`, VAC `Line 1` / `Virtual Audio Cable`, `Steam Streaming …`; exact labels to be read on the user's PC); if none is found, open no input and ask the user to pick the cable's output; a `pickDevice` test.
 - Built-in cable check (tone + `glitch.js` detector).
@@ -329,3 +384,4 @@ docs/
 - Custom HRTF (SOFA) via convolution in an AudioWorklet if Chromium's HRTF falls short.
 - Own minimal DLL instead of RenCloud if the third-party plugin gets in the way.
 - Muting by speed, open window, engine masking.
+- Placing speakers with the detailed cab: the free camera shows the cab's `ext_model` (the interior for outside cameras), and no console variable was found to change that. The interior camera can roam the cab instead with large seat limits (`seat_left_limit` … `seat_back_limit` in `accessory_interior_data`, per truck: a small mod in ATS-Mods, or a "Seat Adjustments No Limits" mod); the sound already follows the seat (head.offset). Then "+ Speaker" would go to the head in the cab camera too (when the seat is moved far, or Shift+click).

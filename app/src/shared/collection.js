@@ -36,6 +36,7 @@ export function parsePresetFile(raw, file) {
     entry: {
       key: `${PREFIX}${file}`,
       file,
+      default: file.startsWith('default/'), // shipped with the app: the bottom layer
       name,
       vehicle: vehicle && !vehicle.includes('#') ? vehicle : null,
       vehicleName: optionalText(raw.vehicleName),

@@ -1,0 +1,104 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › International › International LT › hook 2.9 m",
+  "vehicle": "vehicle.intnational.lt@2.9",
+  "vehicleName": "International LT",
+  "game": "ats",
+  "brand": "intnational",
+  "brandName": "International",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.82,
+        -1.15,
+        -1.16
+      ],
+      "max": [
+        0.82,
+        0.95,
+        0.99
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s4",
+        "name": "Tweeter L",
+        "position": [
+          -0.75,
+          0,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s5"
+      },
+      {
+        "id": "s5",
+        "name": "Tweeter R",
+        "position": [
+          0.75,
+          0,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.75,
+          -0.45,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.75,
+          -0.45,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.44,
+          -0.3,
+          0.78
+        ],
+        "channel": "L",
+        "gainDb": -5,
+        "type": "small",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Small full range R",
+        "position": [
+          0.44,
+          -0.3,
+          0.78
+        ],
+        "channel": "R",
+        "gainDb": -5,
+        "type": "small",
+        "pair": "s3"
+      }
+    ]
+  }
+}

@@ -192,7 +192,7 @@ function normalizeV3(src) {
       vehicles[id] = info;
     }
   }
-  // The presets shipped with the app were made yours (presets.js importDefaults).
+  // Set by 0.1.1, which imported the shipped presets: presets.js dropImportedDefaults.
   return { version: STORE_VERSION, presets, assignments, vehicles, ...(src.defaultsImported === true ? { defaultsImported: true } : {}) };
 }
 
@@ -431,22 +431,29 @@ export function pasteSpeakers(layout, clip) {
   return { layout: withSpeakers(layout, [...layout.speakers, ...pasted]), ids: pasted.map((s) => s.id) };
 }
 
-export function addSpeaker(layout) {
+const snapPoint = (point) => point.map(snap);
+
+// at: where to put it (the game's free camera), else ahead of the head.
+export function addSpeaker(layout, at = null) {
   if (layout.speakers.length >= MAX_SPEAKERS) return { layout, id: null };
   const id = freeId(new Set(layout.speakers.map((s) => s.id)));
   const name = typeName('full', null, new Set(layout.speakers.map((s) => s.name)));
-  const speaker = cleanSpeaker({ name, position: [0, -0.35, -0.9], channel: 'M' }, id, name);
+  const position = at ? snapPoint(at) : [0, -0.35, -0.9];
+  const speaker = cleanSpeaker({ name, position, channel: 'M' }, id, name);
   return { layout: withSpeakers(layout, [...layout.speakers, speaker]), id };
 }
 
-export function addPair(layout) {
+// at: where to put the half on its side (the game's free camera), the other mirrored; else at
+// the sides of the bounds.
+export function addPair(layout, at = null) {
   if (layout.speakers.length + 2 > MAX_SPEAKERS) return { layout, ids: [] };
   const used = new Set(layout.speakers.map((s) => s.id));
   const left = freeId(used);
   used.add(left);
   const right = freeId(used);
   const [leftName, rightName] = typeNames('full', ['L', 'R'], new Set(layout.speakers.map((s) => s.name)));
-  const leftPosition = [snap(layout.bounds.min[0] + 0.03), -0.6, -0.35];
+  const point = at && snapPoint(at);
+  const leftPosition = point ? (point[0] <= 0 ? point : mirrorPosition(point)) : [snap(layout.bounds.min[0] + 0.03), -0.6, -0.35];
   return {
     layout: withSpeakers(layout, [
       ...layout.speakers,

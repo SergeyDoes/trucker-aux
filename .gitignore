@@ -5,3 +5,6 @@ __pycache__/
 # App data stays local: your presets, settings and the Chromium profile. Shared presets
 # are files in app/presets/.
 app/data/
+
+# The camera plugin's build output (native/camera-plugin/build.cmd)
+native/camera-plugin/out/

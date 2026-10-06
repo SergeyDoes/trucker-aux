@@ -25,7 +25,10 @@ import { isSilenced } from '../shared/dsp.js';
 import { trimFromLevels } from '../shared/loudness.js';
 import { measureLoudness } from './loudness-meter.js';
 import {
-  DEFAULT_HEAD_X, createEase, createFrameWatch, headRestX, musicSilenced, turnLook, turnsToDeg,
+  cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
+} from '../shared/camera.js';
+import {
+  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
 } from '../shared/pose.js';
 
@@ -45,6 +48,9 @@ const state = {
   silenced: false, // music muted: the vehicle is parked or the game paused (settings.muteWhen, pauseBehavior)
   inWorld: false,  // game frames are coming (not the main menu or loading)
   turn: 0,          // the game's look into turns and toward the blinker, added to the head, in turns
+  view: { source: null }, // the game camera's view (shared/camera.js), when trucker_aux_camera.dll runs
+  cameraFallback: false, // seen in the game without the camera: the Game camera settings are shown
+  heard: null,      // the pose the engine and the views were given last
   picked: EMPTY,   // selected speakers { ids, primary } (state.selection is the preset choice)
   loudnessDb: null, // the playing layout's loudness-matching trim, once measured
   clipboard: [],   // copied speakers, kept across presets for this session
@@ -58,6 +64,7 @@ const state = {
   fileUrl: null,
   storeWarnings: loaded.warnings,
   audioWarnings: [],
+  pluginWarning: null, // an scs-telemetry revision the offsets were not made for (pose.js)
 };
 let audio = null; // { ctx, engine, stream, player }
 
@@ -653,16 +660,19 @@ const actions = {
   setWidth(width) {
     edit((layout) => setWidth(layout, width));
   },
+  // In the game's free camera new speakers go where the camera is.
   addSpeaker() {
+    const at = cameraPoint(state.view, headRestX(state.truck));
     edit((layout) => {
-      const result = addSpeaker(layout);
+      const result = addSpeaker(layout, at);
       if (result.id) state.picked = { ids: [result.id], primary: result.id };
       return result.layout;
     });
   },
   addPair() {
+    const at = cameraPoint(state.view, headRestX(state.truck));
     edit((layout) => {
-      const result = addPair(layout);
+      const result = addPair(layout, at);
       if (result.ids.length) state.picked = { ids: result.ids, primary: result.ids[0] };
       return result.layout;
     });
@@ -756,7 +766,7 @@ const actions = {
   },
 };
 
-const panel = createPanel(document.getElementById('panel'), actions);
+const panel = createPanel(document.getElementById('panel'), actions, document.getElementById('bounds'));
 const keyTree = createKeyTree(document.getElementById('tree'), actions);
 const views = createViews(document.getElementById('views'), actions);
 
@@ -783,7 +793,7 @@ function render() {
   // Speakers you do not hear (muted, or another one soloed) are drawn grey.
   const silentIds = layout.speakers.filter((s) => isSilenced(s, state.solo, state.muted)).map((s) => s.id);
   panel.update({
-    warnings: [...state.storeWarnings, ...state.collectionWarnings, ...state.audioWarnings],
+    warnings: [...(state.pluginWarning ? [state.pluginWarning] : []), ...state.storeWarnings, ...state.collectionWarnings, ...state.audioWarnings],
     inputs: state.devices.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'communications'),
     outputs: state.devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'communications'),
     inputId: state.inputId,
@@ -792,6 +802,8 @@ function render() {
     source: source(),
     muteWhen: state.settings.muteWhen,
     turnLook: state.settings.turnLook,
+    cameraSource: state.view.source,
+    cameraFallback: state.cameraFallback,
     pauseBehavior: state.settings.pauseBehavior,
     player: audio?.player ?? null,
     presets: presetOptions(state.store, state.truck, state.selection),
@@ -833,14 +845,18 @@ function statusText() {
   if (state.silenced && pose.paused && state.settings.pauseBehavior === 'muted') muted = ' · muted';
   else if (state.silenced) muted = ` · muted, ${state.settings.muteWhen === 'engine' ? 'engine' : 'electrics'} off`;
   if (pose.paused) return `${name} · paused${muted}`;
-  const yaw = turnsToDeg(pose.head.heading + state.turn).toFixed(0);
+  const head = (state.heard ?? pose).head;
   const lookNote = Math.round(state.turn * 360) ? ` (turn look ${turnsToDeg(state.turn).toFixed(0)}°)` : '';
-  return `${name} · yaw ${yaw}°${lookNote} · pitch ${turnsToDeg(pose.head.pitch).toFixed(0)}°${muted}`;
+  const cameraNote = state.view.source ? ` · camera: ${state.view.source}` : '';
+  return `${name} · yaw ${turnsToDeg(head.heading).toFixed(0)}°${lookNote} · pitch ${turnsToDeg(head.pitch).toFixed(0)}°${cameraNote}${muted}`;
 }
 
 let lastStatus = 0;
 const frameWatch = createFrameWatch();
-const easeBlinker = createEase();
+const rampBlinker = createRamp();
+const holdPause = createPauseHold();
+const cameraWatch = createCameraWatch();
+const fallbackWatch = createFallbackWatch();
 // presets/ changed: new, edited or removed shared files. A picked file that is gone
 // leaves the choice to Auto.
 window.aux.onCollection(({ collection, warnings }) => {
@@ -858,6 +874,11 @@ window.aux.onCollection(({ collection, warnings }) => {
 window.aux.onPose((pose) => {
   state.pose = pose;
   state.inWorld = Boolean(pose?.sdkActive) && frameWatch(pose.renderTime, performance.now());
+  const revisionWarning = pluginWarning(pose);
+  if (revisionWarning !== state.pluginWarning) {
+    state.pluginWarning = revisionWarning;
+    render();
+  }
   const truck = pose && pose.sdkActive ? pose.truck : null;
   // The axis may arrive a frame after the truck's name, so it counts as a change too.
   // Another chassis of the same model, or another truck with its own plate, counts too.
@@ -867,7 +888,8 @@ window.aux.onPose((pose) => {
     state.truck = truck;
     if (otherTruck) resetSession();
     // Its name, game and brand name the model's scopes while you drive something else; a
-    // model new to the app gets a key of its own (a copy of what it would inherit).
+    // model new to the app gets a key of its own for this chassis (a copy of what it would
+    // inherit).
     const learned = adoptNewModel(rememberVehicle(state.store, truck), truck);
     if (learned !== state.store) {
       state.store = learned;
@@ -878,11 +900,30 @@ window.aux.onPose((pose) => {
   }
   // The head is placed from the truck's axis: left of it by what the game reports, and
   // turned by the game's look into turns and toward the blinker, which the telemetry
-  // leaves out. The blinker's step is eased in.
+  // leaves out. With trucker_aux_camera.dll the view comes from the game's camera, those
+  // included, an outside camera leaves the head at rest and the free camera takes the head
+  // where it is; without it they are emulated from the Game camera settings, the blinker's
+  // step ramped in.
   const headX = headRestX(state.truck);
-  const look = turnLook(pose, state.settings.turnLook);
-  state.turn = look.steer + easeBlinker(look.blinker, performance.now());
-  const heard = withTurnLook(pose, state.turn);
+  const view = cameraView(pose, pose?.camera, cameraWatch(pose?.camera, performance.now()));
+  const fallback = fallbackWatch({ inWorld: state.inWorld, truck: pose?.truck, source: view.source }, performance.now());
+  if (view.source !== state.view.source || fallback !== state.cameraFallback) {
+    state.view = view;
+    state.cameraFallback = fallback;
+    render(); // "+ Speaker" goes to the free camera; the Game camera fieldset shows without the camera
+  }
+  state.view = view;
+  let heard;
+  if (view.source) {
+    state.turn = 0;
+    heard = withCameraView(pose, view);
+  } else {
+    const look = turnLook(pose, state.settings.turnLook);
+    state.turn = look.steer + rampBlinker(look.blinker, performance.now());
+    heard = withTurnLook(pose, state.turn);
+  }
+  heard = holdPause(heard); // paused: the head stays where it was in the game
+  state.heard = heard;
   audio?.engine.setPose(heard, headX);
   applySilence();
   views.setPose(heard, headX);
