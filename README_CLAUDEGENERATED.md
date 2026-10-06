@@ -74,7 +74,8 @@ Player ─► virtual cable                          Game audio ─────�
     own;
   - drag presets from key to key; right-click for more;
   - a model driven for the first time, with nothing set for it, gets its own copy at
-    once, labelled "new";
+    once on this chassis, labelled "new"; another chassis of the model plays it until you
+    edit it there, which gives that chassis its own;
   - presets on no key wait under "Unused presets".
 - **Labels:** a short coloured tag per preset, shown beside its keys in the tree.
 - **Shared presets:**

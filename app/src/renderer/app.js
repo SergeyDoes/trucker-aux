@@ -888,7 +888,8 @@ window.aux.onPose((pose) => {
     state.truck = truck;
     if (otherTruck) resetSession();
     // Its name, game and brand name the model's scopes while you drive something else; a
-    // model new to the app gets a key of its own (a copy of what it would inherit).
+    // model new to the app gets a key of its own for this chassis (a copy of what it would
+    // inherit).
     const learned = adoptNewModel(rememberVehicle(state.store, truck), truck);
     if (learned !== state.store) {
       state.store = learned;

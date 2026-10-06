@@ -606,16 +606,22 @@ test('a shared file may say the game and brand of its vehicle: the map places it
   assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
 });
 
-test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit', () => {
+test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit, on its chassis', () => {
   const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
   const adopted = adoptNewModel(store, SLEEPER);
-  assert.equal(adopted.assignments[TRUCK.key], 'p.3');
-  assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
-  assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
-  assert.equal(at(adopted, TRUCK.key).label, 'new'); // stands out in the tree until labelled
-  assert.equal(at(adopted, TRUCK.key).labelColor, 'green');
-  assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
-  assert.equal(adoptNewModel(adopted, SHORT), adopted); // the model has a key now
+  const chassis32 = variantKey(SLEEPER);
+  assert.equal(adopted.assignments[chassis32], 'p.3');
+  assert.equal(adopted.assignments[TRUCK.key], undefined); // not the model's: each chassis gets its own
+  assert.equal(at(adopted, chassis32).name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(at(adopted, chassis32).width, 0.4); // the brand's, copied
+  assert.equal(at(adopted, chassis32).label, 'new'); // stands out in the tree until labelled
+  assert.equal(at(adopted, chassis32).labelColor, 'green');
+  assert.notEqual(at(adopted, chassis32).speakers, store.presets['p.2'].speakers);
+  // Another chassis of the model has a key of the model now: it plays that chassis's preset
+  // until it is edited, which gives it a copy of its own.
+  assert.equal(adoptNewModel(adopted, SHORT), adopted);
+  assert.equal(autoPreset(adopted, SHORT).how, 'sibling');
+  // The game reports no chassis: the model gets it.
   assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
   // A key for a chassis or a vehicle of the model, or a shared file for it: nothing new.
   const chassis = storeWith({ [variantKey(SHORT)]: { name: 'Day cab' } });

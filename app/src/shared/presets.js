@@ -300,10 +300,12 @@ export function deletePreset(store, key) {
 export const NEW_LABEL = 'new';
 
 // A model seen for the first time without a key of its own (none for the model, its chassis
-// or its vehicles, and no shared file for it) gets one: a copy of what it would inherit
-// (the brand's, the game's or all vehicles' preset), named after it. From then on the model
-// has its own preset to tune, and wider presets serve as templates. The same store when the
-// model has a key.
+// or its vehicles, and no shared file for it) gets one for this chassis (the model when the
+// game reports no chassis): a copy of what it would inherit (the brand's, the game's or all
+// vehicles' preset), named after the key. From then on it has its own preset to tune, and
+// wider presets serve as templates. On the chassis, not the model: another chassis of the
+// model plays this one's until it is edited, which gives it a copy of its own, and neither
+// falls back to the model. The same store when the model has a key.
 export function adoptNewModel(store, truck) {
   if (!truck) return store;
   const ofModel = (scope) => modelOf(scope) === truck.key && levelOf(scope) !== 'brand' && levelOf(scope) !== 'game' && scope !== ALL_SCOPE;
@@ -311,11 +313,12 @@ export function adoptNewModel(store, truck) {
   if (Object.values(store.collection ?? {}).some((e) => e.vehicle && modelOf(e.vehicle) === truck.key)) return store;
   const { layout } = resolvePlaying(store, { mode: 'auto' }, truck);
   const key = freePresetKey(store.presets);
+  const scope = variantKey(truck);
   return {
     ...store,
     // Labelled "new" so it stands out in the key tree until you give it a label of your own.
-    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, truck.key, truck), label: NEW_LABEL, labelColor: 'green' } },
-    assignments: { ...store.assignments, [truck.key]: key },
+    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' } },
+    assignments: { ...store.assignments, [scope]: key },
   };
 }
 
