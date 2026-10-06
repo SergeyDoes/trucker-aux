@@ -764,6 +764,25 @@ test('importPresets: files on their keys; a key of yours is replaced only when a
   assert.deepEqual(importClashes(kept.store, [chassis]), []);
 });
 
+test('importPresets: a file keeps its name and label; only the very same preset of yours is reused', () => {
+  const file = (name, extra) => ({ ...shared(`${name}.json`, variantKey(SLEEPER)), key: null, name, layout: { ...defaultLayout(), name, ...extra } });
+  // The same speakers as all vehicles' "Default layout", but a name and a label of its own.
+  const tagged = file('Kenworth T680', { label: 'SLEEPER', labelColor: 'green' });
+  const done = importPresets(storeWith(), [tagged]);
+  assert.equal(done.same, 0);
+  const placed = at(done.store, variantKey(SLEEPER));
+  assert.deepEqual([placed.name, placed.label, placed.labelColor], ['Kenworth T680', 'SLEEPER', 'green']);
+  assert.equal(at(done.store, 'all').name, 'Default layout');
+  // Imported again: the very same preset, so no copy and no clash.
+  const again = importPresets(done.store, [tagged]);
+  assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(done.store.presets).length]);
+  assert.deepEqual(importClashes(done.store, [tagged]), []);
+  // Your key with the same speakers but another label: a clash, replaced only when asked.
+  const relabelled = file('Kenworth T680', { label: 'DAY CAB' });
+  assert.equal(importClashes(done.store, [relabelled]).length, 1);
+  assert.equal(at(importPresets(done.store, [relabelled], new Set([variantKey(SLEEPER)])).store, variantKey(SLEEPER)).label, 'DAY CAB');
+});
+
 test('shared files for a brand or a game play after yours there, before wider ones', () => {
   const brandFile = shared('b.json', 'brand:ats/international');
   const gameFile = shared('g.json', 'game:ats');

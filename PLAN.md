@@ -284,6 +284,10 @@ Done: 153 unit tests pass; checked in the app (a new data folder: every default 
 - A store from 0.1.1 (`defaultsImported`): its copies the same as the default on their key (layout, name, label) give way to it, once (`dropImportedDefaults`); copies changed stay yours.
 - Updating the defaults: Export into `app/presets/default/`, remove the old files, `npm run dist`.
 
+### E2.34 — Import keeps a file's name and label ✓
+Done: 154 unit tests pass.
+- Import took a file for one of your presets when the speakers, bounds and width matched, and put yours on the key: the file's name and label were lost (a file with a label and the stock speakers even put all vehicles' "Default layout" on its key). Restoring with `layouts.json` copied in and Import… on the exported folders hit this, as those layouts were already there without labels. Now only the very same preset is reused (`samePreset`: layout, name, label, label colour); the same speakers under another name or label become a preset of their own, and on a key of yours they are a clash (ticked: the file's goes on the key, yours stays among the unused).
+
 ### E3 — polish
 - **Turn look on an outside camera (bug).** The game's "look into turns" / "toward the blinker" only turn the cab camera, but the app adds them from the steering and the blinkers whatever the camera, so on an outside camera the sound turns wrongly. The telemetry does not tell the camera: head.offset freezes outside (R0, `docs/findings.md` item 7, recorded standing still). To check: a drive recorded with `py tools/shm_probe.py --hz 30 --csv docs/drive.csv` (speed, steering, full head and cab values, Enter marks each camera switch): cab with turns, outside with steering, cab again, standing still. If the head never stands exactly still in the cab while driving, an exactly frozen head.offset at speed means an outside camera: turn look off (and back on when it moves). Otherwise: a note that it follows the cab camera only.
 - Tray, autostart, the window can be closed while audio keeps playing.

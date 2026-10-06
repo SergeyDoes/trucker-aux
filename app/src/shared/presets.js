@@ -211,18 +211,22 @@ function learnPlace(store, entry) {
 
 const sameLayout = (a, b) => JSON.stringify([a.width, a.bounds, a.speakers]) === JSON.stringify([b.width, b.bounds, b.speakers]);
 
+// The very same preset: the layout and what the tree shows of it (name, label, its colour).
+const samePreset = (a, b) => sameLayout(a, b) && a.name === b.name
+  && (a.label ?? null) === (b.label ?? null) && (a.labelColor ?? null) === (b.labelColor ?? null);
+
 // Preset files (collection.js entries) made your presets. Each goes on the key its file says
 // when no preset of yours is there, or the key is in replace (the one there stays, among the
-// unused if it is on no other key); else among the unused ones. One the same as a preset of
-// yours (speakers, bounds, width) is not added again: that one goes on the key instead. A key
-// that held the file itself ("file:<path>") gets the preset. What a file says of its vehicle
-// is kept (learnPlace). { store, placed, unused, same }: how many went on keys, among the
-// unused, and were yours already.
+// unused if it is on no other key); else among the unused ones. One the very same as a preset
+// of yours (samePreset) is not added again: that one goes on the key instead; the same speakers
+// under another name or label make a preset of their own. A key that held the file itself
+// ("file:<path>") gets the preset. What a file says of its vehicle is kept (learnPlace).
+// { store, placed, unused, same }: how many went on keys, among the unused, and were yours already.
 export function importPresets(store, entries, replace = new Set()) {
   let next = { ...store, assignments: { ...store.assignments } };
   const counts = { placed: 0, unused: 0, same: 0 };
   for (const entry of [...entries].sort((a, b) => ((a.file ?? '') < (b.file ?? '') ? -1 : 1))) {
-    let key = Object.keys(next.presets).find((k) => sameLayout(next.presets[k], entry.layout));
+    let key = Object.keys(next.presets).find((k) => samePreset(next.presets[k], entry.layout));
     if (key) counts.same++;
     else ({ store: next, key } = createPreset(next, entry.layout));
     const scope = entry.vehicle;
@@ -238,13 +242,13 @@ export function importPresets(store, entries, replace = new Set()) {
 }
 
 // The keys where an import would meet a preset of yours (importPresets' replace): [{ scope,
-// label, yours, theirs }]. A key holding the same layout, or the file itself, is no clash.
+// label, yours, theirs }]. A key holding the very same preset, or the file itself, is no clash.
 export function importClashes(store, entries, truck = null) {
   return entries.flatMap((entry) => {
     const scope = entry.vehicle;
     const held = scope && store.assignments[scope];
     const yours = held && presetLayout(store, held);
-    if (!yours || held === entry.key || sameLayout(yours, entry.layout)) return [];
+    if (!yours || held === entry.key || samePreset(yours, entry.layout)) return [];
     return [{ scope, label: scopeLabel(store, scope, truck), yours: yours.name, theirs: entry.name }];
   });
 }
