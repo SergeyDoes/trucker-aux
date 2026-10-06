@@ -3,6 +3,9 @@
   "name": "Freightliner Cascadia",
   "vehicle": "vehicle.freightliner.cascadia2019@2.0",
   "vehicleName": "Freightliner Cascadia",
+  "game": "ats",
+  "brand": "freightliner",
+  "brandName": "Freightliner",
   "layout": {
     "width": 1,
     "bounds": {
