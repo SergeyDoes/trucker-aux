@@ -1,0 +1,105 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › International › International 9900i › hook 2.7 m",
+  "vehicle": "vehicle.intnational.9900i@2.7",
+  "vehicleName": "International 9900i",
+  "game": "ats",
+  "brand": "intnational",
+  "brandName": "International",
+  "layout": {
+    "label": "sleeper",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.15,
+        -0.74,
+        -0.84
+      ],
+      "max": [
+        1.15,
+        0.45,
+        0.99
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.68,
+          0.11,
+          -0.69
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.68,
+          0.11,
+          -0.69
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Midrange L",
+        "position": [
+          -0.62,
+          0.28,
+          0.02
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Midrange R",
+        "position": [
+          0.62,
+          0.28,
+          0.02
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.43,
+          0.37,
+          0.88
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.43,
+          0.37,
+          0.88
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      }
+    ]
+  }
+}

@@ -22,38 +22,12 @@
     },
     "speakers": [
       {
-        "id": "s1",
-        "name": "Subwoofer L",
-        "position": [
-          -0.71,
-          -0.46,
-          -0.42
-        ],
-        "channel": "L",
-        "gainDb": 0,
-        "type": "sub",
-        "pair": "s2"
-      },
-      {
-        "id": "s2",
-        "name": "Subwoofer R",
-        "position": [
-          0.71,
-          -0.46,
-          -0.42
-        ],
-        "channel": "R",
-        "gainDb": 0,
-        "type": "sub",
-        "pair": "s1"
-      },
-      {
         "id": "s3",
         "name": "Tweeter L",
         "position": [
-          -0.7,
-          0.02,
-          -0.62
+          -0.66,
+          -0.13,
+          -0.94
         ],
         "channel": "L",
         "gainDb": 0,
@@ -64,9 +38,9 @@
         "id": "s4",
         "name": "Tweeter R",
         "position": [
-          0.7,
-          0.02,
-          -0.62
+          0.66,
+          -0.13,
+          -0.94
         ],
         "channel": "R",
         "gainDb": 0,
@@ -75,28 +49,28 @@
       },
       {
         "id": "s5",
-        "name": "Full range L",
+        "name": "Midbass L 2",
         "position": [
-          -0.68,
+          -0.67,
           -0.43,
-          0.41
+          0.4
         ],
         "channel": "L",
-        "gainDb": 0,
-        "type": "full",
+        "gainDb": -6,
+        "type": "midbass",
         "pair": "s6"
       },
       {
         "id": "s6",
-        "name": "Full range R",
+        "name": "Midbass R 2",
         "position": [
-          0.68,
+          0.67,
           -0.43,
-          0.41
+          0.4
         ],
         "channel": "R",
-        "gainDb": 0,
-        "type": "full",
+        "gainDb": -6,
+        "type": "midbass",
         "pair": "s5"
       },
       {
@@ -105,11 +79,11 @@
         "position": [
           0,
           -0.11,
-          -0.79
+          -0.87
         ],
         "channel": "M",
         "gainDb": 0,
-        "type": "mid",
+        "type": "full",
         "pair": null
       },
       {
@@ -121,9 +95,87 @@
           0.8
         ],
         "channel": "M",
-        "gainDb": 0,
+        "gainDb": 8,
         "type": "sub",
         "pair": null
+      },
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.72,
+          -0.63,
+          -0.63
+        ],
+        "channel": "L",
+        "gainDb": -6,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.72,
+          -0.63,
+          -0.63
+        ],
+        "channel": "R",
+        "gainDb": -6,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s9",
+        "name": "FR L 1",
+        "position": [
+          -0.67,
+          -0.43,
+          0.4
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s10"
+      },
+      {
+        "id": "s10",
+        "name": "FR R 1",
+        "position": [
+          0.67,
+          -0.43,
+          0.4
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s9"
+      },
+      {
+        "id": "s11",
+        "name": "FR R 1",
+        "position": [
+          -0.72,
+          -0.63,
+          -0.63
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s12"
+      },
+      {
+        "id": "s12",
+        "name": "FR R 2",
+        "position": [
+          0.72,
+          -0.63,
+          -0.63
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s11"
       }
     ]
   }

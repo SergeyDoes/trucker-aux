@@ -1,0 +1,105 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Mack › Mack Pinnacle › hook 2.6 m",
+  "vehicle": "vehicle.mack.pinnacle@2.6",
+  "vehicleName": "Mack Pinnacle",
+  "game": "ats",
+  "brand": "mack",
+  "brandName": "Mack",
+  "layout": {
+    "label": "sleeper",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.86,
+        -1.15,
+        -0.91
+      ],
+      "max": [
+        0.86,
+        0.47,
+        1.68
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s3",
+        "name": "Midrange L",
+        "position": [
+          -0.8,
+          -0.59,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Midrange R",
+        "position": [
+          0.8,
+          -0.59,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s3"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.66,
+          0.34,
+          -0.27
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.66,
+          0.34,
+          -0.27
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.37,
+          0.18,
+          1.6
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.37,
+          0.18,
+          1.6
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      }
+    ]
+  }
+}

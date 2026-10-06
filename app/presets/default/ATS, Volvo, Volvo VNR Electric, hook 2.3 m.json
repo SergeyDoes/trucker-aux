@@ -1,23 +1,24 @@
 {
   "truckerAuxPreset": 1,
-  "name": "Kenworth T680 2014, hook 1.3 m",
-  "vehicle": "vehicle.kenworth.t680@1.3",
-  "vehicleName": "Kenworth T680 2014",
+  "name": "ATS › Volvo › Volvo VNR Electric › hook 2.3 m",
+  "vehicle": "vehicle.volvo.vnr_e@2.3",
+  "vehicleName": "Volvo VNR Electric",
   "game": "ats",
-  "brand": "kenworth",
-  "brandName": "Kenworth",
+  "brand": "volvo",
+  "brandName": "Volvo",
   "layout": {
+    "label": "day cab",
     "width": 1,
     "bounds": {
       "min": [
+        -0.84,
         -0.92,
-        -1.15,
-        -1.3
+        -0.95
       ],
       "max": [
-        0.92,
+        0.84,
         0.95,
-        0.6
+        0.08
       ]
     },
     "speakers": [
@@ -25,9 +26,9 @@
         "id": "s1",
         "name": "Midbass L",
         "position": [
-          -0.79,
-          -0.6,
-          -0.46
+          -0.73,
+          -0.99,
+          -0.7
         ],
         "channel": "L",
         "gainDb": 0,
@@ -38,9 +39,9 @@
         "id": "s2",
         "name": "Midbass R",
         "position": [
-          0.79,
-          -0.6,
-          -0.46
+          0.73,
+          -0.99,
+          -0.7
         ],
         "channel": "R",
         "gainDb": 0,
@@ -51,9 +52,9 @@
         "id": "s3",
         "name": "Tweeter L",
         "position": [
-          -0.72,
-          -0.03,
-          -0.58
+          -0.81,
+          -0.28,
+          -0.92
         ],
         "channel": "L",
         "gainDb": 0,
@@ -64,9 +65,9 @@
         "id": "s4",
         "name": "Tweeter R",
         "position": [
-          0.72,
-          -0.03,
-          -0.58
+          0.81,
+          -0.28,
+          -0.92
         ],
         "channel": "R",
         "gainDb": 0,
@@ -75,28 +76,28 @@
       },
       {
         "id": "s5",
-        "name": "Midrange L",
+        "name": "Small full range L",
         "position": [
-          -0.75,
-          -0.75,
-          -0.01
+          -0.79,
+          0.15,
+          -0.05
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "mid",
+        "type": "small",
         "pair": "s6"
       },
       {
         "id": "s6",
-        "name": "Midrange R",
+        "name": "Small full range R",
         "position": [
-          0.75,
-          -0.75,
-          -0.01
+          0.79,
+          0.15,
+          -0.05
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "mid",
+        "type": "small",
         "pair": "s5"
       }
     ]
