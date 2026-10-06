@@ -229,6 +229,11 @@ def main():
     while True:
         record = parse(camera.read(0, CAMERA_SIZE))
         box, looks = in_truck(record)
+        # Just after a load the truck is not placed yet (NaN, or the camera thousands of metres
+        # away, for about 4 s): nothing to print or record.
+        if not all(math.isfinite(c) for c in box) or length(box) > 100:
+            time.sleep(period)
+            continue
         if state["zero"]:
             state["zero"] = False
             origin = box
