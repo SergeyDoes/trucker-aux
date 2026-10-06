@@ -805,7 +805,8 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
       .map((key) => ({ key, name: store.presets[key].name, label: store.presets[key].label ?? null, labelColor: store.presets[key].labelColor ?? 'blue' }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     files: Object.values(store.collection ?? {}).filter((e) => !e.vehicle && !used.has(e.key))
-      .map((e) => ({ key: e.key, name: collectionLabel(e), default: Boolean(e.default) })).sort((a, b) => a.name.localeCompare(b.name)),
+      .map((e) => ({ key: e.key, name: collectionLabel(e), default: Boolean(e.default), label: e.layout.label ?? null, labelColor: e.layout.labelColor ?? 'blue' }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 
