@@ -136,7 +136,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.
   - The **current camera mode** is not reported by the game either, the head position is just defaulted when not in FPV. The above-mentioned behavior is processed directly from the trucks steer and turn signal states, and *it keep affect the head's position even in third person camera modes.*
-- **trucker_aux_camera.dll** (comes with the app) reads the game's own camera instead, so the steering and blinker camera rotation are taken as they are and outside cameras leave the sound alone; the status line then says *camera: game*. It reads the camera from the game's memory (the way ETS2LA does), so a game update may switch it off until it is updated: the *Game camera* settings above are the fallback.
+- **trucker_aux_camera.dll** (comes with the app) reads the game's own camera instead, so the steering and blinker camera rotation are taken as they are and outside cameras leave the sound alone; the status line then says *camera: game*. In the game's free camera (developer mode, key 0) the sound is heard from where the camera is (*camera: free*), and *+ Speaker* / *+ Pair* put new speakers at the camera. It reads the camera from the game's memory (the way ETS2LA does), so a game update may switch it off until it is updated: the *Game camera* settings above are the fallback.
 
 <br>
 <br>

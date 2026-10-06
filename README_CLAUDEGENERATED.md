@@ -101,6 +101,10 @@ Player ─► virtual cable                          Game audio ─────�
   - With `trucker_aux_camera.dll` the sound takes the game camera's own rotation in the
     cab (the status line says "camera: game"), and an outside camera leaves the head at
     rest ("camera: outside").
+  - In the game's free camera (developer mode: `g_developer "1"` in the game's
+    `config.cfg`, then 0) the sound is heard from where the camera is ("camera: free"):
+    fly up to a speaker to hear it up close. "+ Speaker" and "+ Pair" then put the new
+    speakers at the camera, a way to place them by looking.
   - Without it, set the same options in the app's "Game camera" fieldset and the turn
     is emulated from the steering and the blinkers.
 - **Safe with the game:**
@@ -207,10 +211,11 @@ npm run dist         # Windows build: out/Trucker AUX-<version>-win-x64.zip
 - Updating the defaults: Export into `app/presets/default/`, remove the old files there,
   then build.
 - `tools/fake_shm.py` fakes the telemetry for work without the game: a game, a truck, a
-  fifth-wheel position, a plate, a blinker and, with `--camera cab|outside`, the camera
-  plugin's block. Run it only while the game is closed.
+  fifth-wheel position, a plate, a blinker and, with `--camera cab|outside|free`, the
+  camera plugin's block. Run it only while the game is closed.
 - `tools/camera_probe.py` records the game camera (from the ETS2LA plugin) beside the
-  telemetry; `tools/shm_probe.py` records the telemetry for a drive.
+  telemetry; `tools/camera_block.py` prints which camera `trucker_aux_camera.dll` reads;
+  `tools/shm_probe.py` records the telemetry for a drive.
 - `tools/cable_tone.py` and `tools/cable_check.py` check the virtual cable for dropouts.
 
 ```

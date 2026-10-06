@@ -8,11 +8,12 @@ plate, --quick-job marks the truck as lent for a quick job (its plate is random)
 --blinker keeps the left or right blinker lever on. It reports plugin revision 12 and the truck
 standing at (1000, 50, -2000) in the world, heading north. --camera also writes a fake
 Local\\TruckerAuxCamera (native/camera-plugin): "cab" puts the camera at the head, looking 15° left
-of where the head offset turns it (the game's look into turns, say); "outside" 6 m behind.
+of where the head offset turns it (the game's look into turns, say); "outside" 6 m behind;
+"free" the free camera by the right door, looking across the cab.
 Run only with the game closed: otherwise the plugins and the script write to the same memory.
 
     py tools/fake_shm.py [--engine-off] [--electrics-off] [--truck ID] [--hook METRES]
-                         [--plate TEXT] [--quick-job] [--blinker left|right] [--camera cab|outside]
+                         [--plate TEXT] [--quick-job] [--blinker left|right] [--camera cab|outside|free]
 """
 import argparse
 import math
@@ -24,6 +25,7 @@ MMF_NAME = "Local\\SCSTelemetry"
 MMF_SIZE = 32 * 1024
 CAMERA_NAME = "Local\\TruckerAuxCamera"  # native/camera-plugin/camera_block.h
 CAMERA_SIZE = 64
+CAMERA_INDEX = {"cab": 2, "outside": 1, "free": 0}  # the camera manager's in the game (docs/findings.md)
 WORLD = (1000.0, 50.0, -2000.0)  # the truck in the world; heading, pitch, roll 0
 HEAD = (-0.45, -0.05, 0.0)  # cabinPosition (0) + headPosition + the head offset's x y z below
 
@@ -38,7 +40,7 @@ def main():
     parser.add_argument("--quick-job", action="store_true")
     parser.add_argument("--blinker", choices=("left", "right"))
     parser.add_argument("--game", choices=("ats", "ets2"), default="ats")
-    parser.add_argument("--camera", choices=("cab", "outside"))
+    parser.add_argument("--camera", choices=("cab", "outside", "free"))
     args = parser.parse_args()
     electrics = not args.electrics_off
     engine = electrics and not args.engine_off
@@ -70,7 +72,7 @@ def main():
     camera = None
     if args.camera:
         camera = mmap.mmap(-1, CAMERA_SIZE, tagname=CAMERA_NAME)
-        struct.pack_into("<4I", camera, 0, 1, 0, 1, 0 if args.camera == "cab" else 1)  # layout, sequence, reading, index
+        struct.pack_into("<4I", camera, 0, 1, 0, 1, CAMERA_INDEX[args.camera])  # layout, sequence, reading, index
     print("writing the pose to Local\\SCSTelemetry" + (f" and a {args.camera} camera to {CAMERA_NAME}" if camera else "")
           + ", Ctrl+C to quit")
     start = time.monotonic()
@@ -82,8 +84,10 @@ def main():
         if camera:
             if args.camera == "cab":  # at the head, turned 15° further left than the head offset
                 position, yaw, fov = HEAD, heading * 2 * math.pi + math.radians(15), 65.0
-            else:  # a chase camera: 1.5 m up, 6 m behind, looking ahead
+            elif args.camera == "outside":  # a chase camera: 1.5 m up, 6 m behind, looking ahead
                 position, yaw, fov = (HEAD[0], HEAD[1] + 1.5, HEAD[2] + 6.0), 0.0, 60.0
+            else:  # the free camera by the right door, 0.3 m down and 0.4 m ahead, looking left
+                position, yaw, fov = (0.75, -0.3, -0.4), math.pi / 2, 60.0
             world = [w + p for w, p in zip(WORLD, position)]
             struct.pack_into("<I", camera, 4, sequence + 1)  # odd: being written
             struct.pack_into("<f4x3d4f", camera, 16, fov, *world, math.cos(yaw / 2), 0.0, math.sin(yaw / 2), 0.0)

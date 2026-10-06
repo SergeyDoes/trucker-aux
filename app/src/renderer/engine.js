@@ -125,9 +125,10 @@ export function createEngine(ctx, output = ctx.destination) {
   const neutral = listenerVectors(0, 0, 0);
 
   // headX: where the driver's default head is, left of the truck's axis (pose.js headRestX).
-  // No game (pose = null or sdkActive = false) or pause: the head at rest, looking ahead.
+  // No game (pose = null or sdkActive = false): the head at rest, looking ahead. On pause the
+  // app holds the head where it was (pose.js createPauseHold).
   function setPose(pose, headX = 0) {
-    const active = pose && pose.sdkActive && !pose.paused;
+    const active = pose && pose.sdkActive;
     const position = active ? [headX + pose.head.x, pose.head.y, pose.head.z] : [headX, 0, 0];
     const { forward, up } = active ? listenerVectors(pose.head.heading, pose.head.pitch, pose.head.roll) : neutral;
     const t = ctx.currentTime;

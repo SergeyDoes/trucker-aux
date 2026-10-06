@@ -195,6 +195,14 @@ test('addPair adds linked L/R speakers at the sides of the bounds', () => {
   assert.deepEqual(mirrorPosition(l.position), r.position);
 });
 
+test('addSpeaker and addPair at a point (the free camera): snapped to centimetres, a pair mirrored', () => {
+  assert.deepEqual(addSpeaker(defaultLayout(), [0.234, -0.301, 6]).layout.speakers.at(-1).position, [0.23, -0.3, 5]);
+  const pair = (at) => addPair(defaultLayout(), at).layout.speakers.slice(-2).map((s) => [s.channel, s.position]);
+  const expected = [['L', [-0.8, -0.4, -0.3]], ['R', [0.8, -0.4, -0.3]]];
+  assert.deepEqual(pair([-0.8, -0.4, -0.3]), expected);
+  assert.deepEqual(pair([0.8, -0.4, -0.3]), expected); // the right one at the camera
+});
+
 test('removeSpeaker unlinks the partner', () => {
   const layout = removeSpeaker(defaultLayout(), 's1');
   assert.deepEqual(layout.speakers.map((s) => [s.id, s.pair]), [['s2', null]]);

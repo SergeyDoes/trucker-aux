@@ -24,9 +24,9 @@ import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
 import { trimFromLevels } from '../shared/loudness.js';
 import { measureLoudness } from './loudness-meter.js';
-import { cameraView, createCameraWatch, withCameraView } from '../shared/camera.js';
+import { cameraPoint, cameraView, createCameraWatch, withCameraView } from '../shared/camera.js';
 import {
-  DEFAULT_HEAD_X, createEase, createFrameWatch, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg,
+  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
 } from '../shared/pose.js';
 
@@ -657,16 +657,19 @@ const actions = {
   setWidth(width) {
     edit((layout) => setWidth(layout, width));
   },
+  // In the game's free camera new speakers go where the camera is.
   addSpeaker() {
+    const at = cameraPoint(state.view, headRestX(state.truck));
     edit((layout) => {
-      const result = addSpeaker(layout);
+      const result = addSpeaker(layout, at);
       if (result.id) state.picked = { ids: [result.id], primary: result.id };
       return result.layout;
     });
   },
   addPair() {
+    const at = cameraPoint(state.view, headRestX(state.truck));
     edit((layout) => {
-      const result = addPair(layout);
+      const result = addPair(layout, at);
       if (result.ids.length) state.picked = { ids: result.ids, primary: result.ids[0] };
       return result.layout;
     });
@@ -846,7 +849,8 @@ function statusText() {
 
 let lastStatus = 0;
 const frameWatch = createFrameWatch();
-const easeBlinker = createEase();
+const rampBlinker = createRamp();
+const holdPause = createPauseHold();
 const cameraWatch = createCameraWatch();
 // presets/ changed: new, edited or removed shared files. A picked file that is gone
 // leaves the choice to Auto.
@@ -891,8 +895,9 @@ window.aux.onPose((pose) => {
   // The head is placed from the truck's axis: left of it by what the game reports, and
   // turned by the game's look into turns and toward the blinker, which the telemetry
   // leaves out. With trucker_aux_camera.dll the view comes from the game's camera, those
-  // included, and an outside camera leaves the head at rest; without it they are emulated
-  // from the Game camera settings, the blinker's step eased in.
+  // included, an outside camera leaves the head at rest and the free camera takes the head
+  // where it is; without it they are emulated from the Game camera settings, the blinker's
+  // step ramped in.
   const headX = headRestX(state.truck);
   const view = cameraView(pose, pose?.camera, cameraWatch(pose?.camera, performance.now()));
   if (view.source !== state.view.source) {
@@ -906,9 +911,10 @@ window.aux.onPose((pose) => {
     heard = withCameraView(pose, view);
   } else {
     const look = turnLook(pose, state.settings.turnLook);
-    state.turn = look.steer + easeBlinker(look.blinker, performance.now());
+    state.turn = look.steer + rampBlinker(look.blinker, performance.now());
     heard = withTurnLook(pose, state.turn);
   }
+  heard = holdPause(heard); // paused: the head stays where it was in the game
   state.heard = heard;
   audio?.engine.setPose(heard, headX);
   applySilence();

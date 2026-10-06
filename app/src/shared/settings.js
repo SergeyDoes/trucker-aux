@@ -13,7 +13,7 @@ function deviceRef(raw) {
 }
 
 // The game's camera options, set here as in the game (pose.js turnLook): "look into turns"
-// (on, percent: 100 % turns 45° at full lock; reverse: on the reverse gear off, on, or
+// (on, percent: 100 % turns 35° at full lock; reverse: on the reverse gear off, on, or
 // inverted) and "look toward the blinker". They turn the camera, but not the telemetry's
 // head, so the app adds them.
 export const TURN_LOOK_REVERSE = ['off', 'on', 'inverted'];

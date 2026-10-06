@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HEAD_X, createEase, createFrameWatch, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
+  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
 } from '../src/shared/pose.js';
 
 test('pluginWarning: an scs-telemetry revision the offsets were not made for', () => {
@@ -21,52 +21,87 @@ const drive = (steer, gear = 3, blinkers = {}) => ({
   sdkActive: true, paused: false, steer, gear, blinkers: { left: false, right: false, ...blinkers }, head: { heading: 0.02 },
 });
 
-test('look into turns: the steering times 45° at 100 %; in reverse off, on or inverted', () => {
+test('look into turns: the steering times 35° at 100 %; in reverse off, on or inverted', () => {
   const look = { on: true, percent: 100, reverse: 'off', blinkers: false };
-  near(turnLook(drive(1), look).steer, deg(45)); // full lock left
-  near(turnLook(drive(-0.5), { ...look, percent: 200 }).steer, deg(-45)); // 200 % looks sideways at full lock
-  near(turnLook(drive(1), { ...look, percent: 75 }).steer, deg(33.75));
-  near(turnLook(drive(1, 0), look).steer, deg(45)); // neutral counts as forward
+  near(turnLook(drive(1), look).steer, deg(35)); // full lock left
+  near(turnLook(drive(-0.5), { ...look, percent: 200 }).steer, deg(-35));
+  near(turnLook(drive(1), { ...look, percent: 75 }).steer, deg(26.25)); // measured in the game: 26.2°
+  near(turnLook(drive(1, 0), look).steer, deg(35)); // neutral counts as forward
   near(turnLook(drive(1, -1), look).steer, 0);
-  near(turnLook(drive(1, -1), { ...look, reverse: 'on' }).steer, deg(45));
-  near(turnLook(drive(1, -1), { ...look, reverse: 'inverted' }).steer, deg(-45));
-  near(turnLook(drive(1, 2), { ...look, reverse: 'inverted' }).steer, deg(45)); // forward is never inverted
+  near(turnLook(drive(1, -1), { ...look, reverse: 'on' }).steer, deg(35));
+  near(turnLook(drive(1, -1), { ...look, reverse: 'inverted' }).steer, deg(-35));
+  near(turnLook(drive(1, 2), { ...look, reverse: 'inverted' }).steer, deg(35)); // forward is never inverted
   near(turnLook(drive(1), { ...look, on: false }).steer, 0);
-  assert.deepEqual(turnLook({ ...drive(1), paused: true }, look), { steer: 0, blinker: 0 });
+  near(turnLook({ ...drive(1), paused: true }, look).steer, deg(35)); // the pause keeps it, as the game does
   assert.deepEqual(turnLook(drive(1), null), { steer: 0, blinker: 0 });
   assert.deepEqual(turnLook(null, look), { steer: 0, blinker: 0 });
 });
 
-test('look toward the blinker: at least 30° left or 45° right, whatever the steering', () => {
+test('look toward the blinker: at least 20° toward the driver\'s side or 40° across, whatever the steering', () => {
   const look = { on: true, percent: 100, reverse: 'off', blinkers: true };
   const total = (pose, l = look) => { const t = turnLook(pose, l); return t.steer + t.blinker; };
-  near(total(drive(0, 3, { left: true })), deg(30));
-  near(total(drive(0, 3, { right: true })), deg(-45));
-  near(total(drive(-0.2, 3, { left: true })), deg(30)); // steering right does not pull it back
-  near(total(drive(1, 3, { left: true })), deg(45)); // steering further left wins
-  near(total(drive(-1, 3, { right: true })), deg(-45));
-  near(total(drive(0.5, 3, { right: true })), deg(-45));
-  // The blinker part is kept apart, for the app to ease it in.
-  near(turnLook(drive(0.4, 3, { left: true }), look).blinker, deg(30 - 18));
+  // A left-hand-drive cab (measured in the game): 20° left, 40° right.
+  near(total(drive(0, 3, { left: true })), deg(20));
+  near(total(drive(0, 3, { right: true })), deg(-40));
+  near(total(drive(-0.2, 3, { left: true })), deg(20)); // steering right does not pull it back
+  near(total(drive(1, 3, { left: true })), deg(35)); // steering further left wins
+  near(total(drive(-1, 3, { right: true })), deg(-40)); // full lock is 35°, the limit 40°
+  near(total(drive(-1, 3, { right: true }), { ...look, percent: 200 }), deg(-70));
+  near(total(drive(0.5, 3, { right: true })), deg(-40));
+  // The blinker part is kept apart, for the app to ramp it in.
+  near(turnLook(drive(0.4, 3, { left: true }), look).blinker, deg(20 - 14));
   // Hazard lights (both blinkers) do not turn the camera.
   near(total(drive(0, 3, { left: true, right: true })), 0);
   // Without look into turns the blinkers still work; switched off they do not.
-  near(total(drive(0, 3, { left: true }), { ...look, on: false }), deg(30));
+  near(total(drive(0, 3, { left: true }), { ...look, on: false }), deg(20));
   near(total(drive(0, 3, { left: true }), { ...look, blinkers: false }), 0);
   // In reverse the game keeps the same limits, even with inverted look into turns.
-  near(total(drive(0, -1, { left: true }), { ...look, reverse: 'inverted' }), deg(30));
-  near(total(drive(0.5, -1, { left: true }), { ...look, reverse: 'inverted' }), deg(30)); // inverted steering -22.5°, the limit 30°
-  near(total(drive(1, -1, { right: true }), look), deg(-45));
+  near(total(drive(0, -1, { left: true }), { ...look, reverse: 'inverted' }), deg(20));
+  near(total(drive(0.5, -1, { left: true }), { ...look, reverse: 'inverted' }), deg(20)); // inverted steering -17.5°, the limit 20°
+  near(total(drive(1, -1, { right: true }), look), deg(-40));
 });
 
-test('ease: follows a step with the time constant; a long gap jumps', () => {
-  const ease = createEase(250);
-  assert.equal(ease(0, 0), 0);
-  near(ease(1, 250), 1 - Math.exp(-1));
-  near(ease(1, 500), 1 - Math.exp(-2));
-  assert.equal(ease(0.5, 2000), 0.5); // after a gap of over a second
-  const first = createEase(250);
-  assert.equal(first(0.3, 100), 0.3); // the first value is taken as it is
+test('look toward the blinker: mirrored in a right-hand-drive cab (the head right of the axis)', () => {
+  const look = { on: false, percent: 100, reverse: 'off', blinkers: true };
+  const total = (pose) => { const t = turnLook(pose, look); return t.steer + t.blinker; };
+  const inTruck = (centerX, blinkers) => ({ ...drive(0, 3, blinkers), truck: { key: 'vehicle.x', centerX } });
+  near(total(inTruck(-0.45, { left: true })), deg(40));
+  near(total(inTruck(-0.45, { right: true })), deg(-20));
+  near(total(inTruck(0.459, { left: true })), deg(20));
+  near(total(inTruck(0.459, { right: true })), deg(-40));
+  // Without the truck's centre, the 40 cm left-hand-drive default.
+  near(total(inTruck(null, { left: true })), deg(20));
+});
+
+test('ramp: moves toward the target at a steady speed; the first value and a long gap jump', () => {
+  const ramp = createRamp(80);
+  assert.equal(ramp(0, 0), 0);
+  near(ramp(deg(40), 100), deg(8)); // 80°/s for 0.1 s
+  near(ramp(deg(40), 400), deg(32));
+  near(ramp(deg(40), 600), deg(40)); // reached, not passed
+  near(ramp(0, 700), deg(32)); // back at the same speed
+  near(ramp(deg(-20), 2000), deg(-20)); // after a gap of over a second
+  const first = createRamp(80);
+  near(first(deg(20), 100), deg(20)); // the first value is taken as it is
+});
+
+test('pause hold: while paused the head stays where it was in the game', () => {
+  const hold = createPauseHold();
+  const at = (paused, x, heading, sdkActive = true) => ({ sdkActive, paused, head: { x, y: 0.1, z: 0, heading, pitch: 0, roll: 0 } });
+  assert.deepEqual(hold(at(false, 0.2, deg(30))).head, at(false, 0.2, deg(30)).head);
+  // Paused: the camera or the telemetry may say otherwise (a menu camera, a stale block).
+  const paused = hold(at(true, 0, 0));
+  assert.equal(paused.paused, true);
+  assert.deepEqual(paused.head, at(false, 0.2, deg(30)).head);
+  assert.deepEqual(hold(at(true, -0.5, deg(-90))).head, at(false, 0.2, deg(30)).head);
+  // Back in the game: the game's head again.
+  assert.deepEqual(hold(at(false, 0.1, deg(5))).head, at(false, 0.1, deg(5)).head);
+  // A game paused before any frame of play, or gone: nothing to hold.
+  const fresh = createPauseHold();
+  assert.deepEqual(fresh(at(true, 0.3, deg(10))).head, at(true, 0.3, deg(10)).head);
+  assert.equal(hold(null), null);
+  hold(at(false, 0.4, 0, false)); // the game closed: forget the head
+  assert.deepEqual(hold(at(true, 0.3, deg(10))).head, at(true, 0.3, deg(10)).head);
 });
 
 test('withTurnLook adds turns to the head\'s heading for the engine and the views', () => {

@@ -133,7 +133,7 @@ export function createOverview(root) {
 
   // headX: the driver's default head, left of the truck's axis (pose.js headRestX).
   function setPose(pose, headX = 0) {
-    const active = pose && pose.sdkActive && !pose.paused;
+    const active = pose && pose.sdkActive;
     if (active) {
       head.position.set(headX + pose.head.x, pose.head.y, pose.head.z);
       head.rotation.set(pose.head.pitch * TURN, pose.head.heading * TURN, pose.head.roll * TURN);

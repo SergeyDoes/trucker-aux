@@ -134,8 +134,8 @@ Neither the SDK nor the plugin passes the game's settings, but the game keeps th
 
 - A file watcher showed the game rewriting `config_local.cfg` (and `Documents\…\config.cfg`) at once on every change in the options. Switching the reverse option On → Inverted → Off wrote `1 → 2 → 0`. Older ETS2 profiles keep floats there ("1.0").
 - With several profiles, the active one is the one whose `config_local.cfg` is newest. Local (non-Steam) profiles keep `config.cfg` next to it.
-- Angles, by eye in the game: 100 % turns the camera 45° at full lock, 200 % looks straight sideways, 10 % about 5°: so `45° × percent`, and the earlier guess of 25–30° for 75 % was 34°.
-- Look toward the blinker: with the left blinker the camera turns 30° left, with the right one 45° right, whatever the percent; while a blinker is on, the turn is at least that, and steering further that way turns it further. The hazard lights do nothing. In reverse the game keeps the same limits, even with inverted look into turns (it looks like a bug in the game; Trucker AUX repeats it).
+- Angles, by eye in the game: 100 % turns the camera 45° at full lock, 200 % looks straight sideways, 10 % about 5°: so `45° × percent`, and the earlier guess of 25–30° for 75 % was 34°. The game's camera showed otherwise: 26.2° at 75 %, so 35° per 100 % (next section).
+- Look toward the blinker: with the left blinker the camera turns 30° left, with the right one 45° right (by eye; the game's camera showed 20° and 40°, next section), whatever the percent; while a blinker is on, the turn is at least that, and steering further that way turns it further. The hazard lights do nothing. In reverse the game keeps the same limits, even with inverted look into turns (it looks like a bug in the game; Trucker AUX repeats it).
 - The telemetry gives the blinker levers (`truck_b.blinkerLeftActive` @1578, `blinkerRightActive` @1579; per the SDK the logical state, which does not blink with the light) and which game runs (`scs_values.game` @52: 1 ETS2, 2 ATS).
 
 ## The game camera from the ETS2LA plugin: the cab camera, the turn look, the blinkers (2026-10-06)
@@ -145,5 +145,24 @@ Recorded with `tools/camera_probe.py` (the ETS2LA plugin's `Local\ETS2LACameraPr
 - **The cab camera is the SDK's head.** With the origin set in the cab camera (head straight), the camera sits where the origin plus `head.offset` says, within 1 mm on average and 7 mm (across) to 2 cm (along) at worst, also looking back over the shoulder (the head then 55 cm left, 14 cm down, 10 cm forward). With the head at rest the camera stays within ±7 mm across and 2 cm along (it turns about the neck). The head sits 0.459 m left of the truck's box centre, the app's `centerX`.
 - **The F150 has no cab suspension:** `cabin.offset` stayed 0.
 - **The game's look into turns is in the camera, not in the SDK's head** (look into turns on, 75 %, reverse "On"; the truck stood in R the whole run, speed 0): the camera's yaw follows `gameSteer` linearly, **26.2° at full lock** (26.4 per unit across the range), about 0.14 s behind it; the SDK's head yaw stayed 0. That is 35° per 100 % if it scales with the percent, not the 45° guessed by eye; other percents are not measured yet.
-- **Look toward the blinker: 20° left, 40° right**, not the 30° / 45° guessed by eye. The camera turns there at a steady speed, about 80°/s (20° in 0.24 s, 40° in 0.48 s, the same coming back), not easing exponentially.
+- **Look toward the blinker: 20° left, 40° right**, not the 30° / 45° guessed by eye. The camera turns there at a steady speed, about 80°/s (20° in 0.24 s, 40° in 0.48 s, the same coming back), not easing exponentially. A right-hand-drive cab is not measured: Trucker AUX takes its limits as mirrored, 20° toward the driver's side (right) and 40° across (left).
 - **Outside cameras get no turn look:** steering full left and right on the chase camera (6.0–6.3 m from the head) left its yaw at 0. The app adds the turn look whatever the camera (E3).
+
+## The game's cameras by index (2026-10-06)
+
+`tools/camera_block.py` with `trucker_aux_camera.dll` in ATS 1.61, a truck standing still, the keys 1…9 and 0 pressed in turn (the camera manager's `current_camera`; the distance is from the cab camera):
+
+| index | FOV | distance | camera (by where it is) |
+|---|---|---|---|
+| 2 | 65 | 0 | the cab (key 1) |
+| 1 | 62 | 25.1 m | chase |
+| 7 | 70 | 26.1 m | top, 25.5 m up |
+| 5 | 70 | 1.70 m | 1.5 m up: on the roof |
+| 4 | 70 | 0.88 m | beside the head: leaning out of the window |
+| 3 | 65 | 2.25 m | low, 0.9 m down |
+| 6 | 65 | 2.03 m | low, 1.4 m down |
+| 9 | 57 | 18.1 m | cinematic |
+| 0 | 60 | 2.87 m | the free (developer) camera, where it starts |
+
+- The free camera is index 0: `FREE_CAMERA` in `app/src/shared/camera.js`.
+- The index 4 camera is 0.88 m from the cab camera, inside the app's `CAB_RADIUS` (1.5 m): by distance alone the app took it for the cab camera. Since then the cab camera is index 2 (`CAB_CAMERA`) and within `CAB_RADIUS`; any other index but the free camera's is an outside camera.

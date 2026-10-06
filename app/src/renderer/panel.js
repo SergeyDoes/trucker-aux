@@ -105,11 +105,11 @@ export function createPanel(root, actions) {
     textContent: 'The game\'s camera is read (trucker_aux_camera.dll): the sound turns with it, so these settings are not used now.',
   });
   const turnLookPercent = el('input', {
-    type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 45° at full lock',
+    type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 35° at full lock',
   });
   const turnLookReverse = el('select', { title: '"Look into turns" on the reverse gear, as in the game' });
   const turnLookBlinkers = el('input', {
-    type: 'checkbox', title: 'The game\'s "look toward the blinker": 30° left or 45° right while a blinker is on',
+    type: 'checkbox', title: 'The game\'s "look toward the blinker": while a blinker is on, 20° toward the driver\'s side or 40° across (in a left-hand-drive cab 20° left, 40° right)',
   });
 
   const preset = el('select');
@@ -235,7 +235,7 @@ export function createPanel(root, actions) {
       cameraNote,
       el('p', {
         className: 'hint',
-        textContent: 'Set these as in the game\'s Accessibility options: the game turns the camera without telling the telemetry, so the sound is turned here. 100 % is 45° at full lock; blinkers 30° left, 45° right.',
+        textContent: 'Set these as in the game\'s Accessibility options: the game turns the camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.',
       }),
     ]),
     el('fieldset', {}, [
@@ -407,6 +407,9 @@ export function createPanel(root, actions) {
     list.replaceChildren(...view.speakers.map((s) => speakerItem(s, view)));
     add.disabled = view.speakers.length >= view.maxSpeakers;
     addPair.disabled = view.speakers.length + 2 > view.maxSpeakers;
+    const atCamera = view.cameraSource === 'free';
+    add.title = atCamera ? 'Adds a speaker where the game\'s free camera is' : '';
+    addPair.title = atCamera ? 'Adds a pair: the speaker on the free camera\'s side where the camera is, the other mirrored' : '';
     duplicate.disabled = !view.canDuplicate;
     copy.disabled = !view.selected.length;
     paste.disabled = !view.canPaste;
