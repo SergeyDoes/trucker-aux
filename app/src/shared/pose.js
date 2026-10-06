@@ -76,6 +76,15 @@ export function createFrameWatch(timeoutMs = 1000) {
   };
 }
 
+// RenCloud's scs-telemetry revisions whose memory layout main/telemetry.js reads. Another one
+// (another mod may install its own) may have moved the values, so the panel says so.
+export const KNOWN_PLUGIN_REVISIONS = [12];
+
+export function pluginWarning(pose) {
+  if (!pose?.sdkActive || KNOWN_PLUGIN_REVISIONS.includes(pose.pluginRevision)) return null;
+  return `scs-telemetry.dll revision ${pose.pluginRevision} is not one Trucker AUX knows (${KNOWN_PLUGIN_REVISIONS.join(', ')}): the values it reads may be wrong.`;
+}
+
 // Whether the music is muted: while the vehicle is switched off (settings.muteWhen), and
 // on pause as settings.pauseBehavior says: 'active' plays, 'muted' mutes, 'vehicle' goes
 // by muteWhen as when driving. Without the game, before a vehicle is loaded, or outside

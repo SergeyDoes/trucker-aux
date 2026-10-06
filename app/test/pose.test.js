@@ -1,8 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HEAD_X, createEase, createFrameWatch, headRestX, musicSilenced, turnLook, turnsToDeg, listenerVectors, withTurnLook,
+  DEFAULT_HEAD_X, createEase, createFrameWatch, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
 } from '../src/shared/pose.js';
+
+test('pluginWarning: an scs-telemetry revision the offsets were not made for', () => {
+  assert.equal(pluginWarning({ sdkActive: true, pluginRevision: 12 }), null);
+  assert.equal(
+    pluginWarning({ sdkActive: true, pluginRevision: 13 }),
+    'scs-telemetry.dll revision 13 is not one Trucker AUX knows (12): the values it reads may be wrong.',
+  );
+  // Only while the game runs: the plugin clears it when the game closes.
+  assert.equal(pluginWarning({ sdkActive: false, pluginRevision: 0 }), null);
+  assert.equal(pluginWarning(null), null);
+});
 
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 const deg = (d) => d / 360;

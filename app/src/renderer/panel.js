@@ -99,6 +99,11 @@ export function createPanel(root, actions) {
   });
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });
+  // Shown while the view comes from the game's camera (trucker_aux_camera.dll, shared/camera.js).
+  const cameraNote = el('p', {
+    className: 'hint',
+    textContent: 'The game\'s camera is read (trucker_aux_camera.dll): the sound turns with it, so these settings are not used now.',
+  });
   const turnLookPercent = el('input', {
     type: 'number', min: 0, max: 200, step: 5, className: 'narrow', title: 'As in the game: 100 % turns 45° at full lock',
   });
@@ -227,6 +232,7 @@ export function createPanel(root, actions) {
       ])),
       row('In reverse', turnLookReverse),
       row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
+      cameraNote,
       el('p', {
         className: 'hint',
         textContent: 'Set these as in the game\'s Accessibility options: the game turns the camera without telling the telemetry, so the sound is turned here. 100 % is 45° at full lock; blinkers 30° left, 45° right.',
@@ -338,12 +344,16 @@ export function createPanel(root, actions) {
     fillSelect(muteWhen, MUTE_OPTIONS, view.muteWhen);
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);
     const look = view.turnLook;
+    const fromGame = Boolean(view.cameraSource);
     turnLookOn.checked = look.on;
+    turnLookOn.disabled = fromGame;
     setValue(turnLookPercent, look.percent);
-    turnLookPercent.disabled = !look.on;
+    turnLookPercent.disabled = !look.on || fromGame;
     fillSelect(turnLookReverse, REVERSE_OPTIONS, look.reverse);
-    turnLookReverse.disabled = !look.on;
+    turnLookReverse.disabled = !look.on || fromGame;
     turnLookBlinkers.checked = look.blinkers;
+    turnLookBlinkers.disabled = fromGame;
+    cameraNote.hidden = !fromGame;
     if (playerSlot.firstChild !== view.player) playerSlot.replaceChildren(...(view.player ? [view.player] : []));
 
     fillSelect(preset, view.presets, view.preset);

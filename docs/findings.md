@@ -137,3 +137,13 @@ Neither the SDK nor the plugin passes the game's settings, but the game keeps th
 - Angles, by eye in the game: 100 % turns the camera 45° at full lock, 200 % looks straight sideways, 10 % about 5°: so `45° × percent`, and the earlier guess of 25–30° for 75 % was 34°.
 - Look toward the blinker: with the left blinker the camera turns 30° left, with the right one 45° right, whatever the percent; while a blinker is on, the turn is at least that, and steering further that way turns it further. The hazard lights do nothing. In reverse the game keeps the same limits, even with inverted look into turns (it looks like a bug in the game; Trucker AUX repeats it).
 - The telemetry gives the blinker levers (`truck_b.blinkerLeftActive` @1578, `blinkerRightActive` @1579; per the SDK the logical state, which does not blink with the light) and which game runs (`scs_values.game` @52: 1 ETS2, 2 ATS).
+
+## The game camera from the ETS2LA plugin: the cab camera, the turn look, the blinkers (2026-10-06)
+
+Recorded with `tools/camera_probe.py` (the ETS2LA plugin's `Local\ETS2LACameraProps` next to scs-telemetry), a Ford F150 2023 standing still, `docs/camera.csv` runs 3 and 4.
+
+- **The cab camera is the SDK's head.** With the origin set in the cab camera (head straight), the camera sits where the origin plus `head.offset` says, within 1 mm on average and 7 mm (across) to 2 cm (along) at worst, also looking back over the shoulder (the head then 55 cm left, 14 cm down, 10 cm forward). With the head at rest the camera stays within ±7 mm across and 2 cm along (it turns about the neck). The head sits 0.459 m left of the truck's box centre, the app's `centerX`.
+- **The F150 has no cab suspension:** `cabin.offset` stayed 0.
+- **The game's look into turns is in the camera, not in the SDK's head** (look into turns on, 75 %, reverse "On"; the truck stood in R the whole run, speed 0): the camera's yaw follows `gameSteer` linearly, **26.2° at full lock** (26.4 per unit across the range), about 0.14 s behind it; the SDK's head yaw stayed 0. That is 35° per 100 % if it scales with the percent, not the 45° guessed by eye; other percents are not measured yet.
+- **Look toward the blinker: 20° left, 40° right**, not the 30° / 45° guessed by eye. The camera turns there at a steady speed, about 80°/s (20° in 0.24 s, 40° in 0.48 s, the same coming back), not easing exponentially.
+- **Outside cameras get no turn look:** steering full left and right on the chase camera (6.0–6.3 m from the head) left its yaw at 0. The app adds the turn look whatever the camera (E3).

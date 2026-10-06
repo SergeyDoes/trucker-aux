@@ -23,8 +23,10 @@ The same in this console: z then Enter, or Enter alone.
 
 Printed: the camera in the truck's axes (X right, Y up, Z back, metres), from the origin once
 set, else from the middle of the truck's box; where it looks (a unit vector, -Z is ahead); its
-distance from the origin; the FOV. With scs-telemetry.dll running too: the head offset the SDK
-reports, to compare in the cab camera.
+distance from the origin; the FOV; its yaw. With scs-telemetry.dll running too: the head offset
+and turn the SDK reports, to compare in the cab camera, and the steering, the gear, the speed
+and the blinkers: with the game's "look into turns" or "look toward the blinker" on, the camera's
+yaw minus the SDK's is what they add.
 """
 import argparse
 import csv
@@ -46,6 +48,10 @@ TELEMETRY_MMF = "Local\\SCSTelemetry"
 TELEMETRY_SIZE = 32 * 1024
 OFF_CABIN_OFFSET = 2000  # 6 floats: x y z heading pitch roll (tools/shm_probe.py)
 OFF_HEAD_OFFSET = 2024
+OFF_GEAR = 504           # truck_i.gear, int; negative is reverse (app/src/main/telemetry.js)
+OFF_SPEED = 948          # truck_f.speed, m/s, negative when reversing
+OFF_GAME_STEER = 972     # truck_f.gameSteer, -1..1, positive is left
+OFF_BLINKER_LEFT = 1578  # truck_b.blinkerLeftActive (the lever), then blinkerRightActive
 FILE_MAP_READ = 0x0004
 
 assert struct.calcsize(CAMERA_FMT) == CAMERA_SIZE
@@ -74,6 +80,18 @@ def rotate(q, v):
 
 def sub(a, b):
     return tuple(p - q for p, q in zip(a, b))
+
+
+def yaw_pitch(looks):
+    """Where the camera looks, as the SDK gives the head's turn: yaw in degrees, positive to
+    the left (-Z is ahead), and pitch, positive up."""
+    x, y, z = looks
+    return math.degrees(math.atan2(-x, -z)), math.degrees(math.asin(max(-1.0, min(1.0, y))))
+
+
+def turns_to_deg(turns):
+    """SCS angles come in turns, heading in [0, 1): degrees in -180..180."""
+    return (turns * 360.0 + 180.0) % 360.0 - 180.0
 
 
 def length(v):
@@ -115,6 +133,10 @@ def selftest():
     position, looks = in_truck(parse(raw))
     assert all(abs(a - b) < 1e-4 for a, b in zip(position, (1.0, 0.5, 0.0))), position
     assert all(abs(a - b) < 1e-6 for a, b in zip(looks, (0.0, 0.0, -1.0))), looks
+    # Looking left, and a little up: yaw +90, pitch +30, as the SDK's head turn.
+    yaw, pitch = yaw_pitch((-math.cos(math.radians(30)), math.sin(math.radians(30)), 0.0))
+    assert abs(yaw - 90.0) < 1e-6 and abs(pitch - 30.0) < 1e-6, (yaw, pitch)
+    assert abs(turns_to_deg(0.99) + 3.6) < 1e-6 and abs(turns_to_deg(0.25) - 90.0) < 1e-6
     print("selftest ok:", tuple(round(c, 4) for c in position), tuple(round(c, 4) for c in looks))
 
 
@@ -203,7 +225,8 @@ def main():
         writer = csv.writer(csv_file)
         writer.writerow(["t", "mark", "zeroed", "fov", "x", "y", "z", "look_x", "look_y", "look_z", "distance",
                          "box_x", "box_y", "box_z", "head_x", "head_y", "head_z", "cabin_x", "cabin_y", "cabin_z",
-                         *[f"m{r}{c}" for r in range(1, 5) for c in range(1, 5)]])
+                         *[f"m{r}{c}" for r in range(1, 5) for c in range(1, 5)],
+                         "cam_yaw", "cam_pitch", "sdk_yaw", "sdk_pitch", "steer", "gear", "speed", "blink_l", "blink_r"])
 
     state = {"marks": 0, "zero": False, "show": False}
 
@@ -240,13 +263,26 @@ def main():
             print(f"--- origin set: {fmt3(origin)} m from the truck's box centre ---", flush=True)
         position = sub(box, origin) if origin else box
         distance = length(position) if origin else float("nan")
-        head = cabin = (float("nan"),) * 3
+        nan = float("nan")
+        head = cabin = (nan,) * 3
+        sdk_yaw = sdk_pitch = steer = gear = speed = nan
+        blinkers = (nan, nan)
         if has_telemetry:
-            head = struct.unpack("<3f", telemetry.read(OFF_HEAD_OFFSET, 12))
+            *head, heading, pitch = struct.unpack("<5f", telemetry.read(OFF_HEAD_OFFSET, 20))
+            sdk_yaw, sdk_pitch = turns_to_deg(heading), turns_to_deg(pitch)
             cabin = struct.unpack("<3f", telemetry.read(OFF_CABIN_OFFSET, 12))
+            (gear,) = struct.unpack("<i", telemetry.read(OFF_GEAR, 4))
+            (speed,) = struct.unpack("<f", telemetry.read(OFF_SPEED, 4))
+            (steer,) = struct.unpack("<f", telemetry.read(OFF_GAME_STEER, 4))
+            blinkers = tuple(telemetry.read(OFF_BLINKER_LEFT, 2))
+        cam_yaw, cam_pitch = yaw_pitch(looks)
+        # The game's look into turns and toward the blinker turn the camera but not the SDK's
+        # head: in the cab camera, cam_yaw - sdk_yaw is what they add.
         line = (f"{'origin' if origin else 'box   '} {fmt3(position)} m  looks {fmt3(looks)}"
-                f"  dist {distance:5.2f}  fov {record['fov']:5.1f}"
-                + (f"  | sdk head {fmt3(head)}  cabin {fmt3(cabin)}" if has_telemetry else ""))
+                f"  dist {distance:5.2f}  fov {record['fov']:5.1f}  yaw {cam_yaw:+6.1f}"
+                + (f"  | sdk head {fmt3(head)}  yaw {sdk_yaw:+6.1f}  cabin {fmt3(cabin)}"
+                   f"  steer {steer:+.2f} gear {gear} {speed * 3.6:+5.1f} km/h"
+                   f"  blink {'L' if blinkers[0] else '-'}{'R' if blinkers[1] else '-'}" if has_telemetry else ""))
         if state["show"]:
             state["show"] = False
             print(f"--- mark {state['marks']} ---\n{line}", flush=True)
@@ -255,7 +291,9 @@ def main():
         if writer:
             writer.writerow([f"{time.time():.3f}", state["marks"], int(origin is not None), repr(record["fov"]),
                              *map(repr, position), *(f"{c:.5f}" for c in looks), f"{distance:.4f}",
-                             *map(repr, box), *map(repr, head), *map(repr, cabin), *map(repr, record["projection"])])
+                             *map(repr, box), *map(repr, head), *map(repr, cabin), *map(repr, record["projection"]),
+                             f"{cam_yaw:.3f}", f"{cam_pitch:.3f}", f"{sdk_yaw:.3f}", f"{sdk_pitch:.3f}",
+                             f"{steer:.4f}", gear, f"{speed:.3f}", *blinkers])
             csv_file.flush()
         time.sleep(period)
 

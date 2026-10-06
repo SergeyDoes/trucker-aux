@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js';
-import { openTelemetry } from './telemetry.js';
+import { openCamera, openTelemetry } from './telemetry.js';
 import { presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
 import { parsePresetFile, presetFileName } from '../shared/collection.js';
 import { dropImportedDefaults, seedAll } from '../shared/presets.js';
@@ -119,13 +119,22 @@ function fakeTelemetry() {
 function startPoseFeed(win) {
   let telemetry = fakeTelemetry();
   let lastTry = 0;
+  // The game camera from trucker_aux_camera.dll, when it is installed (shared/camera.js).
+  let camera = null;
+  let lastCameraTry = 0;
   const timer = setInterval(() => {
     const now = Date.now();
     if (!telemetry && now - lastTry >= RETRY_MS) {
       lastTry = now;
       telemetry = openTelemetry();
     }
-    if (!win.isDestroyed()) win.webContents.send('pose', telemetry ? telemetry.read() : null);
+    if (!camera && now - lastCameraTry >= RETRY_MS) {
+      lastCameraTry = now;
+      camera = openCamera();
+    }
+    const pose = telemetry ? telemetry.read() : null;
+    if (pose) pose.camera = camera ? camera.read() : null;
+    if (!win.isDestroyed()) win.webContents.send('pose', pose);
   }, POSE_PERIOD_MS);
   win.on('closed', () => clearInterval(timer));
 }
