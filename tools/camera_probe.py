@@ -13,11 +13,13 @@ The free camera: g_developer "1" (and g_console "1") in Documents\\<game>\\confi
     py tools/camera_probe.py --hz 30 --csv docs/camera.csv
     py tools/camera_probe.py --selftest       # the maths, without the game (any OS)
 
-Typed while it runs (then Enter):
-    z       zero: the camera's place now is the origin. Do it in the cab camera, head straight
-            and not moved: the origin is then the driver's default head, as in the app.
-    (empty) a mark into the CSV (the "mark" column counts them), and the line printed again
-            with "mark", e.g. with the free camera at a speaker grille.
+Keys, pressed in the game (read from anywhere, a beep answers):
+    Ctrl+F9   zero: the camera's place now is the origin. Do it in the cab camera, head
+              straight and not moved: the origin is then the driver's default head, as in
+              the app (high beep).
+    Ctrl+F10  a mark into the CSV (the "mark" column counts them), and the line printed
+              again with "mark", e.g. with the free camera at a speaker grille (low beep).
+The same in this console: z then Enter, or Enter alone.
 
 Printed: the camera in the truck's axes (X right, Y up, Z back, metres), from the origin once
 set, else from the middle of the truck's box; where it looks (a unit vector, -Z is ahead); its
@@ -140,6 +142,36 @@ class Mapping:
         return self.ctypes.string_at(self.view + offset, size)
 
 
+VK_CONTROL, VK_F9, VK_F10 = 0x11, 0x78, 0x79
+
+
+def beep(freq):
+    try:
+        import winsound
+        winsound.Beep(freq, 120)
+    except (ImportError, RuntimeError):
+        print("\a", end="", flush=True)
+
+
+def hotkeys(actions):
+    """Ctrl + a key from actions, pressed in any window (the game has the focus): polls the
+    keyboard, as a hook would need a message loop. Each press acts once."""
+    import ctypes
+    state = ctypes.windll.user32.GetAsyncKeyState
+    down = set()
+    while True:
+        ctrl = state(VK_CONTROL) & 0x8000
+        for key, act in actions.items():
+            pressed = bool(ctrl and state(key) & 0x8000)
+            if pressed and key not in down:
+                act()
+            if pressed:
+                down.add(key)
+            else:
+                down.discard(key)
+        time.sleep(0.02)
+
+
 def fmt3(v):
     return " ".join(f"{c:+7.3f}" for c in v)
 
@@ -163,7 +195,6 @@ def main():
     telemetry = Mapping(TELEMETRY_MMF, TELEMETRY_SIZE)
     has_telemetry = telemetry.open()
     print(f"connected; scs-telemetry: {'yes' if has_telemetry else 'no (no head offset to compare)'}")
-    print("type z + Enter in the cab camera (head straight) to set the origin; Enter alone puts a mark")
 
     writer = None
     if args.csv:
@@ -176,15 +207,22 @@ def main():
 
     state = {"marks": 0, "zero": False, "show": False}
 
+    def zero():
+        state["zero"] = True
+        beep(1200)
+
+    def mark():
+        state["marks"] += 1
+        state["show"] = True
+        beep(600)
+
     def commands():
         for line in sys.stdin:
-            if line.strip().lower() == "z":
-                state["zero"] = True
-            else:
-                state["marks"] += 1
-                state["show"] = True
+            zero() if line.strip().lower() == "z" else mark()
 
     threading.Thread(target=commands, daemon=True).start()
+    threading.Thread(target=hotkeys, args=({VK_F9: zero, VK_F10: mark},), daemon=True).start()
+    print("in the game: Ctrl+F9 sets the origin (in the cab camera, head straight), Ctrl+F10 puts a mark")
 
     origin = None
     period = 1.0 / args.hz
