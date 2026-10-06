@@ -98,33 +98,20 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Y goes up and Z goes back, from the driver's default head;
   - There is no consistency in cabin positions, so it end up being the most handy way
 - **Bounds** only frame the views for placing speakers and don't affect the sound.
+- **Free camera (ingame developer option)** can be used to (kind of) precisely position speakers. New speakers are created at the current camera position if free camera is active.
 - **Shortcuts,** outside text fields://sheeesh we have shortcuts?
   - arrows nudge the selected speakers, Shift+arrows by 10 cm;
   - Delete removes them, Esc clears the selection;
-  - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate.
-- **Data** is kept next to the app, `%APPDATA%` is not being bloated:
-  - `app/data/layouts.json`: your presets;
-  - `app/data/settings.json`: devices and options;
-  - `app/data/profile/`: Chromium's profile;
-  - `app/presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
-  - `app/presets/default/`: the presets that come with the app, the bottom layer under yours and others' files. To update them for a build: Export the presets into this folder (and remove the old files); `npm run dist` ships it as it is.
- 
- - Presets included (`app/presets/default/`):
-  
-
-   | Vehicle | Notes
-   |---|---|
-   | Freightliner Cascadia
-   | International 9900i | Day Cab
-   | Kenworth T680 | Day Cab and Sleeper
-   | Kenworth W900
-   | Peterbilt 389
-   | Volvo VNL | 440 Sleeper
-   | Western Star 49X | Day Cab and Sleeper
-   | Ford F150 | Road Trip: Ford DLC
-   | Ford Bronco | Road Trip: Ford DLC
-   | Ford Mustang | Road Trip: Ford DLC
-   | Ford Crown Victoria | Road Trip: Ford DLC
+  - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate;
+  - Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes;
+  - F2 renames an unused preset.
+- **Data** is kept within the app folder, `%APPDATA%` is not being bloated:
+  - `data/layouts.json`: your presets;
+  - `data/settings.json`: devices and options;
+  - `data/profile/`: Chromium's profile;
+  - `presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
+  - `presets/default/`: the presets that come with the app, the bottom layer under yours and others' files. To update them for a build: Export the presets into `app/presets/default/` (and remove the old files); `npm run dist` ships it as it is.
+  - When run from source, these folders are in `app/`.
 
 <br>
 <br>
@@ -132,11 +119,12 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 ## Workarounds and Limitations
 
 - The game telemetry doesn't report the truck upgrades, so Day Cabs and Sleepers are distinguished by the fifth-wheel position. Ambiguities may appear on certain chassis.
-- The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
+- **Fallback method** (when *trucker_aux_camera.dll* doesn't read the game's camera, see below): The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.
   - The **current camera mode** is not reported by the game either, the head position is just defaulted when not in FPV. The above-mentioned behavior is processed directly from the trucks steer and turn signal states, and *it keep affect the head's position even in third person camera modes.*
 - **trucker_aux_camera.dll** (comes with the app) reads the game's own camera instead, so the steering and blinker camera rotation are taken as they are and outside cameras leave the sound alone; the status line then says *camera: game*. In the game's free camera (developer mode, key 0) the sound is heard from where the camera is (*camera: free*), and *+ Speaker* / *+ Pair* put new speakers at the camera. It reads the camera from the game's memory (the way ETS2LA does), so a game update may switch it off until it is updated: the *Game camera* settings above are the fallback.
+- In the game's free camera the cab interior is the low-detail model
 
 <br>
 <br>
@@ -161,6 +149,7 @@ MIT, see [LICENSE](LICENSE). Third-party parts keep their own licenses:
 | part | license |
 |---|---|
 | scs-sdk-plugin and the SCS SDK headers in it | MIT |
+| ETS2LA game plugin (the camera pattern and offsets in `trucker_aux_camera.dll`) | MIT |
 | Electron | MIT |
 | three.js | MIT |
 | koffi | MIT |
