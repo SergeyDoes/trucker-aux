@@ -5,7 +5,7 @@
 // game reports (pose.js headRestX). Mirrored pairs are mirror images about X = 0.
 
 export const MAX_SPEAKERS = 16;
-export const LABEL_MAX = 16; // characters of a preset's label
+export const LABEL_MAX = 32; // characters of a preset's label (over 16 it runs like a ticker: badge.js)
 // A label's colour; blue when none is stored.
 export const LABEL_COLORS = ['gray', 'blue', 'orange', 'green', 'red'];
 // 1: X started at the driver's head. 2: X starts at the truck's axis. 3: presets apart from

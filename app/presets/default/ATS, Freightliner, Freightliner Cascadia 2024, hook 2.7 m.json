@@ -1,0 +1,118 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Freightliner › Freightliner Cascadia 2024 › hook 2.7 m",
+  "vehicle": "vehicle.freightliner.cascadia2024@2.7",
+  "vehicleName": "Freightliner Cascadia",
+  "game": "ats",
+  "brand": "freightliner",
+  "brandName": "Freightliner",
+  "layout": {
+    "label": "2024",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.15,
+        -1.15,
+        -1.1
+      ],
+      "max": [
+        1.15,
+        1.51,
+        1.75
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.78,
+          1.31,
+          1.59
+        ],
+        "channel": "L",
+        "gainDb": 2,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R",
+        "position": [
+          0.78,
+          1.31,
+          1.59
+        ],
+        "channel": "R",
+        "gainDb": 2,
+        "type": "small",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -0.81,
+          -0.52,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          0.81,
+          -0.52,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.76,
+          -0.11,
+          -0.98
+        ],
+        "channel": "L",
+        "gainDb": 2,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.76,
+          -0.11,
+          -0.98
+        ],
+        "channel": "R",
+        "gainDb": 2,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s7",
+        "name": "Subwoofer",
+        "position": [
+          0.11,
+          -0.71,
+          1.44
+        ],
+        "channel": "M",
+        "gainDb": 0,
+        "type": "sub",
+        "pair": null
+      }
+    ]
+  }
+}

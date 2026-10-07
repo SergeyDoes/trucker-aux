@@ -1,8 +1,8 @@
 {
   "truckerAuxPreset": 1,
-  "name": "Volvo VNL 440",
+  "name": "ATS › Volvo › Volvo VNL › hook 1.7 m",
   "vehicle": "vehicle.volvo.vnl2025@1.7",
-  "vehicleName": "Volvo VNL 440",
+  "vehicleName": "Volvo VNL",
   "game": "ats",
   "brand": "volvo",
   "brandName": "Volvo",
@@ -10,14 +10,14 @@
     "width": 1,
     "bounds": {
       "min": [
-        -0.84,
+        -0.83,
         -0.92,
-        -0.81
+        -1.02
       ],
       "max": [
-        0.84,
+        0.83,
         0.95,
-        0.9
+        0.98
       ]
     },
     "speakers": [
@@ -49,37 +49,37 @@
       },
       {
         "id": "s3",
-        "name": "Small full range L",
+        "name": "Tweeter L",
         "position": [
-          -0.53,
-          -0.1,
-          -0.69
+          -0.71,
+          -0.2,
+          -0.97
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "small",
+        "type": "tweeter",
         "pair": "s4"
       },
       {
         "id": "s4",
-        "name": "Small full range R",
+        "name": "Tweeter R",
         "position": [
-          0.53,
-          -0.1,
-          -0.69
+          0.71,
+          -0.2,
+          -0.97
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "small",
+        "type": "tweeter",
         "pair": "s3"
       },
       {
         "id": "s5",
         "name": "Full range L",
         "position": [
-          -0.74,
-          0.1,
-          0.74
+          -0.41,
+          0,
+          0.95
         ],
         "channel": "L",
         "gainDb": 0,
@@ -90,9 +90,9 @@
         "id": "s6",
         "name": "Full range R",
         "position": [
-          0.74,
-          0.1,
-          0.74
+          0.41,
+          0,
+          0.95
         ],
         "channel": "R",
         "gainDb": 0,

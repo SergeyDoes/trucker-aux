@@ -73,9 +73,11 @@ Player ─► virtual cable                          Game audio ─────�
   - click a key to play and edit it; editing a key that inherits gives it a copy of its
     own;
   - drag presets from key to key; right-click for more;
-  - a model driven for the first time, with nothing set for it, gets its own copy at
-    once on this chassis, labelled "new"; another chassis of the model plays it until you
-    edit it there, which gives that chassis its own;
+  - a chassis driven for the first time without a preset of its own gets one at once,
+    labelled "new": a copy of another chassis's preset of the model, or, for a model new to
+    the app, of what it would inherit;
+  - models of a brand the game names alike (Freightliner Cascadia 2019 and 2024) get the
+    year from their id;
   - presets on no key wait under "Unused presets".
 - **Labels:** a short coloured tag per preset, shown beside its keys in the tree.
 - **Shared presets:**

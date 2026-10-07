@@ -4,6 +4,8 @@
 // ticked [{ scope, key }] (scope null: on no key), or null when cancelled.
 // map: presetTree(...); checked: the ids ticked at first (a key's scope, or "~" + preset key);
 // check(picks): exportFiles(...) for what is ticked, for the notes under the tree.
+import { labelBadge } from './badge.js';
+
 const el = (tag, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
@@ -69,7 +71,7 @@ export function chooseExport({ map, checked, check }) {
   };
   const badge = (own) => {
     const text = own.label || (own.default ? 'default' : own.file ? 'shared file' : 'preset');
-    return el('span', { className: `reg-badge${own.label ? ` tag-${own.labelColor}` : own.default ? ' tag-gray' : ''}`, textContent: text });
+    return labelBadge(text, `reg-badge${own.label ? ` tag-${own.labelColor}` : own.default ? ' tag-gray' : ''}`);
   };
 
   function row(node) {
@@ -103,7 +105,7 @@ export function chooseExport({ map, checked, check }) {
       ...unused.map((p) => el('label', { className: `reg-row export-pick${p.file ? ' file' : ''}`, title: p.file ? 'A shared file' : '' }, [
         box([`~${p.key}`]),
         el('span', { className: 'reg-name', textContent: p.name }),
-        ...(p.label ? [el('span', { className: `reg-badge tag-${p.labelColor ?? 'blue'}`, textContent: p.label })] : []),
+        ...(p.label ? [labelBadge(p.label, `reg-badge tag-${p.labelColor ?? 'blue'}`)] : []),
       ])),
     ] : []));
     const picks = [...items].filter(([id]) => ticked.has(id)).map(([, item]) => item);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewModel, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
+  adoptNewChassis, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -539,6 +539,55 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
   assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
 });
 
+test('presetTree: ▶ also on another chassis whose preset or file plays', () => {
+  // Yours on the 3.2 m chassis plays in the 2.1 m one.
+  const sibling = presetTree(storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } }), SHORT);
+  assert.deepEqual(lines(sibling.root).slice(3), [
+    '      ● International 9900i (Default layout)',
+    '        ● hook 2.1 m (Default layout)',
+    '        ▶ hook 3.2 m = Sleeper',
+  ]);
+  // A shared file (a default) for the 3.2 m chassis plays in the 2.1 m one.
+  const file = presetTree(withCollection(storeWith(), SLEEPER_FILE), SHORT);
+  assert.ok(lines(file.root).includes('        ▶ hook 3.2 m = sleeper (file)'));
+  // Not in Auto: no ▶.
+  const picked = presetTree(storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } }), SHORT, { mode: 'scope', scope: 'all' });
+  assert.ok(!lines(picked.root).some((l) => l.includes('▶')));
+});
+
+test('model names: models of a brand the game names alike get the year from their id', () => {
+  const C19 = { key: 'vehicle.freightliner.cascadia2019', name: 'Freightliner Cascadia', game: 'ats', brand: 'freightliner', brandName: 'Freightliner', variant: '2.0' };
+  const C24 = { ...C19, key: 'vehicle.freightliner.cascadia2024', variant: '2.7' };
+  const store = rememberVehicle(rememberVehicle(storeWith(), C19), C24);
+  assert.equal(scopeLabel(store, C19.key), 'Freightliner Cascadia 2019');
+  assert.equal(scopeLabel(store, variantKey(C24)), 'Freightliner Cascadia 2024, hook 2.7 m');
+  assert.equal(truckStatus(store, AUTO, C24).truck, 'Freightliner Cascadia 2024 · hook 2.7 m');
+  const tree = lines(presetTree(store, C24).root);
+  assert.ok(tree.includes('      ● Freightliner Cascadia 2024 (Default layout)'));
+  assert.ok(tree.includes('      Freightliner Cascadia 2019 (Default layout)'));
+  // A new chassis's preset is named with it.
+  const adopted = adoptNewChassis(store, C24);
+  assert.equal(at(adopted, variantKey(C24)).name, 'ATS › Freightliner › Freightliner Cascadia 2024 › hook 2.7 m');
+  // A file keeps the game's name: the app tells the twins apart when it shows them.
+  const picks = [{ scope: variantKey(C24), key: adopted.assignments[variantKey(C24)] }];
+  assert.equal(exportFiles(adopted, picks).files[0].data.vehicleName, 'Freightliner Cascadia');
+  // Alone, a model keeps the game's name; one already ending with the year is not given it twice.
+  assert.equal(scopeLabel(rememberVehicle(storeWith(), C24), C24.key), 'Freightliner Cascadia');
+  const named = rememberVehicle(rememberVehicle(storeWith(), { ...C19, name: 'Cascadia 2019' }), { ...C24, name: 'Cascadia 2019' });
+  assert.equal(scopeLabel(named, C19.key), 'Cascadia 2019');
+});
+
+test('model names: a shared file\'s vehicleName before your preset\'s name, never a key path', () => {
+  const PINNACLE = 'vehicle.mack.pinnacle';
+  // Never driven here: your preset on its key named the way the app names them.
+  const store = storeWith({ [PINNACLE]: { name: 'ATS › Mack › Mack Pinnacle' } });
+  assert.equal(scopeLabel(store, PINNACLE), 'Mack Pinnacle');
+  // Copies are named by the path, so the path does not grow ("ATS › Mack › ATS › Mack › …").
+  assert.equal(scopeLabel(storeWith({ [PINNACLE]: { name: 'My Mack' } }), PINNACLE), 'My Mack');
+  const file = withCollection(storeWith({ [PINNACLE]: { name: 'My Mack' } }), shared('pin.json', `${PINNACLE}@2.6`, { vehicleName: 'Mack Pinnacle' }));
+  assert.equal(scopeLabel(file, PINNACLE), 'Mack Pinnacle');
+});
+
 test('planAssign: one of your presets put at a key of the map', () => {
   const store = withPreset();
   const plan = planAssign(store, 'p.1', TRUCK.key);
@@ -606,9 +655,10 @@ test('a shared file may say the game and brand of its vehicle: the map places it
   assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
 });
 
-test('adoptNewModel: a model seen without a key of its own gets a copy of what it would inherit, on its chassis', () => {
+test('adoptNewChassis: a chassis seen without a preset of its own gets a copy of what it would play', () => {
   const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
-  const adopted = adoptNewModel(store, SLEEPER);
+  // A model new to the app: a copy of what it would inherit, on this chassis.
+  const adopted = adoptNewChassis(store, SLEEPER);
   const chassis32 = variantKey(SLEEPER);
   assert.equal(adopted.assignments[chassis32], 'p.3');
   assert.equal(adopted.assignments[TRUCK.key], undefined); // not the model's: each chassis gets its own
@@ -617,20 +667,35 @@ test('adoptNewModel: a model seen without a key of its own gets a copy of what i
   assert.equal(at(adopted, chassis32).label, 'new'); // stands out in the tree until labelled
   assert.equal(at(adopted, chassis32).labelColor, 'green');
   assert.notEqual(at(adopted, chassis32).speakers, store.presets['p.2'].speakers);
-  // Another chassis of the model has a key of the model now: it plays that chassis's preset
-  // until it is edited, which gives it a copy of its own.
-  assert.equal(adoptNewModel(adopted, SHORT), adopted);
-  assert.equal(autoPreset(adopted, SHORT).how, 'sibling');
+  // Another chassis of the model: a copy of that chassis's preset at once, so nothing plays
+  // from another chassis. Labelled "new" too, not with the other chassis's label.
+  const chassis21 = variantKey(SHORT);
+  const labelled = editLayout(adopted, AUTO, SLEEPER, (l) => ({ ...l, label: 'sleeper', labelColor: 'blue' }));
+  const second = adoptNewChassis(labelled, SHORT);
+  assert.notEqual(second.assignments[chassis21], second.assignments[chassis32]);
+  assert.equal(at(second, chassis21).name, 'ATS › International › International 9900i › hook 2.1 m');
+  assert.equal(at(second, chassis21).width, 0.4); // the 3.2 m chassis's
+  assert.deepEqual([at(second, chassis21).label, at(second, chassis21).labelColor], ['new', 'green']);
+  assert.equal(autoPreset(second, SHORT).how, 'chassis');
+  assert.equal(adoptNewChassis(second, SHORT), second); // it has its own now
+  // A shared file (a default) for another chassis: copied too.
+  const fromFile = adoptNewChassis(withCollection(storeWith(), SLEEPER_FILE), SHORT);
+  assert.equal(at(fromFile, chassis21).name, 'ATS › International › International 9900i › hook 2.1 m');
+  assert.equal(at(fromFile, chassis21).width, 0.8); // the file's
+  assert.equal(at(fromFile, chassis21).label, 'new');
   // The game reports no chassis: the model gets it.
-  assert.equal(at(adoptNewModel(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
-  // A key for a chassis or a vehicle of the model, or a shared file for it: nothing new.
-  const chassis = storeWith({ [variantKey(SHORT)]: { name: 'Day cab' } });
-  assert.equal(adoptNewModel(chassis, SLEEPER), chassis);
+  assert.equal(at(adoptNewChassis(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
+  // Its own plays, or the model's (yours or a shared file for the model), or a vehicle of the
+  // model has a key: nothing new.
+  const own = storeWith({ [chassis21]: { name: 'Day cab' } });
+  assert.equal(adoptNewChassis(own, SHORT), own);
+  const model = storeWith({ [TRUCK.key]: { name: 'Model' } });
+  assert.equal(adoptNewChassis(model, SHORT), model);
+  const modelFile = withCollection(storeWith(), MODEL_FILE);
+  assert.equal(adoptNewChassis(modelFile, SHORT), modelFile);
   const plate = storeWith({ [plateKey(OWNED)]: { name: 'Mine' } });
-  assert.equal(adoptNewModel(plate, SHORT), plate);
-  const file = withCollection(storeWith(), SLEEPER_FILE);
-  assert.equal(adoptNewModel(file, SHORT), file);
-  assert.equal(adoptNewModel(store, null), store);
+  assert.equal(adoptNewChassis(plate, SHORT), plate);
+  assert.equal(adoptNewChassis(store, null), store);
 });
 
 test('a key picked in the map: it plays what it has or inherits; editing gives it its own first', () => {

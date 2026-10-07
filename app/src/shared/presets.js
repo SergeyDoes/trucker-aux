@@ -299,18 +299,24 @@ export function deletePreset(store, key) {
 
 export const NEW_LABEL = 'new';
 
-// A model seen for the first time without a key of its own (none for the model, its chassis
-// or its vehicles, and no shared file for it) gets one for this chassis (the model when the
-// game reports no chassis): a copy of what it would inherit (the brand's, the game's or all
-// vehicles' preset), named after the key. From then on it has its own preset to tune, and
-// wider presets serve as templates. On the chassis, not the model: another chassis of the
-// model plays this one's until it is edited, which gives it a copy of its own, and neither
-// falls back to the model. The same store when the model has a key.
-export function adoptNewModel(store, truck) {
+// A chassis seen without a preset of its own gets one (the model gets it when the game reports
+// no chassis), so what plays in it is its own to tune:
+// - a model new to the app (no key for the model, its chassis or its vehicles, and no shared
+//   file for it): a copy of what it would inherit, the brand's, the game's or all vehicles'
+//   preset, which serve as templates;
+// - another chassis of a model you have a chassis preset or file for: a copy of the one Auto
+//   would play from another chassis, so nothing plays from another chassis.
+// Named after the key and labelled "new", not with another chassis's label. On the chassis, not
+// the model, so no chassis falls back to the model. The same store when its own plays, or the
+// model's (yours or a shared file for the model), or a vehicle of the model has a key.
+export function adoptNewChassis(store, truck) {
   if (!truck) return store;
-  const ofModel = (scope) => modelOf(scope) === truck.key && levelOf(scope) !== 'brand' && levelOf(scope) !== 'game' && scope !== ALL_SCOPE;
-  if (Object.keys(store.assignments).some(ofModel)) return store;
-  if (Object.values(store.collection ?? {}).some((e) => e.vehicle && modelOf(e.vehicle) === truck.key)) return store;
+  const how = autoPreset(store, truck)?.how;
+  if (how !== 'sibling' && how !== 'collectionSibling') {
+    const ofModel = (scope) => modelOf(scope) === truck.key && levelOf(scope) !== 'brand' && levelOf(scope) !== 'game' && scope !== ALL_SCOPE;
+    if (Object.keys(store.assignments).some(ofModel)) return store;
+    if (Object.values(store.collection ?? {}).some((e) => e.vehicle && modelOf(e.vehicle) === truck.key)) return store;
+  }
   const { layout } = resolvePlaying(store, { mode: 'auto' }, truck);
   const key = freePresetKey(store.presets);
   const scope = variantKey(truck);
@@ -348,15 +354,42 @@ export function rememberVehicle(store, truck) {
 
 const GAME_NAMES = { ats: 'ATS', ets2: 'ETS2' };
 
-// A model's name: what the game said, else the name of your preset for the model, else a
-// shared file's vehicleName, else its id made readable ("vehicle.peterbilt.389" -> "peterbilt 389").
+// A model's name: what the game said, else a shared file's vehicleName, else the name of your
+// preset for the model (the last part when it is a key's path, as the app names copies: else
+// the path would grow with each copy), else its id made readable ("vehicle.peterbilt.389" ->
+// "peterbilt 389"). The game gives some models of a brand one name (Freightliner Cascadia 2019
+// and 2024 are both "Freightliner Cascadia"): such twins get the year from their id, else the
+// id's last part.
 function modelName(store, model, truck) {
-  if (truck?.key === model) return truck.name;
-  const own = store.presets[store.assignments[model]];
-  const file = Object.values(store.collection ?? {}).find((e) => e.vehicle && modelOf(e.vehicle) === model && e.vehicleName);
-  return store.vehicles?.[model]?.name ?? own?.name ?? file?.vehicleName ?? readableId(model);
+  const name = givenName(store, model, truck);
+  const place = placeOf(store, model, truck);
+  const twin = knownModels(store, truck).some((other) => {
+    if (other === model || brandIdOf(other) !== brandIdOf(model)) return false;
+    const { game } = placeOf(store, other, truck);
+    return (!game || !place.game || game === place.game) && givenName(store, other, truck) === name;
+  });
+  if (!twin) return name;
+  const tag = model.match(/(\d{4})$/)?.[1] ?? model.slice(model.lastIndexOf('.') + 1);
+  return name.endsWith(tag) ? name : `${name} ${tag}`;
 }
 
+function givenName(store, model, truck) {
+  if (truck?.key === model && truck.name) return truck.name;
+  if (store.vehicles?.[model]?.name) return store.vehicles[model].name;
+  const file = Object.values(store.collection ?? {}).find((e) => e.vehicle && modelOf(e.vehicle) === model && e.vehicleName);
+  if (file) return file.vehicleName;
+  const own = store.presets[store.assignments[model]]?.name;
+  return own ? own.split(' › ').at(-1) : readableId(model);
+}
+
+// The models the store knows: driven, with a key, or with a shared file; and the one in the game.
+function knownModels(store, truck) {
+  const scopes = [...Object.keys(store.vehicles ?? {}), ...Object.keys(store.assignments), ...Object.values(store.collection ?? {}).map((e) => e.vehicle)];
+  const models = scopes.filter((s) => s && s !== ALL_SCOPE && !s.startsWith('game:') && !s.startsWith('brand:')).map(modelOf);
+  return [...new Set(truck ? [...models, truck.key] : models)];
+}
+
+const brandIdOf = (model) => model.split('.')[1] ?? '';
 const readableId = (model) => model.replace(/^vehicle\./, '').replace(/[._]/g, ' ');
 
 function brandName(store, game, brand, truck) {
@@ -399,9 +432,9 @@ function displayName(store, key, truck = null) {
 // What a preset picked in the list applies to by itself.
 function scopeOfKey(store, key, truck) {
   if (isCollectionKey(key)) {
-    const { vehicle, vehicleName } = store.collection[key];
+    const { vehicle } = store.collection[key];
     if (!vehicle) return 'only where it is chosen';
-    const name = vehicleName ?? modelName(store, modelOf(vehicle), truck);
+    const name = modelName(store, modelOf(vehicle), truck);
     return levelOf(vehicle) === 'chassis' ? `${name} on the hook ${vehicle.slice(vehicle.indexOf('@') + 1)} m chassis` : `all ${name}`;
   }
   const scopes = scopesOf(store, key);
@@ -412,7 +445,7 @@ function scopeOfKey(store, key, truck) {
 const EVERY = 'every vehicle without its own preset';
 // Picking a key or a preset stops following the vehicle in the game; this goes back.
 const BACK_TO_AUTO = { action: 'auto', label: 'Back to Auto' };
-const chassisScope = (truck) => (truck.variant ? `all ${truck.name} on this chassis` : `all ${truck.name}`);
+const chassisScope = (name, truck) => (truck.variant ? `all ${name} on this chassis` : `all ${name}`);
 
 // Where a model belongs: { game, brand }, as the game said (the vehicle in it, or when it
 // was driven), else as a shared file for it says. Null parts are not known: no guesses.
@@ -484,10 +517,11 @@ export function planMove(store, from, to, truck = null) {
 export function scopeLadder(store, truck) {
   const brand = brandKey(truck);
   const game = gameKey(truck);
+  const name = modelName(store, truck.key, truck);
   return [
     truck.plate && !truck.quickJob && ['vehicle', plateKey(truck), `this vehicle (${truck.plate})`],
     truck.variant && ['chassis', chassisKey(truck), `this chassis (hook ${truck.variant} m)`],
-    ['model', truck.key, truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`],
+    ['model', truck.key, truck.variant ? `all chassis of ${name}` : `all ${name}`],
     brand && ['brand', brand, scopeLabel(store, brand, truck)],
     game && ['game', game, scopeLabel(store, game, truck)],
     ['all', ALL_SCOPE, 'all vehicles'],
@@ -606,7 +640,7 @@ function nameFor(store, scope, truck) {
 export function truckStatus(store, selection, truck) {
   const playing = resolvePlaying(store, selection, truck);
   const base = {
-    truck: truck ? [truck.name, truck.variant && `hook ${truck.variant} m`, truck.plate].filter(Boolean).join(' · ') : 'no vehicle in the game',
+    truck: truck ? [modelName(store, truck.key, truck), truck.variant && `hook ${truck.variant} m`, truck.plate].filter(Boolean).join(' · ') : 'no vehicle in the game',
     plays: displayName(store, playing.key, truck),
     appliesTo: EVERY,
     note: null,
@@ -645,11 +679,12 @@ export function truckStatus(store, selection, truck) {
   if (!truck) return base;
   const auto = autoPreset(store, truck);
   const from = currentScope(store, selection, truck);
+  const name = modelName(store, truck.key, truck);
   const FROM = {
-    sibling: `another chassis of ${truck.name}`,
-    collectionChassis: `${chassisScope(truck)}, from the collection`,
-    collectionModel: `${truck.variant ? `all chassis of ${truck.name}` : `all ${truck.name}`}, from the collection`,
-    collectionSibling: `another chassis of ${truck.name}, from the collection`,
+    sibling: `another chassis of ${name}`,
+    collectionChassis: `${chassisScope(name, truck)}, from the collection`,
+    collectionModel: `${truck.variant ? `all chassis of ${name}` : `all ${name}`}, from the collection`,
+    collectionSibling: `another chassis of ${name}, from the collection`,
   };
   const appliesTo = from ? scopeLadder(store, truck).find((r) => r.scope === from).label : FROM[auto?.how] ?? `${scopeLabel(store, auto.scope, truck)}, from the collection`;
   const scope = from
@@ -657,7 +692,7 @@ export function truckStatus(store, selection, truck) {
     : { value: '', options: [{ value: '', label: appliesTo }, ...rungOptions(playing.key)] };
   const owns = ownsEdits(auto, truck);
   const file = isCollectionKey(auto.key) ? store.collection[auto.key].file : null;
-  const copy = truck.variant ? 'copy for this chassis' : `preset for ${truck.name}`;
+  const copy = truck.variant ? 'copy for this chassis' : `preset for ${name}`;
   let editNote = null;
   if (file) editNote = `From the collection: ${file}. Editing makes your own ${copy} first.`;
   else if (!owns) editNote = `Editing makes a ${copy} first.`;
@@ -753,7 +788,8 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   for (const r of ladder) scopes.add(r.scope);
   const chain = new Set(truck ? ladder.map((r) => r.scope) : [ALL_SCOPE]);
   const auto = truck && selection.mode === 'auto' ? autoPreset(store, truck) : null;
-  const playsAt = auto && chain.has(auto.scope) ? auto.scope : null;
+  // Off the chain too: another chassis of the model, whose preset or file plays in this one.
+  const playsAt = auto ? auto.scope : null;
 
   const nodes = new Map();
   const node = (scope, label, parent) => {
@@ -847,7 +883,8 @@ function placeOfScope(store, vehicle, truck) {
   }
   if (level === 'game') return { game: vehicle.slice(5) };
   const { game, brand } = placeOf(store, modelOf(vehicle), truck);
-  const name = modelName(store, modelOf(vehicle), truck);
+  // The game's name, not the year modelName gives twins: the app tells them apart itself.
+  const name = givenName(store, modelOf(vehicle), truck);
   return {
     vehicleName: name !== readableId(modelOf(vehicle)) ? name : null, // an id is no name
     game,

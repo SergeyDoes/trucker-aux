@@ -3,6 +3,8 @@
 // overrides what it would inherit, as a prefab override in Unity); a shared file's says
 // "shared file"; the others inherit. Click a key to play and edit what it has; right-click
 // for its menu; drag a key's preset onto another key to move it (Ctrl: set it there as well).
+import { labelBadge } from './badge.js';
+
 const el = (tag, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
@@ -201,7 +203,7 @@ export function createKeyTree(root, actions) {
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
-      ...(badge ? [el('span', { className: `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`, textContent: badge })] : []),
+      ...(badge ? [labelBadge(badge, `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`)] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
@@ -245,7 +247,7 @@ export function createKeyTree(root, actions) {
   // (not a shared file: those are files), right-click for its menu.
   function unusedItem(p, file) {
     const name = el('span', { textContent: p.name });
-    const tag = p.label ? [el('span', { className: `reg-badge tag-${p.labelColor ?? 'blue'}`, textContent: p.label })] : [];
+    const tag = p.label ? [labelBadge(p.label, `reg-badge tag-${p.labelColor ?? 'blue'}`)] : [];
     const item = el('div', { className: `reg-loose${file ? ' file' : ''}`, tabIndex: 0, title: file ? `${p.default ? 'A default' : 'A shared file'} for no vehicle` : 'Click to play; drag onto a key' }, [name, ...tag]);
     dragSource(item, { from: null, key: p.key, file });
     const rename = () => {
