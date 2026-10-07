@@ -42,6 +42,12 @@ export function createOverview(root) {
   gaze.rotation.x = -Math.PI / 2; // the cone points along +Y; turn it to -Z (forward)
   gaze.position.z = -0.19;
   head.add(gaze);
+  // The ears, left blue and right red as the channels: a tilt of the head (roll) shows in them.
+  for (const [side, x] of [['L', -1], ['R', 1]]) {
+    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshStandardMaterial({ color: COLORS[side] }));
+    ear.position.x = x * 0.1;
+    head.add(ear);
+  }
   scene.add(head);
 
   // The same shapes as the 2D glyphs: octahedron (diamond) tweeter, triangular

@@ -71,6 +71,14 @@ export function withTurnLook(pose, turns) {
   return turns ? { ...pose, head: { ...pose.head, heading: pose.head.heading + turns } } : pose;
 }
 
+// The listener's ears stay level in the cab: the game's camera (and head.offset) leans against
+// the cab while the cab sways, and tilted ears move the speakers above and below them sideways,
+// a centred one most audibly. A seated driver leans with the cab. Heading, pitch and the head's
+// place stay.
+export function levelHead(pose) {
+  return pose?.head?.roll ? { ...pose, head: { ...pose.head, roll: 0 } } : pose;
+}
+
 // While the game is paused the head stays where it was in the game: the last head heard
 // before the pause, whatever the camera or the telemetry say meanwhile (the pause menu may
 // show another camera, the camera block may go stale). Without such a head (paused from the

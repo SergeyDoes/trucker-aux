@@ -148,6 +148,14 @@ Recorded with `tools/camera_probe.py` (the ETS2LA plugin's `Local\ETS2LACameraPr
 - **Look toward the blinker: 20° left, 40° right**, not the 30° / 45° guessed by eye. The camera turns there at a steady speed, about 80°/s (20° in 0.24 s, 40° in 0.48 s, the same coming back), not easing exponentially. A right-hand-drive cab is not measured: Trucker AUX takes its limits as mirrored, 20° toward the driver's side (right) and 40° across (left).
 - **Outside cameras get no turn look:** steering full left and right on the chase camera (6.0–6.3 m from the head) left its yaw at 0. The app adds the turn look whatever the camera (E3).
 
+## The cab camera's roll (2026-10-07)
+
+Recorded 90 s at 10 Hz (scs-telemetry beside `trucker_aux_camera.dll`), ATS, Freightliner Cascadia 2019 at 23–28 m/s on a curvy road, the mouse still (`head.offset` heading 0, pitch −3°, roll 0 throughout); the truck's roll −2.2…+0.4°, the cab's on its suspension ±0.6°.
+
+- **Pitch:** the camera's world pitch follows the truck's exactly (correlation 1.0): the SDK's pitch convention is the app's.
+- **Roll:** the camera rolls the same way as the truck (correlation 0.997; with the truck's roll taken the other way the camera's roll in the cab comes out three times as large), so the convention is right too. But it follows only about half: camera roll = 0.51 × truck roll + 0.03 × cab roll; near 0 (|truck roll| < 0.5°) about 0.3. Against the cab the view so leans the other way by about half the truck's roll and the whole cab sway, up to 1.3° here, and less for small rolls: the sound wandered between the ears with it. The app keeps the listener's ears level in the cab (`levelHead`).
+- **Heading:** the view's heading in the cab moved ±1.1° with the truck's yaw rate (0.12 s × the rate, up to 8°/s): the game's look into turns (75 % then) at the small steering of a highway curve.
+
 ## The game's cameras by index (2026-10-06)
 
 `tools/camera_block.py` with `trucker_aux_camera.dll` in ATS 1.61, a truck standing still, the keys 1…9 and 0 pressed in turn (the camera manager's `current_camera`; the distance is from the cab camera):

@@ -28,7 +28,7 @@ import {
   cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
 } from '../shared/camera.js';
 import {
-  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg,
+  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
 } from '../shared/pose.js';
 
@@ -51,6 +51,7 @@ const state = {
   view: { source: null }, // the game camera's view (shared/camera.js), when trucker_aux_camera.dll runs
   cameraFallback: false, // seen in the game without the camera: the Game camera settings are shown
   heard: null,      // the pose the engine and the views were given last
+  roll: 0,          // the head's roll against the cab, in turns: shown, not heard (levelHead)
   picked: EMPTY,   // selected speakers { ids, primary } (state.selection is the preset choice)
   loudnessDb: null, // the playing layout's loudness-matching trim, once measured
   clipboard: [],   // copied speakers, kept across presets for this session
@@ -848,7 +849,7 @@ function statusText() {
   const head = (state.heard ?? pose).head;
   const lookNote = Math.round(state.turn * 360) ? ` (turn look ${turnsToDeg(state.turn).toFixed(0)}°)` : '';
   const cameraNote = state.view.source ? ` · camera: ${state.view.source}` : '';
-  return `${name} · yaw ${turnsToDeg(head.heading).toFixed(0)}°${lookNote} · pitch ${turnsToDeg(head.pitch).toFixed(0)}°${cameraNote}${muted}`;
+  return `${name} · yaw ${turnsToDeg(head.heading).toFixed(0)}°${lookNote} · pitch ${turnsToDeg(head.pitch).toFixed(0)}° · roll ${turnsToDeg(state.roll).toFixed(0)}°${cameraNote}${muted}`;
 }
 
 let lastStatus = 0;
@@ -922,6 +923,8 @@ window.aux.onPose((pose) => {
     heard = withTurnLook(pose, state.turn);
   }
   heard = holdPause(heard); // paused: the head stays where it was in the game
+  state.roll = heard?.head?.roll ?? 0;
+  if (view.source !== 'free') heard = levelHead(heard); // the ears level in the cab; the free camera's are its own
   state.heard = heard;
   audio?.engine.setPose(heard, headX);
   applySilence();

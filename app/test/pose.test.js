@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
+  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
 } from '../src/shared/pose.js';
 
 test('pluginWarning: an scs-telemetry revision the offsets were not made for', () => {
@@ -83,6 +83,14 @@ test('ramp: moves toward the target at a steady speed; the first value and a lon
   near(ramp(deg(-20), 2000), deg(-20)); // after a gap of over a second
   const first = createRamp(80);
   near(first(deg(20), 100), deg(20)); // the first value is taken as it is
+});
+
+test('levelHead: the ears stay level in the cab; heading, pitch and position stay', () => {
+  const pose = { sdkActive: true, head: { x: 0.1, y: 0.02, z: -0.03, heading: deg(20), pitch: deg(-3), roll: deg(4) } };
+  assert.deepEqual(levelHead(pose).head, { x: 0.1, y: 0.02, z: -0.03, heading: deg(20), pitch: deg(-3), roll: 0 });
+  const level = { ...pose, head: { ...pose.head, roll: 0 } };
+  assert.equal(levelHead(level), level);
+  assert.equal(levelHead(null), null);
 });
 
 test('pause hold: while paused the head stays where it was in the game', () => {
