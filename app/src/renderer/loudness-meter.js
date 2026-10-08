@@ -18,7 +18,7 @@ export async function measureLoudness(layout, headX, { trimDb = 0 } = {}) {
   const shelf = new BiquadFilterNode(ctx, { type: 'highshelf', frequency: 1682, gain: 4 });
   const lowCut = new BiquadFilterNode(ctx, { type: 'highpass', frequency: 38, Q: 20 * Math.log10(0.5) });
   shelf.connect(lowCut).connect(ctx.destination);
-  const engine = createEngine(ctx, shelf);
+  const engine = createEngine(ctx, shelf, { limiter: false });
   engine.sync(forMeasuring(layout));
   engine.setPose(null, headX);
   engine.setTrim(10 ** (trimDb / 20));

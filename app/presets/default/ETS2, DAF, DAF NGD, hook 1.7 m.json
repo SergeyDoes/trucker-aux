@@ -1,0 +1,78 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › DAF › DAF NGD › hook 1.7 m",
+  "vehicle": "vehicle.daf.2021@1.7",
+  "vehicleName": "DAF NGD",
+  "game": "ets2",
+  "brand": "daf",
+  "brandName": "DAF",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.1,
+        -0.92,
+        -1.06
+      ],
+      "max": [
+        1.1,
+        0.82,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midrange L",
+        "position": [
+          -0.87,
+          0.39,
+          -0.57
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midrange R",
+        "position": [
+          0.87,
+          0.39,
+          -0.57
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L 2",
+        "position": [
+          -0.99,
+          -0.4,
+          -0.92
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R 2",
+        "position": [
+          0.99,
+          -0.4,
+          -0.92
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s3"
+      }
+    ]
+  }
+}

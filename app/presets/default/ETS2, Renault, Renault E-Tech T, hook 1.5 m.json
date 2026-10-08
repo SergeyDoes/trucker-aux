@@ -1,22 +1,21 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ATS › Freightliner › Freightliner Cascadia 2019",
-  "vehicle": "vehicle.freightliner.cascadia2019",
-  "vehicleName": "Freightliner Cascadia 2019",
-  "game": "ats",
-  "brand": "freightliner",
-  "brandName": "Freightliner",
+  "name": "ETS2 › Renault › Renault E-Tech T › hook 1.5 m",
+  "vehicle": "vehicle.renault.etech_t@1.5",
+  "vehicleName": "Renault E-Tech T",
+  "game": "ets2",
+  "brand": "renault",
+  "brandName": "Renault",
   "layout": {
-    "label": "2019",
     "width": 1,
     "bounds": {
       "min": [
-        -0.96,
-        -1.15,
-        -1.3
+        -0.97,
+        -0.92,
+        -0.81
       ],
       "max": [
-        0.96,
+        0.97,
         0.95,
         0.6
       ]
@@ -24,37 +23,37 @@
     "speakers": [
       {
         "id": "s1",
-        "name": "Small full range L",
+        "name": "Midbass L",
         "position": [
-          -0.9,
-          -0.51,
-          -0.53
+          -0.92,
+          -0.83,
+          -0.6
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "small",
+        "type": "midbass",
         "pair": "s2"
       },
       {
         "id": "s2",
-        "name": "Small full range R",
+        "name": "Midbass R",
         "position": [
-          0.9,
-          -0.51,
-          -0.53
+          0.92,
+          -0.83,
+          -0.6
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "small",
+        "type": "midbass",
         "pair": "s1"
       },
       {
         "id": "s3",
         "name": "Tweeter L",
         "position": [
-          -0.91,
-          0,
-          -0.57
+          -0.99,
+          0.17,
+          -0.7
         ],
         "channel": "L",
         "gainDb": 0,
@@ -65,9 +64,9 @@
         "id": "s4",
         "name": "Tweeter R",
         "position": [
-          0.91,
-          0,
-          -0.57
+          0.99,
+          0.17,
+          -0.7
         ],
         "channel": "R",
         "gainDb": 0,
@@ -78,12 +77,12 @@
         "id": "s5",
         "name": "Full range L",
         "position": [
-          -0.76,
-          -0.15,
-          0.44
+          -0.44,
+          0.09,
+          0.77
         ],
         "channel": "L",
-        "gainDb": -21.5,
+        "gainDb": -3,
         "type": "full",
         "pair": "s6"
       },
@@ -91,27 +90,14 @@
         "id": "s6",
         "name": "Full range R",
         "position": [
-          0.76,
-          -0.15,
-          0.44
+          0.44,
+          0.09,
+          0.77
         ],
         "channel": "R",
-        "gainDb": -5,
+        "gainDb": -3,
         "type": "full",
         "pair": "s5"
-      },
-      {
-        "id": "s7",
-        "name": "Subwoofer",
-        "position": [
-          -0.42,
-          -0.35,
-          0.26
-        ],
-        "channel": "M",
-        "gainDb": 0,
-        "type": "sub",
-        "pair": null
       }
     ]
   }

@@ -1,0 +1,104 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › Volvo › Volvo FH5 › hook 1.9 m",
+  "vehicle": "vehicle.volvo.fh_2021@1.9",
+  "vehicleName": "Volvo FH5",
+  "game": "ets2",
+  "brand": "volvo",
+  "brandName": "Volvo",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -1.02,
+          -0.91,
+          -0.74
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          1.02,
+          -0.91,
+          -0.74
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Full range L",
+        "position": [
+          -0.81,
+          -0.02,
+          0.87
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Full range R",
+        "position": [
+          0.81,
+          -0.02,
+          0.87
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Tweeter L",
+        "position": [
+          -1.01,
+          -0.24,
+          -0.92
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Tweeter R",
+        "position": [
+          1.01,
+          -0.24,
+          -0.92
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s5"
+      }
+    ]
+  }
+}

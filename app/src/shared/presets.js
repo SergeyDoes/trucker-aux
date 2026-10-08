@@ -382,10 +382,11 @@ export function dropAlternate(store, scope, key) {
   return promoteWaiting({ ...store, assignments }, scope);
 }
 
-// A new variant on a key: a copy of what the key plays (or inherits), named by the key and
-// labelled "new"; it plays, the one that played waits.
-export function newAlternate(store, scope, truck = null) {
-  const layout = presetLayout(store, scopePreset(store, scope, truck).key);
+// A new variant on a key: a copy of `from` (what plays now, the menu's "copy current"), else of
+// what the key plays (or inherits), named by the key and labelled "new"; it plays, the one that
+// played waits.
+export function newAlternate(store, scope, truck = null, from = null) {
+  const layout = presetLayout(store, from ?? scopePreset(store, scope, truck).key);
   const key = freePresetKey(store.presets);
   const preset = { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' };
   const held = store.assignments[scope];

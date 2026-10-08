@@ -1,0 +1,78 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › Renault › Renault Premium › hook 1.6 m",
+  "vehicle": "vehicle.renault.premium@1.6",
+  "vehicleName": "Renault Premium",
+  "game": "ets2",
+  "brand": "renault",
+  "brandName": "Renault",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.99,
+        -0.92,
+        -0.89
+      ],
+      "max": [
+        0.99,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.68,
+          0.81,
+          -0.09
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.68,
+          0.81,
+          -0.09
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.93,
+          -0.2,
+          -0.85
+        ],
+        "channel": "L",
+        "gainDb": 3,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.93,
+          -0.2,
+          -0.85
+        ],
+        "channel": "R",
+        "gainDb": 3,
+        "type": "tweeter",
+        "pair": "s1"
+      }
+    ]
+  }
+}

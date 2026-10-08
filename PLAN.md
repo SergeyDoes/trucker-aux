@@ -351,6 +351,15 @@ Done: 173 unit tests pass; the ticker checked in a sandbox (the tree and Unused 
 Done: 176 unit tests and 17 engine checks pass; the slider checked in a sandbox (saved to settings.json).
 - Audio → Volume, 0–100 %, over everything (after the loudness trim and the mute gate, `engine.setVolume`). The slider's place is the setting (`volume`, 0..1 to the percent); `loudness.js perceptualGain` makes it a gain in even dB steps over 50 dB, the curve of discord/perceptual (MIT); 0 is silence.
 
+### E2.49 — defaults from the presets in use, with variants ✓
+- `app/presets/default/` is the user's 0.2.4 data exported (`scripts/export-store.mjs`, which now takes your variants on a key too): 42 presets (23 before). New: 17 ETS2 keys (DAF NGD, XD, XF; Iveco Stralis; MAN TGX Euro 6; Mercedes-Benz New Actros; Renault E-Tech T, Magnum, Premium; Scania R, S, S BEV, Streamline; Volvo FH4, FH5), Freightliner Cascadia 2019 on 2.7 m; the Kenworth W900 on 3.6 m as two variants (studio sleeper, sleeper); Peterbilt 389 retuned. The Cascadia 2019's `vehicleName` is the game's now, "Freightliner Cascadia 2019".
+
+### E2.48 — volume up to 200 %, with a limiter ✓
+Done: 185 unit tests and 18 engine checks pass.
+- The slider goes to 200 %: over 100 % up to +12 dB (`perceptualGain`'s boost, as discord/perceptual's; +6 dB was not enough).
+- A limiter after the volume (`DynamicsCompressorNode`, threshold −3 dB, ratio 20, knee 0): with loudness matching a quiet preset can be lifted 12 dB. Chromium's compressor adds a makeup gain of (1 − 1/ratio) × |threshold| × 0.6 dB (+0.57 dB at −1 dB, measured), taken off after it, so below the threshold the sound is as it was (0.000 dB in the engine check). At −1 dB a +12 dB boost still peaked at +0.17 dBFS; at −3 dB +12 dB stays at −1.7 dBFS and +18 dB (the slider's +12 with loudness matching's +6) at −1.3 dBFS. The loudness meter's engine has none.
+- The tree's menu: "Set the current preset here" only when that is not the key's already; the variants in a nested list (Variants ▸: the one that plays ticked, the others to play, "New variant (copy current)", a copy of what plays now); no divider at the end.
+
 ### E2.47 — variants on a key; "new" goes at the first edit ✓
 Spec: `docs/superpowers/specs/2026-10-08-key-variants-design.md`; plan: `docs/superpowers/plans/2026-10-08-key-variants.md`.
 Done: 185 unit tests and 17 engine checks pass; checked in a sandbox on a copy of the user's 0.2.3 presets with `tools/fake_shm.py --truck vehicle.kenworth.w900 --hook 3.6`: the card's Variant (sleeper, studio-sleeper, the default), "+2" in the tree, picking plays it.

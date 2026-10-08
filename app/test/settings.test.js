@@ -11,10 +11,11 @@ test('normalizeSettings: defaults', () => {
   });
 });
 
-test('normalizeSettings: the volume is a slider fraction 0..1, to the percent; full by default', () => {
+test('normalizeSettings: the volume is a slider fraction 0..2 (up to 200 %), to the percent; 100 % by default', () => {
   assert.equal(normalizeSettings({ volume: 0.456 }).volume, 0.46);
   assert.equal(normalizeSettings({ volume: 0 }).volume, 0);
-  assert.equal(normalizeSettings({ volume: 1.7 }).volume, 1);
+  assert.equal(normalizeSettings({ volume: 1.7 }).volume, 1.7);
+  assert.equal(normalizeSettings({ volume: 2.5 }).volume, 2);
   assert.equal(normalizeSettings({ volume: -0.2 }).volume, 0);
   assert.equal(normalizeSettings({ volume: 'loud' }).volume, 1);
 });

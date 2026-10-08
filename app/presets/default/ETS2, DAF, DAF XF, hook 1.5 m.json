@@ -1,0 +1,65 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › DAF › DAF XF › hook 1.5 m",
+  "vehicle": "vehicle.daf.xf_euro6@1.5",
+  "vehicleName": "DAF XF",
+  "game": "ets2",
+  "brand": "daf",
+  "brandName": "DAF",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.08,
+        -0.92,
+        -0.7
+      ],
+      "max": [
+        1.08,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.93,
+          0.16,
+          -0.42
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": null
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter L",
+        "position": [
+          -1.08,
+          -0.28,
+          -0.64
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s5"
+      },
+      {
+        "id": "s5",
+        "name": "Tweeter R",
+        "position": [
+          1.08,
+          -0.28,
+          -0.64
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      }
+    ]
+  }
+}

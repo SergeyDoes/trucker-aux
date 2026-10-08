@@ -7,46 +7,21 @@
   "brand": "kenworth",
   "brandName": "Kenworth",
   "layout": {
+    "label": "sleeper",
     "width": 1,
     "bounds": {
       "min": [
-        -0.74,
+        -0.87,
         -1.15,
         -0.73
       ],
       "max": [
-        0.74,
+        0.87,
         0.95,
         1.18
       ]
     },
     "speakers": [
-      {
-        "id": "s1",
-        "name": "Midbass L",
-        "position": [
-          -0.64,
-          -0.6,
-          -0.5
-        ],
-        "channel": "L",
-        "gainDb": 0,
-        "type": "midbass",
-        "pair": "s2"
-      },
-      {
-        "id": "s2",
-        "name": "Midbass R",
-        "position": [
-          0.64,
-          -0.6,
-          -0.5
-        ],
-        "channel": "R",
-        "gainDb": 0,
-        "type": "midbass",
-        "pair": "s1"
-      },
       {
         "id": "s3",
         "name": "Tweeter L",
@@ -85,6 +60,32 @@
         "gainDb": 4.5,
         "type": "sub",
         "pair": null
+      },
+      {
+        "id": "s6",
+        "name": "Midbass L 2",
+        "position": [
+          -0.79,
+          -0.33,
+          0
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s7"
+      },
+      {
+        "id": "s7",
+        "name": "Midbass R 2",
+        "position": [
+          0.79,
+          -0.33,
+          0
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
       }
     ]
   }

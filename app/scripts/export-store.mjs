@@ -1,6 +1,7 @@
 // Exports every key of a data folder's preset tree as preset files, as Export… with the whole
-// tree ticked does: a key's own preset, else its shared file or default. For making a build's
-// defaults from the presets you use: node scripts/export-store.mjs <data folder> <out folder>
+// tree ticked does: a key's own preset, else its shared file or default, and your variants on
+// it. For making a build's defaults from the presets you use:
+//   node scripts/export-store.mjs <data folder> <out folder>
 // (the data folder's layouts.json is only read; the collection is this app's presets/).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,6 +21,8 @@ const store = { ...normalizeStore(raw), collection: shared.collection };
 const picks = [];
 (function walk(node) {
   if (node.own && !node.pseudo) picks.push({ scope: node.scope, key: node.own.key });
+  // Your variants waiting on the key go too, a file each; the key's other files are there already.
+  for (const v of node.alternates ?? []) if (!v.file) picks.push({ scope: node.scope, key: v.key });
   node.children.forEach(walk);
 })(presetTree(store, null).root);
 

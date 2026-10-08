@@ -43,9 +43,9 @@ function noiseSource(ctx) {
 }
 
 // Renders 1 s; left/right are the frequencies fed into each input channel, or noise.
-async function render({ layout, left = [], right = [], noise = false, yawDeg = 0, headX = 0, setup, change }) {
+async function render({ layout, left = [], right = [], noise = false, yawDeg = 0, headX = 0, setup, change, limiter = true }) {
   const ctx = new OfflineAudioContext({ numberOfChannels: 2, length: RATE, sampleRate: RATE });
-  const engine = createEngine(ctx);
+  const engine = createEngine(ctx, ctx.destination, { limiter });
   const merger = new ChannelMergerNode(ctx, { numberOfInputs: 2 });
   for (const [channel, freqs] of [[0, left], [1, right]]) {
     for (const frequency of freqs) {
@@ -186,6 +186,15 @@ const checks = [
     const off = db(end(base, 500), end(silent, 500));
     const on = db(both(base, 500), both(back, 500));
     return [off >= 60 && Math.abs(on) <= 0.5, `silenced ${off.toFixed(1)} dB down, back within ${on.toFixed(2)} dB`];
+  }],
+  ['limiter: the sound as it is below the threshold; +18 dB (volume 200 %, loudness matching +6) held under 0 dBFS', async () => {
+    const quiet = (e) => e.setVolume(10 ** (-10 / 20));
+    const off = await render({ layout: PAIR, left: [500], right: [1500], setup: quiet, limiter: false });
+    const on = await render({ layout: PAIR, left: [500], right: [1500], setup: quiet });
+    const change = db(both(on, 500) + both(on, 1500), both(off, 500) + both(off, 1500));
+    const loud = await render({ layout: PAIR, left: [500], right: [1500], setup: (e) => e.setVolume(8) });
+    const peak = Math.max(...[loud.left, loud.right].map((x) => tail(x).reduce((m, v) => Math.max(m, Math.abs(v)), 0)));
+    return [Math.abs(change) <= 0.05 && peak <= 1, `below: ${change.toFixed(3)} dB; boosted: peak ${(20 * Math.log10(peak)).toFixed(2)} dBFS`];
   }],
   ['switching layouts mid-stream: no NaN, not silent', async () => {
     const next = { ...PAIR, speakers: [speaker('c', 'M', [0, 0, -1], 'tweeter'), speaker('d', 'M', [0, -0.5, 0], 'sub')] };

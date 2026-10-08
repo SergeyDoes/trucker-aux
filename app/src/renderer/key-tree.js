@@ -152,19 +152,36 @@ export function createKeyTree(root, actions) {
         run();
       },
     });
+    // A nested list beside its item, opened on hover or a click; to the left near the window's edge.
+    const submenu = (label, children) => {
+      const list = el('div', { className: 'reg-menu reg-submenu' }, children);
+      const wrap = el('div', { className: 'reg-sub-wrap' }, [el('button', { className: 'reg-sub', textContent: label }), list]);
+      const place = () => list.classList.toggle('left', wrap.getBoundingClientRect().right + (list.offsetWidth || 200) > window.innerWidth - 4);
+      wrap.onmouseenter = place;
+      wrap.firstChild.onclick = (e) => {
+        e.stopPropagation();
+        place();
+        wrap.classList.toggle('open');
+      };
+      return wrap;
+    };
     const items = [];
     if (!node.pseudo) {
-      items.push(
-        item('Set the current preset here', () => actions.assignCurrent(node.scope), node.own && node.own.key === map.currentKey),
-        item('Copy the current preset here', () => actions.copyCurrent(node.scope)),
-      );
-      for (const v of node.alternates) items.push(item(`Play variant: ${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key)));
-      items.push(item('New variant (a copy of what plays here)', () => actions.newVariant(node.scope)));
+      if (!(node.own && node.own.key === map.currentKey)) items.push(item('Set the current preset here', () => actions.assignCurrent(node.scope)));
+      items.push(item('Copy the current preset here', () => actions.copyCurrent(node.scope)));
+      // The key's variants (two cabs on one chassis): the one that plays ticked, the others play
+      // when picked; a new one is a copy of what plays now.
+      const variants = [...(node.own ? [{ ...node.own, active: true }] : []), ...node.alternates];
+      items.push(submenu('Variants', [
+        ...variants.map((v) => item(`${v.active ? '✓ ' : ''}${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key), v.active)),
+        ...(variants.length ? [el('hr')] : []),
+        item('New variant (copy current)', () => actions.newVariant(node.scope)),
+      ]));
       if (node.own && !node.own.file && node.scope !== 'all') {
         items.push(item(node.alternates.length ? 'Take this variant off' : 'Unassign', () => actions.unassignScope(node.scope)));
       }
       items.push(item('Export…', () => actions.exportPresets(node.scope)));
-      items.push(el('hr'));
+      if (node.children.length) items.push(el('hr'));
     }
     if (node.children.length) {
       items.push(item(expanded.has(node.scope) ? 'Collapse' : 'Expand', () => {

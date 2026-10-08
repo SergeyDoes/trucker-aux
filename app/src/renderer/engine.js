@@ -8,11 +8,14 @@ const RETIRE_MS = 200;    // a removed speaker fades out before it is disconnect
 const REF_DISTANCE = PANNER_REF_DISTANCE; // closer than this the level stops growing
 const MAKEUP = 1.7;       // restores the level of speakers ~0.86 m away with REF_DISTANCE 0.5
 const SILENCE_FADE = 0.1;  // time constant of muting when the truck is parked, s (-60 dB in ~0.7 s)
+const LIMIT_DB = -3;      // the limiter's threshold, dBFS
+const LIMIT_RATIO = 20;
 
 const monoBus = (ctx) => new GainNode(ctx, { channelCount: 1, channelCountMode: 'explicit' });
 
 // output: where the mix goes, the speakers (ctx.destination) or a meter.
-export function createEngine(ctx, output = ctx.destination) {
+// limiter: off for measuring loudness (loudness-meter.js), where it would flatten the noise.
+export function createEngine(ctx, output = ctx.destination, { limiter = true } = {}) {
   const input = new GainNode(ctx, { channelCount: 2, channelCountMode: 'explicit', channelInterpretation: 'speakers' });
   const split = new ChannelSplitterNode(ctx, { numberOfOutputs: 2 });
   input.connect(split);
@@ -30,7 +33,17 @@ export function createEngine(ctx, output = ctx.destination) {
   const master = new GainNode(ctx, { gain: MAKEUP });
   const gate = new GainNode(ctx, { gain: 1 }); // closed while the truck is parked
   const volume = new GainNode(ctx, { gain: 1 }); // the volume slider, over everything
-  master.connect(gate).connect(volume).connect(output);
+  master.connect(gate).connect(volume);
+  if (limiter) {
+    // Peaks held under 0 dBFS: the volume over 100 % (up to +12 dB) and loudness matching (up
+    // to +6 dB) can lift a quiet preset 18 dB. Below the threshold it passes the sound as it is: Chromium's compressor
+    // adds a makeup gain of (1 - 1/ratio) x |threshold| x 0.6 dB everywhere, taken off after.
+    const limit = new DynamicsCompressorNode(ctx, { threshold: LIMIT_DB, knee: 0, ratio: LIMIT_RATIO, attack: 0.003, release: 0.25 });
+    const makeupDb = (1 - 1 / LIMIT_RATIO) * -LIMIT_DB * 0.6;
+    volume.connect(limit).connect(new GainNode(ctx, { gain: 10 ** (-makeupDb / 20) })).connect(output);
+  } else {
+    volume.connect(output);
+  }
 
   const chains = new Map(); // speaker id -> { speaker, entry, nodes, level, panner }
   const muted = new Set();

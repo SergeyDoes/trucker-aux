@@ -117,6 +117,14 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-menu button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 4px 12px; font: inherit; color: inherit; }
 .reg-menu button:hover:not(:disabled) { background: #2f6fde33; }
 .reg-menu hr { border: 0; border-top: 1px solid #8884; margin: 4px 0; }
+/* A nested menu (the tree's Variants): beside its item on hover or a click, to the left near the edge. */
+.reg-sub-wrap { position: relative; }
+.reg-sub-wrap > .reg-submenu { display: none; position: absolute; top: -5px; left: 100%; }
+.reg-sub-wrap > .reg-submenu.left { left: auto; right: 100%; }
+.reg-sub-wrap:hover > .reg-submenu, .reg-sub-wrap.open > .reg-submenu { display: block; }
+.reg-menu .reg-sub::after { content: '▸'; float: right; margin-left: 16px; color: var(--dim); }
+.reg-sub-wrap:hover > .reg-sub { background: #2f6fde33; }
+.reg-menu button:disabled { color: inherit; opacity: 0.75; }
 .reg-tree, .reg-tree ul { list-style: none; margin: 0; padding: 0; }
 .reg-tree ul { padding-left: 14px; }
 .reg-row { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; white-space: nowrap; cursor: default; min-width: 0; }

@@ -82,7 +82,8 @@ Player ─► virtual cable                          Game audio ─────�
 - **Variants:** two cabs can share a hook (the Kenworth W900's sleeper and studio on
   3.6 m), so a key can hold several presets. One plays; the card's "Variant" picks
   another, which your own vehicle (by its plate) keeps for itself. The tree shows "+N"
-  beside the key; its menu plays a variant, makes a new one or takes one off. Dropping a
+  beside the key; its menu's Variants list plays one or makes a new one (a copy of what
+  plays), and the menu takes the playing one off. Dropping a
   preset on a key of yours can add it as a variant.
 - **Labels:** a short coloured tag per preset (up to 32 characters, a longer one than 16
   runs like a ticker), shown beside its keys in the tree. "new" marks a preset the app
@@ -102,8 +103,9 @@ Player ─► virtual cable                          Game audio ─────�
   game reports. The game's seat adjustment moves the listener too.
 - **Loudness matching:** a preset with many speakers is not louder than the default two
   doors. The trim is measured: K-weighted pink noise rendered through the engine.
-- **Volume:** a slider in Audio, over everything, in even steps of loudness (a 50 dB
-  range, as discord/perceptual does).
+- **Volume:** a slider in Audio, 0–200 %, over everything, in even steps of loudness (a
+  50 dB range up to 100 %, then up to +12 dB, as discord/perceptual does); a limiter keeps
+  the peaks under 0 dBFS.
 - **Like a car radio:**
   - "Mute when" mutes the music while the electrics (the default) or the engine are off;
   - "Pause behavior" sets what happens on pause: always active, always muted, or by

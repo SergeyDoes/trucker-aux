@@ -861,6 +861,10 @@ test('variants: a new one is a copy of what plays on the key, named by the key, 
   const fresh = newAlternate(storeWith(), CHASSIS, SLEEPER);
   assert.equal(at(fresh, CHASSIS).label, 'new');
   assert.equal(fresh.alternates, undefined);
+  // A copy of another preset (the menu's "copy current": what plays now).
+  const fromAll = newAlternate(store, CHASSIS, SLEEPER, 'p.1');
+  assert.deepEqual([at(fromAll, CHASSIS).width, at(fromAll, CHASSIS).speakers.length], [1, 2]);
+  assert.deepEqual(fromAll.alternates, { [CHASSIS]: ['p.2'] });
 });
 
 test('variants: shared files for one key are variants too; picking one sets it on the key', () => {

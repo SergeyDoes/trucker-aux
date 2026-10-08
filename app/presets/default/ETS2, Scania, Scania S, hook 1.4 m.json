@@ -1,0 +1,78 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › Scania › Scania S › hook 1.4 m",
+  "vehicle": "vehicle.scania.s_2016@1.4",
+  "vehicleName": "Scania S",
+  "game": "ets2",
+  "brand": "scania",
+  "brandName": "Scania",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.13,
+        -0.92,
+        -0.99
+      ],
+      "max": [
+        1.13,
+        0.73,
+        0.47
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -1.03,
+          -0.63,
+          -0.46
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          1.03,
+          -0.63,
+          -0.46
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.99,
+          -0.32,
+          -0.87
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.99,
+          -0.32,
+          -0.87
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      }
+    ]
+  }
+}

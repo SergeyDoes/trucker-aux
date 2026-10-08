@@ -1,0 +1,78 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › MAN › MAN TGX Euro 6 › hook 2.1 m",
+  "vehicle": "vehicle.man.tgx_euro6@2.1",
+  "vehicleName": "MAN TGX Euro 6",
+  "game": "ets2",
+  "brand": "man",
+  "brandName": "MAN",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.04,
+        -0.92,
+        -0.9
+      ],
+      "max": [
+        1.04,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -0.92,
+          -0.68,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          0.92,
+          -0.68,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s3",
+        "name": "Tweeter L 2",
+        "position": [
+          -0.97,
+          -0.09,
+          -0.83
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R 2",
+        "position": [
+          0.97,
+          -0.09,
+          -0.83
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      }
+    ]
+  }
+}

@@ -5,14 +5,16 @@ import {
 } from '../src/shared/loudness.js';
 import { defaultLayout } from '../src/shared/layout.js';
 
-test('perceptualGain: the volume slider over 50 dB, even steps in dB; 0 is silence', () => {
+test('perceptualGain: the volume slider over 50 dB up to 100 %, then up to +12 dB at 200 %; 0 is silence', () => {
   const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
   near(perceptualGain(1), 1);
   near(perceptualGain(0.5), 10 ** (-25 / 20));
   near(perceptualGain(0.8), 10 ** (-10 / 20));
   near(perceptualGain(0.5, 60), 10 ** (-30 / 20));
   assert.equal(perceptualGain(0), 0);
-  assert.equal(perceptualGain(1.5), 1); // no boost over full
+  near(perceptualGain(1.5), 10 ** (6 / 20));
+  near(perceptualGain(2), 10 ** (12 / 20));
+  near(perceptualGain(3), 10 ** (12 / 20)); // no more than 200 %
   assert.equal(perceptualGain(-1), 0);
 });
 

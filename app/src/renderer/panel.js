@@ -98,7 +98,7 @@ export function createPanel(root, actions, boundsRoot) {
   const pauseBehavior = el('select', {
     title: 'While the game is paused: keep playing, mute, or play while the vehicle is on, as "Mute when" says',
   });
-  const volume = el('input', { type: 'range', min: 0, max: 100, step: 1, title: 'The volume of Trucker AUX, over everything else' });
+  const volume = el('input', { type: 'range', min: 0, max: 200, step: 1, title: 'The volume of Trucker AUX, over everything else; over 100 % up to +12 dB, a limiter keeps it from clipping' });
   const volumeValue = el('span', { className: 'value' });
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });

@@ -1,0 +1,170 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Kenworth › Kenworth W900 › hook 3.6 m",
+  "vehicle": "vehicle.kenworth.w900@3.6",
+  "vehicleName": "Kenworth W900",
+  "game": "ats",
+  "brand": "kenworth",
+  "brandName": "Kenworth",
+  "layout": {
+    "label": "studio-sleeper",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.04,
+        -1.15,
+        -0.73
+      ],
+      "max": [
+        1.04,
+        0.95,
+        2.01
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.76,
+          -0.38,
+          -0.1
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.76,
+          -0.38,
+          -0.1
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Tweeter L",
+        "position": [
+          -0.55,
+          0.27,
+          -0.69
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R",
+        "position": [
+          0.55,
+          0.27,
+          -0.69
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Subwoofer",
+        "position": [
+          0,
+          -0.69,
+          0.61
+        ],
+        "channel": "M",
+        "gainDb": 4.5,
+        "type": "sub",
+        "pair": null
+      },
+      {
+        "id": "s6",
+        "name": "Tweeter L 2",
+        "position": [
+          -0.71,
+          0.26,
+          -0.43
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s7"
+      },
+      {
+        "id": "s7",
+        "name": "Tweeter R 2",
+        "position": [
+          0.71,
+          0.26,
+          -0.43
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s6"
+      },
+      {
+        "id": "s8",
+        "name": "Small full range L",
+        "position": [
+          -0.24,
+          0.86,
+          0.56
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s9"
+      },
+      {
+        "id": "s9",
+        "name": "Small full range R",
+        "position": [
+          0.24,
+          0.86,
+          0.56
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s8"
+      },
+      {
+        "id": "s10",
+        "name": "Midrange L 2",
+        "position": [
+          -0.82,
+          -0.05,
+          1.75
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s11"
+      },
+      {
+        "id": "s11",
+        "name": "Midrange R 2",
+        "position": [
+          0.82,
+          -0.05,
+          1.75
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s10"
+      }
+    ]
+  }
+}

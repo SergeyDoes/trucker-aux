@@ -517,8 +517,9 @@ const actions = {
   },
   newVariant(scope) {
     const before = speakerIds();
+    const current = playing().key;
     remember();
-    state.store = newAlternate(state.store, scope, state.truck);
+    state.store = newAlternate(state.store, scope, state.truck, current);
     afterScopeChange(before);
   },
   // A key clicked in the preset map: it plays what it has or inherits; editing gives it its own.
