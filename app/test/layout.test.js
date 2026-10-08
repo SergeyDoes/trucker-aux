@@ -107,6 +107,17 @@ test('normalizeStore keeps assignments to presets that exist and to shared files
   assert.equal(normalizeStore({ version: STORE_VERSION, assignments: { all: 'file:a.json' } }).assignments.all, 'p.1');
 });
 
+test('normalizeStore keeps the variants waiting on a key: presets that exist, not the playing one, once', () => {
+  const store = normalizeStore({
+    version: STORE_VERSION,
+    presets: { 'p.1': {}, 'p.2': {}, 'p.3': {}, 'p.4': {} },
+    assignments: { all: 'p.1', 'vehicle.x@3.6': 'p.2' },
+    alternates: { 'vehicle.x@3.6': ['p.3', 'p.2', 'gone', 'p.3', 'p.4', 7], 'vehicle.y': ['gone'], 'vehicle.z': 'p.3' },
+  });
+  assert.deepEqual(store.alternates, { 'vehicle.x@3.6': ['p.3', 'p.4'] });
+  assert.equal('alternates' in normalizeStore({ version: STORE_VERSION }), false);
+});
+
 test('normalizeStore converts version 2: each preset keyed by its scope becomes p.N assigned to it', () => {
   const store = normalizeStore({
     version: 2,

@@ -4,6 +4,7 @@
 // "shared file"; the others inherit. Click a key to play and edit what it has; right-click
 // for its menu; drag a key's preset onto another key to move it (Ctrl: set it there as well).
 import { labelBadge } from './badge.js';
+import { variantLabel } from '../shared/presets.js';
 
 const el = (tag, props = {}, children = []) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -157,7 +158,11 @@ export function createKeyTree(root, actions) {
         item('Set the current preset here', () => actions.assignCurrent(node.scope), node.own && node.own.key === map.currentKey),
         item('Copy the current preset here', () => actions.copyCurrent(node.scope)),
       );
-      if (node.own && !node.own.file && node.scope !== 'all') items.push(item('Unassign', () => actions.unassignScope(node.scope)));
+      for (const v of node.alternates) items.push(item(`Play variant: ${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key)));
+      items.push(item('New variant (a copy of what plays here)', () => actions.newVariant(node.scope)));
+      if (node.own && !node.own.file && node.scope !== 'all') {
+        items.push(item(node.alternates.length ? 'Take this variant off' : 'Unassign', () => actions.unassignScope(node.scope)));
+      }
       items.push(item('Export…', () => actions.exportPresets(node.scope)));
       items.push(el('hr'));
     }
@@ -204,6 +209,12 @@ export function createKeyTree(root, actions) {
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
       ...(badge ? [labelBadge(badge, `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`)] : []),
+      // Variants waiting on the key (two cabs on one chassis): how many, and which.
+      ...(node.alternates.length ? [el('span', {
+        className: 'reg-more',
+        textContent: `+${node.alternates.length}`,
+        title: `Variants: ${node.alternates.map(variantLabel).join(', ')} (right-click to play one; the card picks too)`,
+      })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));

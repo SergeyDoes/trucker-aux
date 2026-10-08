@@ -79,13 +79,20 @@ Player ─► virtual cable                          Game audio ─────�
   - models of a brand the game names alike (Freightliner Cascadia 2019 and 2024) get the
     year from their id;
   - presets on no key wait under "Unused presets".
-- **Labels:** a short coloured tag per preset, shown beside its keys in the tree.
+- **Variants:** two cabs can share a hook (the Kenworth W900's sleeper and studio on
+  3.6 m), so a key can hold several presets. One plays; the card's "Variant" picks
+  another, which your own vehicle (by its plate) keeps for itself. The tree shows "+N"
+  beside the key; its menu plays a variant, makes a new one or takes one off. Dropping a
+  preset on a key of yours can add it as a variant.
+- **Labels:** a short coloured tag per preset (up to 32 characters, a longer one than 16
+  runs like a ticker), shown beside its keys in the tree. "new" marks a preset the app
+  made and goes at its first edit.
 - **Shared presets:**
   - **Export…** saves presets ticked in a tree as files, one or a folder of them. The
     plates stay private: a vehicle's own preset goes out for its chassis;
-  - **Import…** makes preset files your presets, on the keys they are for, and asks
-    before replacing one of yours (yours then stays among the unused); a file keeps its
-    name and label;
+  - **Import…** makes preset files your presets, on the keys they are for; where one of
+    yours is, both stay as variants and it asks which plays; a file keeps its name and
+    label;
   - files dropped into `presets/` play without importing, after your own presets.
 - **Defaults:**
   - the presets that come with the app sit in `presets/default/`, under everything else;
@@ -95,6 +102,8 @@ Player ─► virtual cable                          Game audio ─────�
   game reports. The game's seat adjustment moves the listener too.
 - **Loudness matching:** a preset with many speakers is not louder than the default two
   doors. The trim is measured: K-weighted pink noise rendered through the engine.
+- **Volume:** a slider in Audio, over everything, in even steps of loudness (a 50 dB
+  range, as discord/perceptual does).
 - **Like a car radio:**
   - "Mute when" mutes the music while the electrics (the default) or the engine are off;
   - "Pause behavior" sets what happens on pause: always active, always muted, or by

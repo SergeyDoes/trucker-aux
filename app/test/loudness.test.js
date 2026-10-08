@@ -1,9 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_BOOST_DB, forMeasuring, pinkNoise, trimFromLevels,
+  MAX_BOOST_DB, forMeasuring, perceptualGain, pinkNoise, trimFromLevels,
 } from '../src/shared/loudness.js';
 import { defaultLayout } from '../src/shared/layout.js';
+
+test('perceptualGain: the volume slider over 50 dB, even steps in dB; 0 is silence', () => {
+  const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
+  near(perceptualGain(1), 1);
+  near(perceptualGain(0.5), 10 ** (-25 / 20));
+  near(perceptualGain(0.8), 10 ** (-10 / 20));
+  near(perceptualGain(0.5, 60), 10 ** (-30 / 20));
+  assert.equal(perceptualGain(0), 0);
+  assert.equal(perceptualGain(1.5), 1); // no boost over full
+  assert.equal(perceptualGain(-1), 0);
+});
 
 test('trimFromLevels: down by the difference, lifted at most 6 dB, nothing without a level', () => {
   assert.equal(trimFromLevels(-20, -15.2), -4.800000000000001);

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  adoptNewChassis, adoptPicked, allPresetKey, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
+  addAlternate, adoptNewChassis, adoptPicked, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
   levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -815,6 +815,123 @@ test('dropImportedDefaults: 0.1.1\'s copies of the defaults give way to them; ch
   assert.equal(normalizeStore(store).defaultsImported, true);
 });
 
+const CHASSIS = variantKey(SLEEPER);
+// p.2 the studio plays on the 3.2 m chassis, p.3 the sleeper waits on it.
+const twoCabs = () => addAlternate(storeWith({ [CHASSIS]: { name: 'Studio', label: 'studio' } }, [{ name: 'Sleeper' }]), CHASSIS, 'p.3');
+const nodeAt = (root, scope) => (function find(n) { return n.scope === scope ? n : n.children.map(find).find(Boolean); })(root);
+
+test('variants: a key holds one that plays and others that wait; picking one swaps them', () => {
+  const store = twoCabs();
+  assert.deepEqual(store.alternates, { [CHASSIS]: ['p.3'] });
+  assert.deepEqual(alternatesOf(store, CHASSIS).map((a) => [a.key, a.name, a.label, a.active]), [['p.2', 'Studio', 'studio', true], ['p.3', 'Sleeper', null, false]]);
+  assert.deepEqual(presetTree(store, null).unassigned, []); // it waits on the key, not among the unused
+  assert.deepEqual(nodeAt(presetTree(store, SLEEPER).root, CHASSIS).alternates.map((a) => a.key), ['p.3']);
+  const picked = pickAlternate(store, CHASSIS, 'p.3');
+  assert.equal(picked.assignments[CHASSIS], 'p.3');
+  assert.deepEqual(picked.alternates, { [CHASSIS]: ['p.2'] });
+  assert.equal(autoPreset(picked, SLEEPER).key, 'p.3');
+  assert.equal(pickAlternate(picked, CHASSIS, 'p.3'), picked); // it plays already
+  // The playing one, or one waiting already, is not added again.
+  assert.equal(addAlternate(store, CHASSIS, 'p.2'), store);
+  assert.equal(addAlternate(store, CHASSIS, 'p.3'), store);
+  // A deleted preset leaves the key's variants.
+  assert.equal(deletePreset(store, 'p.3').alternates, undefined);
+});
+
+test('variants: taking one off the key; the next one plays, the preset stays', () => {
+  const store = twoCabs();
+  const off = dropAlternate(store, CHASSIS, 'p.2'); // the one that plays
+  assert.equal(off.assignments[CHASSIS], 'p.3');
+  assert.equal(off.alternates, undefined);
+  assert.deepEqual(presetTree(off, null).unassigned.map((p) => p.key), ['p.2']);
+  const waiting = dropAlternate(store, CHASSIS, 'p.3');
+  assert.deepEqual([waiting.assignments[CHASSIS], waiting.alternates], ['p.2', undefined]);
+  assert.equal(dropAlternate(off, CHASSIS, 'p.3').assignments[CHASSIS], undefined); // the last one: the key is free
+});
+
+test('variants: a new one is a copy of what plays on the key, named by the key, labelled new; it plays', () => {
+  const store = storeWith({ [CHASSIS]: { name: 'Studio', label: 'studio', width: 0.7 } });
+  const next = newAlternate(store, CHASSIS, SLEEPER);
+  const key = next.assignments[CHASSIS];
+  assert.notEqual(key, 'p.2');
+  assert.equal(next.presets[key].name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.deepEqual([next.presets[key].label, next.presets[key].labelColor, next.presets[key].width], ['new', 'green', 0.7]);
+  assert.deepEqual(next.alternates, { [CHASSIS]: ['p.2'] });
+  // A key with nothing of its own: a copy of what it inherits, and nothing waits.
+  const fresh = newAlternate(storeWith(), CHASSIS, SLEEPER);
+  assert.equal(at(fresh, CHASSIS).label, 'new');
+  assert.equal(fresh.alternates, undefined);
+});
+
+test('variants: shared files for one key are variants too; picking one sets it on the key', () => {
+  const studio = shared('studio.json', CHASSIS);
+  const files = withCollection(storeWith(), SLEEPER_FILE, studio);
+  assert.deepEqual(alternatesOf(files, CHASSIS).map((a) => [a.key, a.file, a.active]), [['file:sleeper.json', true, true], ['file:studio.json', true, false]]);
+  const picked = pickAlternate(files, CHASSIS, 'file:studio.json');
+  assert.equal(picked.assignments[CHASSIS], 'file:studio.json');
+  assert.equal(picked.alternates, undefined); // a file needs no place: it is the key's by its vehicle
+  assert.equal(autoPreset(picked, SLEEPER).key, 'file:studio.json');
+  assert.deepEqual(alternatesOf(picked, CHASSIS).map((a) => [a.key, a.active]), [['file:studio.json', true], ['file:sleeper.json', false]]);
+  // Yours on the key plays before the files; picking a file keeps yours waiting.
+  const own = withCollection(storeWith({ [CHASSIS]: { name: 'Mine' } }), SLEEPER_FILE);
+  assert.deepEqual(alternatesOf(own, CHASSIS).map((a) => [a.key, a.active]), [['p.2', true], ['file:sleeper.json', false]]);
+  const toFile = pickAlternate(own, CHASSIS, 'file:sleeper.json');
+  assert.deepEqual([toFile.assignments[CHASSIS], toFile.alternates], ['file:sleeper.json', { [CHASSIS]: ['p.2'] }]);
+  assert.deepEqual(pickAlternate(toFile, CHASSIS, 'p.2').assignments[CHASSIS], 'p.2');
+  // A file with the same speakers as one of yours on the key (yours a copy of it) is no variant
+  // of its own; nor is all vehicles' file, which plays only when picked by hand.
+  const copied = withCollection(storeWith({ [CHASSIS]: { ...SLEEPER_FILE.layout, name: 'My copy' } }), SLEEPER_FILE);
+  assert.deepEqual(alternatesOf(copied, CHASSIS).map((a) => a.key), ['p.2']);
+  const allFile = withCollection(storeWith(), shared('everything.json', 'all'));
+  assert.deepEqual(alternatesOf(allFile, 'all').map((a) => a.key), ['p.1']);
+});
+
+test('variants: the card picks one; your own vehicle keeps its choice by its plate', () => {
+  const store = twoCabs();
+  assert.deepEqual(variantChoice(store, SLEEPER), { scope: CHASSIS, value: 'p.2', options: [{ value: 'p.2', label: 'studio' }, { value: 'p.3', label: 'Sleeper' }] });
+  assert.equal(variantChoice(storeWith({ [CHASSIS]: { name: 'Studio' } }), SLEEPER), null); // one is no choice
+  // A quick-job vehicle: the key's choice.
+  const lent = chooseVariant(store, LENT, 'p.3');
+  assert.deepEqual([lent.assignments[CHASSIS], lent.assignments[plateKey(LENT)]], ['p.3', undefined]);
+  // Your own vehicle: on its plate; the key keeps playing the studio for the others.
+  const own = chooseVariant(store, OWNED, 'p.3');
+  assert.deepEqual([own.assignments[plateKey(OWNED)], own.assignments[CHASSIS]], ['p.3', 'p.2']);
+  assert.equal(variantChoice(own, OWNED).value, 'p.3');
+  assert.equal(variantChoice(own, SLEEPER).value, 'p.2');
+  assert.equal(autoPreset(own, OWNED).key, 'p.3');
+  // Your vehicle with a preset of its own that is no variant: no choice offered.
+  assert.equal(variantChoice(assign(store, plateKey(OWNED), 'p.1'), OWNED), null);
+});
+
+test('applyScope: "Add as a variant" keeps what the key had waiting; a key a preset leaves plays its next variant', () => {
+  const store = twoCabs();
+  // Another preset put on the key as a variant: it plays, the studio waits beside the sleeper.
+  const spare = applyScope(store, planAssign(store, 'p.1', CHASSIS), SLEEPER, { variant: true });
+  assert.equal(spare.assignments[CHASSIS], 'p.1');
+  assert.deepEqual(spare.alternates[CHASSIS], ['p.3', 'p.2']);
+  // Without it, the studio leaves the key, as before; the sleeper still waits.
+  const replaced = applyScope(store, planAssign(store, 'p.1', CHASSIS), SLEEPER);
+  assert.deepEqual(replaced.alternates[CHASSIS], ['p.3']);
+  // The studio moved up to the model: the 3.2 m chassis plays the sleeper waiting there.
+  const moved = applyScope(store, planMove(store, CHASSIS, TRUCK.key, SLEEPER), SLEEPER);
+  assert.deepEqual([moved.assignments[TRUCK.key], moved.assignments[CHASSIS], moved.alternates], ['p.2', 'p.3', undefined]);
+});
+
+test('exportFiles: the variants of a key are a file each, for that key, and no clash', () => {
+  const { files, clashes } = exportFiles(twoCabs(), [{ scope: CHASSIS, key: 'p.2' }, { scope: CHASSIS, key: 'p.3' }]);
+  assert.deepEqual(files.map((f) => [f.data.name, f.data.vehicle]), [['Studio', CHASSIS], ['Sleeper', CHASSIS]]);
+  assert.deepEqual(clashes, []);
+});
+
+test('editLayout: a preset labelled "new" loses the label at its first edit, not at a label edit', () => {
+  const store = storeWith({ [variantKey(SHORT)]: { name: 'Fresh', label: 'new', labelColor: 'green' } });
+  const edited = at(editLayout(store, AUTO, SHORT, widen), variantKey(SHORT));
+  assert.deepEqual([edited.label, edited.labelColor, edited.width], [undefined, undefined, 1.5]);
+  assert.equal(at(editLayout(store, AUTO, SHORT, (l) => ({ ...l, label: 'day cab' })), variantKey(SHORT)).label, 'day cab');
+  assert.equal(at(editLayout(store, AUTO, SHORT, (l) => ({ ...l, labelColor: 'red' })), variantKey(SHORT)).label, 'new');
+  assert.equal(at(editLayout(store, AUTO, SHORT, (l) => ({ ...l })), variantKey(SHORT)).label, 'new'); // nothing changed
+});
+
 test('importPresets: files on their keys; a key of yours is replaced only when asked', () => {
   const file = (name, vehicle, width) => ({ ...shared(`${name}.json`, vehicle), key: null, name, layout: { ...defaultLayout(), name, width } });
   const store = rememberVehicle(storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } }), TRUCK);
@@ -822,13 +939,16 @@ test('importPresets: files on their keys; a key of yours is replaced only when a
   const chassis = file('Sleeper', variantKey(SLEEPER), 0.6);
   assert.deepEqual(importClashes(store, [model, chassis]), [{ scope: TRUCK.key, label: 'International 9900i', yours: 'Mine', theirs: 'Theirs' }]);
   const kept = importPresets(store, [model, chassis]);
-  assert.deepEqual([kept.placed, kept.unused, kept.same], [1, 1, 0]);
+  assert.deepEqual([kept.placed, kept.variants, kept.unused, kept.same], [1, 1, 0, 0]);
   assert.equal(at(kept.store, TRUCK.key).name, 'Mine');
   assert.equal(at(kept.store, variantKey(SLEEPER)).name, 'Sleeper');
-  assert.deepEqual(presetTree(kept.store, null).unassigned.map((p) => p.name), ['Theirs']);
+  // Theirs waits on the key as a variant, not among the unused.
+  assert.deepEqual(kept.store.alternates[TRUCK.key].map((k) => kept.store.presets[k].name), ['Theirs']);
+  assert.deepEqual(presetTree(kept.store, null).unassigned, []);
   const replaced = importPresets(store, [model], new Set([TRUCK.key]));
   assert.equal(at(replaced.store, TRUCK.key).name, 'Theirs');
-  assert.deepEqual(presetTree(replaced.store, null).unassigned.map((p) => p.name), ['Mine']); // yours stays, unused
+  assert.deepEqual(replaced.store.alternates[TRUCK.key], ['p.2']); // yours waits as a variant
+  assert.deepEqual(presetTree(replaced.store, null).unassigned, []);
   // The same layout as yours: no copy, no clash.
   const again = importPresets(kept.store, [chassis]);
   assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(kept.store.presets).length]);

@@ -5,6 +5,13 @@
 
 export const MAX_BOOST_DB = 6; // a sparse layout is lifted at most this much
 
+// The volume slider (0..1) as a gain: even steps in dB over rangeDb up to full, as the
+// curve of discord/perceptual (MIT) does, so the lower half is not all loud; 0 is silence.
+export function perceptualGain(fraction, rangeDb = 50) {
+  if (!(fraction > 0)) return 0;
+  return 10 ** ((Math.min(fraction, 1) * rangeDb - rangeDb) / 20);
+}
+
 // Trim in dB from the measured levels of the reference and of a layout.
 export function trimFromLevels(referenceDb, layoutDb) {
   if (!Number.isFinite(referenceDb) || !Number.isFinite(layoutDb)) return 0;

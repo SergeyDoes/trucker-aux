@@ -29,7 +29,8 @@ export function createEngine(ctx, output = ctx.destination) {
 
   const master = new GainNode(ctx, { gain: MAKEUP });
   const gate = new GainNode(ctx, { gain: 1 }); // closed while the truck is parked
-  master.connect(gate).connect(output);
+  const volume = new GainNode(ctx, { gain: 1 }); // the volume slider, over everything
+  master.connect(gate).connect(volume).connect(output);
 
   const chains = new Map(); // speaker id -> { speaker, entry, nodes, level, panner }
   const muted = new Set();
@@ -147,6 +148,11 @@ export function createEngine(ctx, output = ctx.destination) {
     gate.gain.setTargetAtTime(on ? 0 : 1, ctx.currentTime, SILENCE_FADE);
   }
 
+  // The volume slider's gain (loudness.js perceptualGain).
+  function setVolume(gain) {
+    volume.gain.setTargetAtTime(gain, ctx.currentTime, SMOOTH);
+  }
+
   setPose(null);
-  return { input, sync, setSolo, setMuted, setPose, setSilent, setTrim };
+  return { input, sync, setSolo, setMuted, setPose, setSilent, setTrim, setVolume };
 }

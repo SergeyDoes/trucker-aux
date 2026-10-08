@@ -11,9 +11,9 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptNewChassis, adoptPicked, allPresetKey, applyScope, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importPresets, keyPath, levelOf, parseSelection,
-  planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf, selectionValue, truckStatus,
-  unassign, variantKey,
+  adoptNewChassis, adoptPicked, allPresetKey, applyScope, chooseVariant, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importPresets, keyPath, levelOf,
+  newAlternate, parseSelection, pickAlternate, planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf,
+  selectionValue, truckStatus, unassign, variantChoice, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
@@ -22,7 +22,7 @@ import { branchIds, chooseExport, exportItems } from './export-dialog.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isSilenced } from '../shared/dsp.js';
-import { trimFromLevels } from '../shared/loudness.js';
+import { perceptualGain, trimFromLevels } from '../shared/loudness.js';
 import { measureLoudness } from './loudness-meter.js';
 import {
   cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
@@ -93,6 +93,10 @@ const LOUDNESS_DELAY_MS = 250;
 let reference = null; // the default layout's level, measured once
 let loudnessTimer = null;
 let loudnessRun = 0;
+
+function applyVolume() {
+  audio?.engine.setVolume(perceptualGain(state.settings.volume));
+}
 
 function applyTrim() {
   const on = state.settings.matchLoudness && state.loudnessDb !== null;
@@ -285,6 +289,7 @@ async function startAudio() {
   audio = { ctx, engine, stream, player };
   syncEngine();
   applyTrim(); // the last measured trim right away; syncEngine measures again
+  applyVolume();
   engine.setSolo(state.solo);
   for (const id of state.muted) engine.setMuted(id, true);
   engine.setPose(state.pose, headRestX(state.truck));
@@ -336,8 +341,11 @@ async function carryOut(plan, labelOf, name, inVehicle) {
   const { to } = plan;
   const truck = state.truck;
   const lines = [];
+  // A preset of yours there can stay on the key as a variant (two cabs on one chassis).
+  const asVariant = Boolean(plan.taken && !plan.taken.keeps && !plan.taken.key.startsWith('file:'));
   if (plan.taken) {
     lines.push(`"${plan.taken.name}" will no longer apply to ${labelOf(to)}.${plan.taken.keeps ? '' : ' It stays in the list, unassigned.'}`);
+    if (asVariant) lines.push(`Add as a variant: both stay on ${labelOf(to)}, this one plays and "${plan.taken.name}" waits; the card picks between them.`);
   }
   if (plan.outplayed) {
     const what = plan.outplayed.file ? `The collection's "${plan.outplayed.name}"` : `"${plan.outplayed.name}"`;
@@ -374,7 +382,11 @@ async function carryOut(plan, labelOf, name, inVehicle) {
       title,
       lines,
       checks,
-      buttons: [{ value: answer.button, label: copies ? 'Copy' : 'Move', primary: true }, { value: null, label: 'Cancel' }],
+      buttons: [
+        { value: answer.button, label: copies ? 'Copy' : 'Move', primary: true },
+        ...(asVariant ? [{ value: 'variant', label: 'Add as a variant' }] : []),
+        { value: null, label: 'Cancel' },
+      ],
     });
   }
   if (!answer) {
@@ -383,7 +395,8 @@ async function carryOut(plan, labelOf, name, inVehicle) {
   }
   const before = speakerIds();
   remember();
-  state.store = applyScope(state.store, plan, truck, { copy: answer.button === 'copy', clear: answer.checked });
+  const variant = answer.button === 'variant';
+  state.store = applyScope(state.store, plan, truck, { copy: variant ? copies : answer.button === 'copy', clear: answer.checked, variant });
   afterScopeChange(before);
   return true;
 }
@@ -418,6 +431,13 @@ const actions = {
   setTurnLook(patch) {
     state.settings = normalizeSettings({ ...state.settings, turnLook: { ...state.settings.turnLook, ...patch } });
     saveSettings();
+    render();
+  },
+  // fraction: the slider, 0..1. Saved when the slider is let go (save).
+  setVolume(fraction, save = true) {
+    state.settings = normalizeSettings({ ...state.settings, volume: fraction });
+    applyVolume();
+    if (save) saveSettings();
     render();
   },
   setMatchLoudness(on) {
@@ -478,6 +498,28 @@ const actions = {
   async useInScope(to) {
     if (await putAtScope(to)) state.selection = { mode: 'auto' };
     render();
+  },
+  // A variant picked on the card plays at once, back in Auto; your own vehicle keeps it by
+  // its plate (presets.js chooseVariant).
+  cardVariant(key) {
+    const before = speakerIds();
+    remember();
+    state.store = chooseVariant(state.store, state.truck, key);
+    state.selection = { mode: 'auto' };
+    afterScopeChange(before);
+  },
+  // The tree's menu: one of a key's variants plays there; a new one, a copy of what plays.
+  playVariant(scope, key) {
+    const before = speakerIds();
+    remember();
+    state.store = pickAlternate(state.store, scope, key);
+    afterScopeChange(before);
+  },
+  newVariant(scope) {
+    const before = speakerIds();
+    remember();
+    state.store = newAlternate(state.store, scope, state.truck);
+    afterScopeChange(before);
   },
   // A key clicked in the preset map: it plays what it has or inherits; editing gives it its own.
   selectScope(scope) {
@@ -616,8 +658,9 @@ const actions = {
     render();
   },
   // Import: preset files (main asks which) become your presets, each on the key its file
-  // says (importPresets). Keys that have a preset of yours are listed: the ticked ones get the
-  // file's, the others' file goes among the unused presets. Undo takes it all back.
+  // says (importPresets). Keys that have a preset of yours are listed: on the ticked ones the
+  // file's plays, on the others it waits; either way both stay on the key as variants. Undo
+  // takes it all back.
   async importPresets() {
     const result = await window.aux.importPresets();
     if (result.canceled) return;
@@ -627,7 +670,7 @@ const actions = {
     if (clashes.length) {
       const answer = await ask({
         title: `Import ${entries.length} preset(s)`,
-        lines: ['These keys have a preset of yours. Tick the ones to get the imported preset (yours stays among the unused presets); the others\' import goes among the unused presets.'],
+        lines: ['These keys have a preset of yours. Both stay on the key as variants, the card picks between them. Tick the keys where the imported one should play; on the others yours keeps playing.'],
         checks: clashes.map((c) => ({ value: c.scope, label: `${c.label}: ${c.yours} → ${c.theirs}`, checked: false })),
         buttons: [{ value: null, label: 'Cancel' }, { value: 'import', label: 'Import', primary: true }],
       });
@@ -638,7 +681,7 @@ const actions = {
     remember();
     const done = importPresets(state.store, entries, replace);
     state.store = done.store;
-    const parts = [`${done.placed} on their keys`, `${done.unused} among the unused`, ...(done.same ? [`${done.same} yours already`] : [])];
+    const parts = [`${done.placed} on their keys`, ...(done.variants ? [`${done.variants} as variants`] : []), `${done.unused} among the unused`, ...(done.same ? [`${done.same} yours already`] : [])];
     state.storeWarnings = [...warnings, ...(entries.length ? [`Imported ${entries.length} preset(s): ${parts.join(', ')}.`] : [])];
     afterScopeChange(before);
   },
@@ -806,9 +849,11 @@ function render() {
     cameraSource: state.view.source,
     cameraFallback: state.cameraFallback,
     pauseBehavior: state.settings.pauseBehavior,
+    volume: state.settings.volume,
     player: audio?.player ?? null,
     presets: presetOptions(state.store, state.truck, state.selection),
     card: truckStatus(state.store, state.selection, state.truck),
+    variant: variantChoice(state.store, state.truck),
     preset: selectionValue(state.selection),
     canDelete: current.kind === 'preset' && current.key !== allPresetKey(state.store), // all vehicles' preset and files stay
     canRename: current.kind === 'preset',

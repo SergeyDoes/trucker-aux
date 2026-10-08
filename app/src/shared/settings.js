@@ -46,5 +46,7 @@ export function normalizeSettings(raw) {
     // Trim every preset to the loudness of the default layout (loudness.js).
     matchLoudness: typeof src.matchLoudness === 'boolean' ? src.matchLoudness : true,
     turnLook: turnLookSettings(src.turnLook),
+    // The volume slider's place, 0..1 (to the percent); loudness.js perceptualGain makes it a gain.
+    volume: finite(src.volume) ? Math.round(Math.min(1, Math.max(0, src.volume)) * 100) / 100 : 1,
   };
 }

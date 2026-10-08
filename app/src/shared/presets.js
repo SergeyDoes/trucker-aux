@@ -170,15 +170,24 @@ export function editLayout(store, selection, truck, edit) {
   if (isCollectionKey(routed.key)) return store; // files are never changed: adoptPicked copies first
   const current = routed.store.presets[routed.key];
   if (!current) return store;
-  return { ...routed.store, presets: { ...routed.store.presets, [routed.key]: edit(current) } };
+  return { ...routed.store, presets: { ...routed.store.presets, [routed.key]: unlabelNew(current, edit(current)) } };
 }
 
-// Frees a scope; the preset stays. All vehicles always keeps one.
+// A preset labelled "new" (one the app made: adoptNewChassis, newAlternate) loses the label at
+// its first edit, so the tree tells what is still untouched; an edit of the label itself, or
+// no change, keeps it.
+function unlabelNew(before, after) {
+  if (before.label !== NEW_LABEL || after.label !== before.label || after.labelColor !== before.labelColor) return after;
+  if (JSON.stringify(after) === JSON.stringify(before)) return after;
+  const { label, labelColor, ...rest } = after;
+  return rest;
+}
+
+// Frees a scope; the preset stays. A variant waiting on the key plays next. All vehicles
+// always keeps one.
 export function unassign(store, scope) {
   if (scope === ALL_SCOPE || !store.assignments[scope]) return store;
-  const assignments = { ...store.assignments };
-  delete assignments[scope];
-  return { ...store, assignments };
+  return dropAlternate(store, scope, store.assignments[scope]);
 }
 
 // A copy of `layout` as a new unassigned preset; its name is the source's plus " copy".
@@ -224,7 +233,7 @@ const samePreset = (a, b) => sameLayout(a, b) && a.name === b.name
 // { store, placed, unused, same }: how many went on keys, among the unused, and were yours already.
 export function importPresets(store, entries, replace = new Set()) {
   let next = { ...store, assignments: { ...store.assignments } };
-  const counts = { placed: 0, unused: 0, same: 0 };
+  const counts = { placed: 0, variants: 0, unused: 0, same: 0 };
   for (const entry of [...entries].sort((a, b) => ((a.file ?? '') < (b.file ?? '') ? -1 : 1))) {
     let key = Object.keys(next.presets).find((k) => samePreset(next.presets[k], entry.layout));
     if (key) counts.same++;
@@ -233,7 +242,11 @@ export function importPresets(store, entries, replace = new Set()) {
     const held = scope && next.assignments[scope];
     if (scope && (!held || held === key || (entry.key && held === entry.key) || replace.has(scope))) {
       next.assignments[scope] = key;
+      if (held && held !== key) next = addAlternate(next, scope, held); // yours waits as a variant
       counts.placed++;
+    } else if (scope) {
+      next = addAlternate(next, scope, key);
+      counts.variants++;
     } else if (!Object.values(next.assignments).includes(key)) counts.unused++;
     if (entry.key) for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next.assignments[s] = key;
     next = learnPlace(next, entry);
@@ -294,7 +307,118 @@ export function deletePreset(store, key) {
   const presets = { ...store.presets };
   delete presets[key];
   const assignments = Object.fromEntries(Object.entries(store.assignments).filter(([, k]) => k !== key));
-  return { ...store, presets, assignments };
+  let next = { ...store, presets, assignments };
+  for (const [scope, keys] of Object.entries(store.alternates ?? {})) next = withWaiting(next, scope, keys.filter((k) => k !== key));
+  for (const scope of Object.keys(store.assignments)) next = promoteWaiting(next, scope);
+  return next;
+}
+
+// Variants on a key (docs/superpowers/specs/2026-10-08-key-variants-design.md): one plays, the
+// key's preset; presets of yours wait in store.alternates[scope]; the shared files for the key
+// are its variants too, the key's by their vehicle.
+const waitingOn = (store, scope) => store.alternates?.[scope] ?? [];
+
+// The store with scope's waiting variants set; an empty list, and an empty map, left out.
+function withWaiting(store, scope, keys) {
+  const alternates = { ...(store.alternates ?? {}) };
+  if (keys.length) alternates[scope] = keys;
+  else delete alternates[scope];
+  const { alternates: _, ...rest } = store;
+  return Object.keys(alternates).length ? { ...rest, alternates } : rest;
+}
+
+// A key that lost the preset it played plays the first variant waiting on it.
+function promoteWaiting(store, scope) {
+  const [next, ...rest] = waitingOn(store, scope);
+  if (store.assignments[scope] || !next) return store;
+  return withWaiting({ ...store, assignments: { ...store.assignments, [scope]: next } }, scope, rest);
+}
+
+// The variants of a key: [{ key, name, label, labelColor, file, default, active }], the one
+// that plays first (the key's preset, else its first shared file), then yours waiting, then
+// the key's other files: not one with the same speakers as one of yours there (yours is a copy
+// of it), nor all vehicles' files, which play only when picked by hand.
+export function alternatesOf(store, scope) {
+  const files = scope === ALL_SCOPE ? [] : sharedFiles(store).filter((e) => e.vehicle === scope);
+  const held = store.assignments[scope];
+  const playing = held && presetLayout(store, held) ? held : files[0]?.key ?? null;
+  const yours = [held, ...waitingOn(store, scope)].filter((k) => k && store.presets[k]).map((k) => store.presets[k]);
+  const copied = (e) => e.key !== playing && yours.some((l) => sameLayout(l, e.layout));
+  const keys = [...new Set([playing, ...waitingOn(store, scope), ...files.filter((e) => !copied(e)).map((e) => e.key)])];
+  return keys.filter((k) => k && presetLayout(store, k)).map((key) => {
+    const layout = presetLayout(store, key);
+    const file = isCollectionKey(key);
+    return {
+      key, name: holderName(store, key), label: layout.label ?? null, labelColor: layout.labelColor ?? 'blue',
+      file, default: Boolean(file && store.collection[key].default), active: key === playing,
+    };
+  });
+}
+
+// Plays one of a key's variants there; the one that played waits (a file needs no place).
+export function pickAlternate(store, scope, key) {
+  const variants = alternatesOf(store, scope);
+  if (!variants.some((v) => v.key === key) || variants.find((v) => v.active)?.key === key) return store;
+  const held = store.assignments[scope];
+  const waiting = waitingOn(store, scope).filter((k) => k !== key);
+  if (held && !isCollectionKey(held)) waiting.unshift(held);
+  return withWaiting({ ...store, assignments: { ...store.assignments, [scope]: key } }, scope, waiting);
+}
+
+// One of your presets waiting on a key as a variant (not the one that plays, not twice).
+export function addAlternate(store, scope, key) {
+  if (!store.presets[key] || store.assignments[scope] === key || waitingOn(store, scope).includes(key)) return store;
+  return withWaiting(store, scope, [...waitingOn(store, scope), key]);
+}
+
+// A variant taken off a key: one waiting just leaves; the one that plays leaves and the next
+// waiting one plays (all vehicles keeps its last). The preset stays.
+export function dropAlternate(store, scope, key) {
+  const waiting = waitingOn(store, scope);
+  if (waiting.includes(key)) return withWaiting(store, scope, waiting.filter((k) => k !== key));
+  if (store.assignments[scope] !== key || (scope === ALL_SCOPE && !waiting.length)) return store;
+  const assignments = { ...store.assignments };
+  delete assignments[scope];
+  return promoteWaiting({ ...store, assignments }, scope);
+}
+
+// A new variant on a key: a copy of what the key plays (or inherits), named by the key and
+// labelled "new"; it plays, the one that played waits.
+export function newAlternate(store, scope, truck = null) {
+  const layout = presetLayout(store, scopePreset(store, scope, truck).key);
+  const key = freePresetKey(store.presets);
+  const preset = { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' };
+  const held = store.assignments[scope];
+  const waiting = held && !isCollectionKey(held) ? [held, ...waitingOn(store, scope)] : waitingOn(store, scope);
+  return withWaiting({ ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [scope]: key } }, scope, waiting);
+}
+
+// A variant as the card and the tree's menu name it: its label, else its name; a file says so.
+export const variantLabel = (v) => `${v.label || v.name}${v.default ? ' (default)' : v.file ? ' (shared file)' : ''}`;
+
+// Your own vehicle's key (a plate, not a quick job), where its choice of a variant goes.
+const ownPlate = (truck) => (truck?.plate && !truck.quickJob ? plateKey(truck) : null);
+
+// The card's choice of the variants on the vehicle's chassis (the model without one):
+// { scope, value, options: [{ value, label }] }, or null under two, or when your vehicle has a
+// preset of its own that is none of them.
+export function variantChoice(store, truck) {
+  if (!truck) return null;
+  const scope = variantKey(truck);
+  const variants = alternatesOf(store, scope);
+  if (variants.length < 2) return null;
+  const plate = ownPlate(truck);
+  const onPlate = plate ? store.assignments[plate] : null;
+  if (onPlate && !variants.some((v) => v.key === onPlate)) return null;
+  return { scope, value: onPlate ?? variants.find((v) => v.active).key, options: variants.map((v) => ({ value: v.key, label: variantLabel(v) })) };
+}
+
+// A variant picked on the card: for your own vehicle it goes on "this vehicle", so the others
+// on the chassis keep theirs; else it plays on the chassis.
+export function chooseVariant(store, truck, key) {
+  const plate = ownPlate(truck);
+  if (plate) return { ...store, assignments: { ...store.assignments, [plate]: key } };
+  return pickAlternate(store, variantKey(truck), key);
 }
 
 export const NEW_LABEL = 'new';
@@ -592,7 +716,7 @@ export function planScope(store, selection, truck, to) {
 // Carries out a plan (planScope): copy (a move down kept where it was, or anything from a
 // file, another chassis or all vehicles) puts a copy at `to`; a move frees `from`; clear
 // frees those narrower scopes. Presets that lose a scope stay.
-export function applyScope(store, plan, truck, { copy = false, clear = [] } = {}) {
+export function applyScope(store, plan, truck, { copy = false, clear = [], variant = false } = {}) {
   let next = store;
   let key = plan.key;
   if (plan.mode === 'copy' || plan.mustCopy || copy || isCollectionKey(key)) {
@@ -601,10 +725,15 @@ export function applyScope(store, plan, truck, { copy = false, clear = [] } = {}
     next = { ...next, presets: { ...next.presets, [key]: { ...structuredClone(layout), name: nameFor(store, plan.to, truck) } } };
   }
   const assignments = { ...next.assignments };
+  const held = assignments[plan.to];
   if (plan.mode === 'move' && key === plan.key && plan.from !== ALL_SCOPE) delete assignments[plan.from];
   for (const scope of clear) if (scope !== ALL_SCOPE) delete assignments[scope];
   assignments[plan.to] = key;
-  return { ...next, assignments };
+  next = { ...next, assignments };
+  next = withWaiting(next, plan.to, waitingOn(next, plan.to).filter((k) => k !== key));
+  if (variant && held && held !== key) next = addAlternate(next, plan.to, held); // "Add as a variant"
+  for (const scope of [plan.from, ...clear]) if (scope) next = promoteWaiting(next, scope);
+  return next;
 }
 
 // A key's path as the tree shows it, without "All vehicles": "ATS › Kenworth › Kenworth T680
@@ -796,7 +925,8 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     if (!nodes.has(scope)) {
       const pseudo = scope.startsWith('?');
       nodes.set(scope, {
-        scope, label, pseudo, own: pseudo ? null : ownAt(scope), inherited: null, current: chain.has(scope), plays: scope === playsAt,
+        scope, label, pseudo, own: pseudo ? null : ownAt(scope), alternates: pseudo ? [] : alternatesOf(store, scope).filter((v) => !v.active),
+        inherited: null, current: chain.has(scope), plays: scope === playsAt,
         picked: selection.mode === 'scope' && selection.scope === scope, children: [], parent,
       });
     }
@@ -841,7 +971,7 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
     delete n.parent;
     return n;
   };
-  const used = new Set(Object.values(store.assignments));
+  const used = new Set([...Object.values(store.assignments), ...Object.values(store.alternates ?? {}).flat()]);
   return {
     root: finish(root, null),
     unassigned: Object.keys(store.presets).filter((k) => !used.has(k))
@@ -907,7 +1037,7 @@ export function exportFiles(store, picks, truck = null) {
     if (!layout) continue;
     const vehicle = shareScope(store, scope, truck);
     if (scope && levelOf(scope) === 'vehicle') plates++;
-    if (vehicle) targets.set(vehicle, (targets.get(vehicle) ?? 0) + 1);
+    if (vehicle) targets.set(vehicle, new Set([...(targets.get(vehicle) ?? []), scope]));
     const place = vehicle && vehicle !== ALL_SCOPE ? placeOfScope(store, vehicle, truck) : {};
     const author = isCollectionKey(key) ? store.collection[key].author : null;
     files.push({
@@ -915,7 +1045,7 @@ export function exportFiles(store, picks, truck = null) {
       data: presetFile({ name: layout.name, vehicle, author, ...place, layout }),
     });
   }
-  const clashes = [...targets].filter(([, n]) => n > 1).map(([vehicle]) => scopeLabel(store, vehicle, truck));
+  const clashes = [...targets].filter(([, scopes]) => scopes.size > 1).map(([vehicle]) => scopeLabel(store, vehicle, truck));
   return { files, clashes, plates };
 }
 

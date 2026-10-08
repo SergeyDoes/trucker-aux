@@ -193,7 +193,24 @@ function normalizeV3(src) {
     }
   }
   // Set by 0.1.1, which imported the shipped presets: presets.js dropImportedDefaults.
-  return { version: STORE_VERSION, presets, assignments, vehicles, ...(src.defaultsImported === true ? { defaultsImported: true } : {}) };
+  // Variants waiting on a key (presets.js alternatesOf): presets of yours that exist, not the
+  // one the key plays, each once. Left out when there are none.
+  const alternates = {};
+  if (src.alternates && typeof src.alternates === 'object') {
+    for (const [scope, keys] of Object.entries(src.alternates)) {
+      if (!scope || !Array.isArray(keys)) continue;
+      const kept = [...new Set(keys.filter((k) => typeof k === 'string' && presets[k] && k !== assignments[scope]))];
+      if (kept.length) alternates[scope] = kept;
+    }
+  }
+  return {
+    version: STORE_VERSION,
+    presets,
+    assignments,
+    ...(Object.keys(alternates).length ? { alternates } : {}),
+    vehicles,
+    ...(src.defaultsImported === true ? { defaultsImported: true } : {}),
+  };
 }
 
 const PRESET_KEY = /^p\.\d+$/;

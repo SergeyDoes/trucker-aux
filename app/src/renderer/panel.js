@@ -98,6 +98,8 @@ export function createPanel(root, actions, boundsRoot) {
   const pauseBehavior = el('select', {
     title: 'While the game is paused: keep playing, mute, or play while the vehicle is on, as "Mute when" says',
   });
+  const volume = el('input', { type: 'range', min: 0, max: 100, step: 1, title: 'The volume of Trucker AUX, over everything else' });
+  const volumeValue = el('span', { className: 'value' });
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });
   const turnLookPercent = el('input', {
@@ -121,9 +123,13 @@ export function createPanel(root, actions, boundsRoot) {
   const cardNote = el('p', { className: 'hint card-note' });
   const cardUseInLabel = el('span', { className: 'cab-label', textContent: 'Use it in' });
   const cardButtons = el('div', { className: 'inline buttons' });
+  // The variants on the vehicle's chassis (two cabs on one hook): presets.js variantChoice.
+  const cardVariantLabel = el('span', { className: 'cab-label', textContent: 'Variant' });
+  const cardVariant = el('select', { title: 'Which of the presets on this chassis plays: two cabs can share a hook. Your own vehicle keeps its choice' });
   const truckCard = el('div', { className: 'cab-card' }, [
     el('span', { className: 'cab-label', textContent: 'Vehicle' }), cardTruck,
     el('span', { className: 'cab-label', textContent: 'Plays' }), cardPlays,
+    cardVariantLabel, cardVariant,
     el('span', { className: 'cab-label', textContent: 'Applies to' }), cardScope,
     cardNote,
     cardUseInLabel, cardUseIn,
@@ -131,6 +137,7 @@ export function createPanel(root, actions, boundsRoot) {
   ]);
   cardScopeSelect.onchange = () => actions.moveToScope(cardScopeSelect.value);
   cardUseIn.onchange = () => actions.useInScope(cardUseIn.value);
+  cardVariant.onchange = () => actions.cardVariant(cardVariant.value);
   cardButtons.onclick = (event) => {
     const action = event.target.closest('button')?.dataset.action;
     if (action) actions.truckAction(action);
@@ -235,6 +242,7 @@ export function createPanel(root, actions, boundsRoot) {
       fileRow,
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
+      row('Volume', el('div', { className: 'inline' }, [volume, volumeValue])),
     ]),
     cameraForm,
     el('fieldset', {}, [
@@ -266,6 +274,8 @@ export function createPanel(root, actions, boundsRoot) {
   for (const radio of [sourceInput, sourceFile]) radio.onchange = () => actions.setSource(radio.value);
   muteWhen.onchange = () => actions.setMuteWhen(muteWhen.value);
   pauseBehavior.onchange = () => actions.setPauseBehavior(pauseBehavior.value);
+  volume.oninput = () => actions.setVolume(Number(volume.value) / 100, false);
+  volume.onchange = () => actions.setVolume(Number(volume.value) / 100);
   turnLookOn.onchange = () => actions.setTurnLook({ on: turnLookOn.checked });
   turnLookPercent.onchange = () => actions.setTurnLook({ percent: Number(turnLookPercent.value) });
   turnLookReverse.onchange = () => actions.setTurnLook({ reverse: turnLookReverse.value });
@@ -342,6 +352,8 @@ export function createPanel(root, actions, boundsRoot) {
     fileRow.hidden = view.source !== 'file';
     fillSelect(muteWhen, MUTE_OPTIONS, view.muteWhen);
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);
+    setValue(volume, Math.round(view.volume * 100));
+    volumeValue.textContent = `${Math.round(view.volume * 100)} %`;
     const look = view.turnLook;
     cameraForm.hidden = !view.cameraFallback;
     turnLookOn.checked = look.on;
@@ -356,6 +368,9 @@ export function createPanel(root, actions, boundsRoot) {
     const { card } = view;
     cardTruck.textContent = card.truck;
     cardPlays.textContent = card.plays;
+    cardVariantLabel.hidden = !view.variant;
+    cardVariant.hidden = !view.variant;
+    if (view.variant) fillSelect(cardVariant, view.variant.options, view.variant.value);
     cardScopeText.textContent = card.appliesTo;
     cardScopeText.hidden = Boolean(card.scope);
     cardScopeSelect.hidden = !card.scope;

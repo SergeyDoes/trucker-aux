@@ -19,6 +19,8 @@ export function exportItems(map) {
   const items = new Map();
   (function walk(node) {
     if (node.own) items.set(node.scope, { scope: node.scope, key: node.own.key });
+    // A key's variants waiting go with it, a file each for the same key.
+    for (const v of node.alternates ?? []) items.set(`${node.scope}+${v.key}`, { scope: node.scope, key: v.key });
     node.children.forEach(walk);
   })(map.root);
   for (const p of [...map.unassigned, ...map.files]) items.set(`~${p.key}`, { scope: null, key: p.key });
@@ -27,7 +29,8 @@ export function exportItems(map) {
 
 // The ids under a node (itself included).
 export function branchIds(node, keep = () => true) {
-  return [...(node.own && keep(node) ? [node.scope] : []), ...node.children.flatMap((c) => branchIds(c, keep))];
+  const own = node.own && keep(node) ? [node.scope, ...(node.alternates ?? []).map((v) => `${node.scope}+${v.key}`)] : [];
+  return [...own, ...node.children.flatMap((c) => branchIds(c, keep))];
 }
 
 export function chooseExport({ map, checked, check }) {

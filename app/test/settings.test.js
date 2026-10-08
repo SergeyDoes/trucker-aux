@@ -7,8 +7,16 @@ const TURN_LOOK_OFF = { on: false, percent: 100, reverse: 'off', blinkers: false
 test('normalizeSettings: defaults', () => {
   assert.deepEqual(normalizeSettings(undefined), {
     version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true,
-    turnLook: TURN_LOOK_OFF,
+    turnLook: TURN_LOOK_OFF, volume: 1,
   });
+});
+
+test('normalizeSettings: the volume is a slider fraction 0..1, to the percent; full by default', () => {
+  assert.equal(normalizeSettings({ volume: 0.456 }).volume, 0.46);
+  assert.equal(normalizeSettings({ volume: 0 }).volume, 0);
+  assert.equal(normalizeSettings({ volume: 1.7 }).volume, 1);
+  assert.equal(normalizeSettings({ volume: -0.2 }).volume, 0);
+  assert.equal(normalizeSettings({ volume: 'loud' }).volume, 1);
 });
 
 test('normalizeSettings keeps valid devices and drops junk', () => {
@@ -22,7 +30,7 @@ test('normalizeSettings keeps valid devices and drops junk', () => {
   });
   assert.deepEqual(settings, {
     version: 1, source: 'file', input: { id: 'cable', label: 'CABLE Output' }, output: null, muteWhen: 'engine', pauseBehavior: 'muted', matchLoudness: false,
-    turnLook: TURN_LOOK_OFF,
+    turnLook: TURN_LOOK_OFF, volume: 1,
   });
   assert.equal(normalizeSettings({ source: 'radio' }).source, 'input');
   assert.equal(normalizeSettings({ muteWhen: 'electric' }).muteWhen, 'electric');
