@@ -1,28 +1,6 @@
 # What is Trucker AUX
 
-A helper application that allows to simulate 3D speakers of the vehicle in ETS2/ATS and route any audio stream through virtual speakers according to in-game head position.
-
-<br>
-<br>
-
-## How it works
-
-```
-ATS/ETS2 ─► scs-telemetry.dll (RenCloud) ─► shared memory Local\SCSTelemetry
-                                                   │ read at ~100 Hz (koffi)
-┌──────────────────── Trucker AUX (Electron) ──────┼──────────────────────────┐
-│ main: head pose, data folder, IPC                ▼                          │
-│ input device ─(getUserMedia)─► AudioContext → M/S width                     │
-│                                 → per speaker: filter → level → HRTF ─────────► Main Output Device
-│                                 AudioListener ← head pose                   │
-│ panel: devices, presets, speakers                                           │
-└─────────────────────────────────────────────────────────────────────────────┘
-Player ─► Virtual Audio Input.                   Game Audio ────────────────────► Main Output Device
-```
-
-- Any content player (browser, Spotify, VLC) plays into a virtual cable. Trucker AUX records the cable's other end.
-- Each virtual speaker is a Web Audio HRTF panner placed according to the vehicle interior. The listener turns and moves with the driver's head, read from the game's telemetry (`head.offset`).
-- The game's own sound goes straight to the headphones, outside this chain.
+Trucker AUX allows to simulate spatial 3D speakers of the vehicle in ETS2/ATS and route any audio stream through virtual speakers according to in-game head position.
 
 <br>
 <br>
@@ -31,6 +9,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 
 - **Real head position:** The virtual speaker surround is synched with the in-game head position.
 - **Play any audio you want.** Anything that can play audio to selected device (Windows Mixer setting per application, Audio device per browser tab extensions, etc.)
+- **Works with ETS2 Local Radio:** the local stations of wherever you drive play from your cab speakers, see [Works with ETS2 Local Radio](#works-with-ets2-local-radio)
 - **Visual editor:** Drag speakers on a Top View and a Side View projections.
 - **Speaker types,** with Linkwitz–Riley crossovers that sum flat where two types meet:
 
@@ -61,15 +40,37 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 <br>
 <br>
 
+## How it works
+
+```
+ATS/ETS2 ─► scs-telemetry.dll (RenCloud) ─► shared memory Local\SCSTelemetry
+                                                   │ read at ~100 Hz (koffi)
+┌──────────────────── Trucker AUX (Electron) ──────┼──────────────────────────┐
+│ main: head pose, data folder, IPC                ▼                          │
+│ input device ─(getUserMedia)─► AudioContext → M/S width                     │
+│                                 → per speaker: filter → level → HRTF ─────────► Main Output Device
+│                                 AudioListener ← head pose                   │
+│ panel: devices, presets, speakers                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+Player ─► Virtual Audio Input.                   Game Audio ────────────────────► Main Output Device
+```
+
+- Any content player (browser, Spotify, VLC) plays into a virtual cable. Trucker AUX records the cable's other end.
+- Each virtual speaker is a Web Audio HRTF panner placed according to the vehicle interior. The listener turns and moves with the driver's head, read from the game's telemetry (`head.offset`).
+- The game's own sound goes straight to the headphones, outside this chain.
+
+<br>
+<br>
+
 ## Setup and Requirements
 
 - **Prerequisites**:
   - Windows 10 or 11 (Tested with it, but older ones may probably work too)
   - American Truck Simulator or Euro Truck Simulator 2.
   - Virtual Audio Device, any of the following will work:
-    - [Free] [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)
-    - [Paid] [Virtual Audio Cable](https://vac.muzychenko.net/en/)
-    - [Free] Steam Streaming Microphone&Speakers (Installs automatically when trying to start a Remote Play stream)
+    - \[Free\] [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)
+    - \[Paid\] [Virtual Audio Cable](https://vac.muzychenko.net/en/)
+    - \[Free\] Steam Streaming Microphone&Speakers (Installs automatically when trying to start a Remote Play stream)
   
   - Plain stereo headphones. Virtual surround (DTS Headphone:X, Windows Sonic, Dolby Atmos) would virtualize the binaural output a second time and may sound weird
 - **Setup**:
@@ -91,20 +92,29 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 <br>
 <br>
 
+## Works with ETS2 Local Radio
+
+[ETS2/ATS Local Radio](https://github.com/Koenvh1/ets2-local-radio) plays the local stations of wherever you drive, in a browser tab. Trucker AUX takes any sound from the cable, so the radio plays from your cab speakers too:
+  - Set up Local Radio according to its its README
+  - Route the browser with Local Radio tab to your *Virtual Input Device* (Windows Audio Mixer → the browser → Output device)
+    - Windows sends the whole browser there, other tabs too: open the radio tab in different browser, or use an extension that picks the audio device per tab if you want other tabs' sound to not being affected be Trucker AUX spatial
+
+<br>
+<br>
+
 ## Editing Presets
 
 - **Coordinates:**
-  - X goes right from the vehicle's centre line;
+  - X goes right from the vehicle's center line;
   - Y goes up and Z goes back, from the driver's default head;
   - There is no consistency in cabin positions, so it end up being the most handy way
 - **Bounds** only frame the views for placing speakers and don't affect the sound.
 - **Free camera (ingame developer option)** can be used to (kind of) precisely position speakers. New speakers are created at the current camera position if free camera is active.
-- **Shortcuts,** outside text fields://sheeesh we have shortcuts?
-  - arrows nudge the selected speakers, Shift+arrows by 10 cm;
-  - Delete removes them, Esc clears the selection;
+- **Shortcuts,** outside text fields:
+  - Arrows for moving selected speakers, Shift+arrows by 10 cm, no Y movement yet;
   - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate;
-  - Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes;
-  - F2 renames an unused preset.
+  - Undo/Redo supported;
+  - F2 to rename an unused preset.
 - **Data** is kept within the app folder, `%APPDATA%` is not being bloated:
   - `data/layouts.json`: your presets;
   - `data/settings.json`: devices and options;
@@ -146,10 +156,10 @@ Lately, I've started modding games I play just as an experiment to see how far I
 
 MIT, see [LICENSE](LICENSE). Third-party parts keep their own licenses:
 
-| part | license |
-|---|---|
-| scs-sdk-plugin and the SCS SDK headers in it | MIT |
-| ETS2LA game plugin (the camera pattern and offsets in `trucker_aux_camera.dll`) | MIT |
-| Electron | MIT |
-| three.js | MIT |
-| koffi | MIT |
+| part                                                                                      | license |
+| ----------------------------------------------------------------------------------------- | ------- |
+| scs-sdk-plugin and the SCS SDK headers in it                                              | MIT     |
+| ETS2LA game plugin (the camera pattern and offsets borrowed for `trucker_aux_camera.dll`) | MIT     |
+| Electron                                                                                  | MIT     |
+| three.js                                                                                  | MIT     |
+| koffi                                                                                     | MIT     |
