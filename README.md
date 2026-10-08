@@ -95,9 +95,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 ## Works with ETS2 Local Radio
 
 [ETS2/ATS Local Radio](https://github.com/Koenvh1/ets2-local-radio) plays the local stations of wherever you drive, in a browser tab. Trucker AUX takes any sound from the cable, so the radio plays from your cab speakers too:
-  - Set up Local Radio according to its its README
+  - Set up Local Radio according to its README
   - Route the browser with Local Radio tab to your *Virtual Input Device* (Windows Audio Mixer → the browser → Output device)
-    - Windows sends the whole browser there, other tabs too: open the radio tab in different browser, or use an extension that picks the audio device per tab if you want other tabs' sound to not being affected be Trucker AUX spatial
+    - Windows sends the whole browser there, other tabs too: open the radio tab in a different browser, or use an extension that picks the audio device per tab, if you want the other tabs' sound not to be affected by Trucker AUX spatial
 
 <br>
 <br>
