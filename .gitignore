@@ -8,3 +8,6 @@ app/data/
 
 # The camera plugin's build output (native/camera-plugin/build.cmd)
 native/camera-plugin/out/
+
+# Obsidian, when the repository is opened as a vault: its settings stay local
+.obsidian/
