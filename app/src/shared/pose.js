@@ -140,6 +140,14 @@ export function musicSilenced(pose, mode, inWorld = true, onPause = 'vehicle') {
 }
 
 // SCS angles come in turns: heading in [0,1), pitch and roll in [-0.5,0.5].
+// Whole degrees in one width for the status line: a minus (U+2212) or a plus, as wide in the
+// UI font, then the number padded with figure spaces (a digit wide) to `digits`; no minus for
+// a zero. With tabular figures the line keeps its length as the angles change sign.
+export function angleText(degrees, digits) {
+  const whole = Math.round(degrees);
+  return `${whole < 0 ? '\u2212' : '+'}${String(Math.abs(whole)).padStart(digits, '\u2007')}°`;
+}
+
 export function turnsToDeg(turns) {
   const deg = turns * 360;
   return (((deg + 180) % 360) + 360) % 360 - 180;

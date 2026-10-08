@@ -351,6 +351,13 @@ Done: 173 unit tests pass; the ticker checked in a sandbox (the tree and Unused 
 Done: 176 unit tests and 17 engine checks pass; the slider checked in a sandbox (saved to settings.json).
 - Audio → Volume, 0–100 %, over everything (after the loudness trim and the mute gate, `engine.setVolume`). The slider's place is the setting (`volume`, 0..1 to the percent); `loudness.js perceptualGain` makes it a gain in even dB steps over 50 dB, the curve of discord/perceptual (MIT); 0 is silence.
 
+### E2.50 — a steady status line; folding fieldsets ✓
+Done: 186 unit tests pass; checked in a sandbox.
+- The status line jumped as the angles changed sign: a minus made it wrap, and the whole panel moved. Now two lines that never wrap (the vehicle; the angles and notes, cut with … when long) and angles of one width (`angleText`: a minus U+2212 or a plus, as wide in the UI font, then figure spaces to 3 digits for yaw and 2 for pitch and roll, tabular figures). Measured: the same width with either sign.
+- Audio, Game camera, Layout, Speakers, Speaker and Bounds fold at a click on their legend (▾ / ▸), kept per viewer as the tree's width (localStorage `truckerAux.folded`).
+- The mouse wheel over the Volume, Stereo width and a speaker's Level sliders moves them by their step a notch (1 %, 0.05, 0.5 dB), as dragging would, and keeps the page from scrolling (`wheelSlider`). Not from a press of the left button on the slider until the pointer has left it, released or not, so a wheel that slips while dragging moves nothing.
+- Nor while the wheel is scrolling the panel (a slider coming under the pointer takes the wheel only after 0.4 s without it), nor before the pointer has rested on the slider 0.25 s (passing over it moves nothing): the page scrolls on instead.
+
 ### E2.49 — defaults from the presets in use, with variants ✓
 - `app/presets/default/` is the user's 0.2.4 data exported (`scripts/export-store.mjs`, which now takes your variants on a key too): 42 presets (23 before). New: 17 ETS2 keys (DAF NGD, XD, XF; Iveco Stralis; MAN TGX Euro 6; Mercedes-Benz New Actros; Renault E-Tech T, Magnum, Premium; Scania R, S, S BEV, Streamline; Volvo FH4, FH5), Freightliner Cascadia 2019 on 2.7 m; the Kenworth W900 on 3.6 m as two variants (studio sleeper, sleeper); Peterbilt 389 retuned. The Cascadia 2019's `vehicleName` is the game's now, "Freightliner Cascadia 2019".
 

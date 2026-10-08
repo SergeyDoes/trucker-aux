@@ -28,7 +28,7 @@ import {
   cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
 } from '../shared/camera.js';
 import {
-  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg,
+  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
 } from '../shared/pose.js';
 
@@ -882,20 +882,23 @@ function render() {
   overview?.update({ layout, layoutKey: current.key, selectedIds: ids, silentIds });
 }
 
+// The status line: [the vehicle or the game's state, the angles and notes]. Two lines that
+// never wrap and angles of one width (angleText), so the panel does not jump as they change.
 function statusText() {
   const pose = state.pose;
-  if (!pose || !pose.sdkActive) return 'Game not running';
-  if (!state.inWorld) return 'Game in the menu or loading';
+  if (!pose || !pose.sdkActive) return ['Game not running', ''];
+  if (!state.inWorld) return ['Game in the menu or loading', ''];
   const truck = state.truck;
   const name = truck ? `${truck.name}${truck.variant ? ` (hook ${truck.variant} m)` : ''}` : 'Unknown vehicle';
   let muted = '';
   if (state.silenced && pose.paused && state.settings.pauseBehavior === 'muted') muted = ' · muted';
   else if (state.silenced) muted = ` · muted, ${state.settings.muteWhen === 'engine' ? 'engine' : 'electrics'} off`;
-  if (pose.paused) return `${name} · paused${muted}`;
+  if (pose.paused) return [name, `paused${muted}`];
   const head = (state.heard ?? pose).head;
-  const lookNote = Math.round(state.turn * 360) ? ` (turn look ${turnsToDeg(state.turn).toFixed(0)}°)` : '';
+  const lookNote = Math.round(state.turn * 360) ? ` (turn look ${angleText(turnsToDeg(state.turn), 2)})` : '';
   const cameraNote = state.view.source ? ` · camera: ${state.view.source}` : '';
-  return `${name} · yaw ${turnsToDeg(head.heading).toFixed(0)}°${lookNote} · pitch ${turnsToDeg(head.pitch).toFixed(0)}° · roll ${turnsToDeg(state.roll).toFixed(0)}°${cameraNote}${muted}`;
+  const angles = `yaw ${angleText(turnsToDeg(head.heading), 3)}${lookNote} · pitch ${angleText(turnsToDeg(head.pitch), 2)} · roll ${angleText(turnsToDeg(state.roll), 2)}`;
+  return [name, `${angles}${cameraNote}${muted}`];
 }
 
 let lastStatus = 0;

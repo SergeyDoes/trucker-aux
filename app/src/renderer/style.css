@@ -68,7 +68,17 @@ dialog.ask label { display: block; margin: 4px 0; }
 .walls label { display: grid; gap: 2px; font-size: 11px; color: var(--dim); }
 .walls input { width: 100%; box-sizing: border-box; }
 fieldset { margin: 0 0 8px; min-width: 0; } /* fieldsets default to min-content and would push the panel wider */
-.status { font-weight: 600; margin-bottom: 6px; }
+/* Two lines that never wrap: the panel keeps its place as the angles change (app.js statusText). */
+.status { margin-bottom: 6px; }
+.status > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status-name { font-weight: 600; }
+.status-detail { font-variant-numeric: tabular-nums; }
+/* A fieldset folded at its legend (panel.js foldable). */
+legend.foldable { cursor: pointer; user-select: none; }
+legend.foldable::before { content: '▾'; display: inline-block; width: 1.1em; color: var(--dim); }
+fieldset.folded > legend.foldable::before { content: '▸'; }
+fieldset.folded > :not(legend) { display: none !important; }
+fieldset.folded { padding-bottom: 0; }
 .warnings { margin: 0 0 6px; padding-left: 18px; color: #c46900; }
 .row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 6px; align-items: center; margin: 4px 0; }
 .inline { display: flex; gap: 8px; align-items: center; }

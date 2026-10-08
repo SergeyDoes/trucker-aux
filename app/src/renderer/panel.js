@@ -71,6 +71,56 @@ function setValue(input, value) {
   if (document.activeElement !== input) input.value = value;
 }
 
+// The wheel scrolling the page carries on over a slider that comes under the pointer: a slider
+// takes the wheel only after a pause in it (WHEEL_GAP_MS) and once the pointer has rested on it
+// (WHEEL_DWELL_MS), so scrolling the panel, or the pointer passing over a slider, moves nothing.
+const WHEEL_GAP_MS = 400;
+const WHEEL_DWELL_MS = 250;
+let pageWheelAt = -Infinity; // the last wheel event no slider took
+document.addEventListener('wheel', (event) => {
+  if (!event.defaultPrevented) pageWheelAt = performance.now();
+}, { passive: true });
+
+// The mouse wheel over a slider moves it by its step a notch (up: more), as dragging it would:
+// its input and change events follow, and the page does not scroll. Not from a press of the
+// left button on it until the pointer has left it, released or not: a wheel that slips while
+// the slider is dragged, or just after, moves nothing.
+function wheelSlider(input) {
+  let held = false;
+  let enteredAt = -Infinity;
+  input.addEventListener('pointerenter', () => {
+    enteredAt = performance.now();
+  });
+  const outside = (event) => {
+    const box = input.getBoundingClientRect();
+    return event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom;
+  };
+  input.addEventListener('pointerdown', (event) => {
+    if (event.button === 0) held = true;
+  });
+  input.addEventListener('pointerleave', () => {
+    held = false;
+  });
+  input.addEventListener('pointerup', (event) => {
+    if (outside(event)) held = false; // let go after dragging off it
+  });
+  input.addEventListener('wheel', (event) => {
+    if (input.disabled) return;
+    const now = performance.now();
+    if (now - pageWheelAt < WHEEL_GAP_MS || now - enteredAt < WHEEL_DWELL_MS) return; // the page scrolls on
+    event.preventDefault();
+    const delta = event.deltaY || event.deltaX;
+    if (held || !delta) return;
+    const step = Number(input.step) || 1;
+    const moved = Number(input.value) + step * -Math.sign(delta);
+    const value = Math.min(Number(input.max), Math.max(Number(input.min), Math.round(moved / step) * step));
+    if (value === Number(input.value)) return;
+    input.value = String(Number(value.toFixed(6)));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, { passive: false });
+}
+
 function toggleButton(text, action, on, title) {
   const button = el('button', { textContent: text, title, className: on ? 'on' : '' });
   button.dataset.action = action;
@@ -78,8 +128,43 @@ function toggleButton(text, action, on, title) {
 }
 
 // boundsRoot: where the Bounds fieldset goes (under the 3D overview).
+// A fieldset folds at a click on its legend (▾ / ▸), so the speakers can be brought up while
+// editing; which ones are folded is kept per viewer, as the tree's width (localStorage), by the
+// legend's first text.
+const FOLDED_KEY = 'truckerAux.folded';
+function readFolded() {
+  try {
+    const list = JSON.parse(localStorage.getItem(FOLDED_KEY) ?? '[]');
+    return new Set(Array.isArray(list) ? list : []);
+  } catch {
+    return new Set();
+  }
+}
+function foldable(fieldset) {
+  const legend = fieldset.querySelector(':scope > legend');
+  if (!legend) return;
+  const id = legend.textContent;
+  legend.classList.add('foldable');
+  legend.title = 'Click to fold or unfold';
+  fieldset.classList.toggle('folded', readFolded().has(id));
+  legend.onclick = () => {
+    const folded = readFolded();
+    if (folded.has(id)) folded.delete(id);
+    else folded.add(id);
+    try {
+      localStorage.setItem(FOLDED_KEY, JSON.stringify([...folded]));
+    } catch {
+      // not kept: it still folds now
+    }
+    fieldset.classList.toggle('folded', folded.has(id));
+  };
+}
+
 export function createPanel(root, actions, boundsRoot) {
-  const status = el('div', { className: 'status', textContent: 'Starting…' });
+  // Two lines that never wrap (app.js statusText): the vehicle, then the angles.
+  const statusName = el('div', { className: 'status-name', textContent: 'Starting…' });
+  const statusDetail = el('div', { className: 'status-detail', textContent: '\u00a0' });
+  const status = el('div', { className: 'status' }, [statusName, statusDetail]);
   const warnings = el('ul', { className: 'warnings' });
 
   const input = el('select');
@@ -268,6 +353,7 @@ export function createPanel(root, actions, boundsRoot) {
     speakerForm,
   );
   boundsRoot.replaceChildren(boundsForm);
+  for (const fieldset of [...root.querySelectorAll(':scope > fieldset'), boundsForm]) foldable(fieldset);
 
   input.onchange = () => actions.selectInput(input.value);
   output.onchange = () => actions.selectOutput(output.value);
@@ -301,6 +387,7 @@ export function createPanel(root, actions, boundsRoot) {
     if (event.key === 'Enter') presetName.blur();
   };
   width.oninput = () => actions.setWidth(Number(width.value));
+  for (const slider of [volume, width, gain]) wheelSlider(slider);
   matchLoudness.onchange = () => actions.setMatchLoudness(matchLoudness.checked);
   add.onclick = () => actions.addSpeaker();
   addPair.onclick = () => actions.addPair();
@@ -458,8 +545,11 @@ export function createPanel(root, actions, boundsRoot) {
 
   return {
     update,
-    setStatus(text) {
-      status.textContent = text;
+    setStatus([name, detail]) {
+      statusName.textContent = name;
+      statusName.title = name;
+      statusDetail.textContent = detail || '\u00a0'; // the line keeps its height
+      statusDetail.title = detail;
     },
   };
 }

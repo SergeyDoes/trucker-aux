@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HEAD_X, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
+  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
 } from '../src/shared/pose.js';
 
 test('pluginWarning: an scs-telemetry revision the offsets were not made for', () => {
@@ -177,6 +177,15 @@ test('musicSilenced on pause: always active, always muted, or as the vehicle (th
 function close(actual, expected, eps = 1e-9) {
   expected.forEach((e, i) => assert.ok(Math.abs(actual[i] - e) < eps, `[${i}] ${actual[i]} != ${e}`));
 }
+
+test('angleText: whole degrees of one width, so the status line stays put', () => {
+  const FIG = ' '; // figure space, a digit wide
+  assert.equal(angleText(-11.4, 3), `−${FIG}11°`);
+  assert.equal(angleText(140, 3), '+140°'); // a plus as wide as the minus (U+2212)
+  assert.equal(angleText(-0.4, 2), `+${FIG}0°`); // no minus for a zero
+  assert.equal(angleText(5, 2), `+${FIG}5°`);
+  for (const d of [-180, -45, -3, 0, 7, 90, 179]) assert.equal(angleText(d, 3).length, 5);
+});
 
 test('turnsToDeg maps turns to -180..180', () => {
   assert.ok(Math.abs(turnsToDeg(0.99) - -3.6) < 1e-9);

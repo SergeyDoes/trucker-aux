@@ -187,6 +187,7 @@ Build the plugins in Visual Studio 2022:
     card, speakers;
   - the **top and side views**;
   - the **3D overview**, with the **bounds** under it.
+  - The panel's parts fold at a click on their title, and stay so.
 - **Auto** follows the vehicle in the game. Picking a key or a preset stops that; the
   Auto button above the tree or "Back to Auto" on the card brings it back.
 - **The card** under the preset list:
