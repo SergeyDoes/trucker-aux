@@ -4,7 +4,19 @@ Trucker AUX allows to simulate spatial 3D speakers of the vehicle in ETS2/ATS an
 
 <br>
 <br>
+## Note
 
+**Is this AI slop?**
+
+Short answer: YES.
+
+Long answer: No, I mean the *slop* one. I never wrote a single line of code here; my part was iterating with the AI over and over until the thing was actually usable. Sure, I "just" played truck sims for 50 hours this week, which is hardly work. I could have set up the presets much faster by purely switching trucks with cheats or something, but instead I played on my main profile, doing quick jobs with different trucks and tuning the speakers truck by truck. I wanted to bring some *vibes* into the game, and I think it worked. I found building Trucker AUX pretty *vibey* too.
+
+AI is impressive at this kind of stuff, but it still needs a dev's duct-tape ideas, workarounds and so on. Also, have you seen Claude's first [UI attempts](./MEMES.md)?
+
+Have fun!
+<br>
+<br>
 ## Features
 
 - **Real head position:** The virtual speaker surround is synched with the in-game head position.
