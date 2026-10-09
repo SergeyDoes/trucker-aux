@@ -4,7 +4,8 @@ Trucker AUX allows to simulate spatial 3D speakers of the vehicle in ETS2/ATS an
 
 <br>
 <br>
-## Note
+
+## Notes
 
 **Is this AI slop?**
 
