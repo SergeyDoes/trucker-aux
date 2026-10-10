@@ -58,42 +58,50 @@ Player ─► virtual cable                          Game audio ─────�
   - copy and paste, also between presets;
   - undo and redo for every change to your presets.
 - **Presets on keys:** a preset is set on a key, from narrow to wide:
-  - this vehicle (by its plate);
-  - this chassis (told apart by the fifth-wheel position);
-  - the model;
+  - the model, as one of its variants (below);
   - the brand;
   - the game;
   - all vehicles.
 
   Auto plays the narrowest preset there is for the vehicle in the game.
+- **Variants of a model:** a model's cabs are its variants: your presets for it and the
+  shared files for it or its hooks. The game reports no cab, only where the fifth wheel sits
+  (the hook), so a hook remembers the variant it plays, and so does your own vehicle (by its
+  plate), before its hook. A hook new to you remembers the variant picked last (or a file made
+  for that hook plays). Edits go to the variant that plays, wherever else it plays. Your vehicle
+  can also have a preset of its own, "this vehicle only".
 - **The key tree:**
-  - keys are grouped by game, brand, model, chassis and vehicle;
+  - keys are grouped by game, brand and model;
   - each key shows whether it has its own preset, a shared file or a default, or what
     it inherits;
   - click a key to play and edit it; editing a key that inherits gives it a copy of its
     own;
   - drag presets from key to key; right-click for more;
-  - a chassis driven for the first time without a preset of its own gets one at once,
-    labelled "new": a copy of another chassis's preset of the model, or, for a model new to
-    the app, of what it would inherit;
+  - a model driven for the first time gets its first variant at once, labelled "new": a copy
+    of what it would inherit;
   - models of a brand the game names alike (Freightliner Cascadia 2019 and 2024) get the
     year from their id;
   - presets on no key wait under "Unused presets".
-- **Variants:** two cabs can share a hook (the Kenworth W900's sleeper and studio on
-  3.6 m), so a key can hold several presets. One plays; the card's "Variant" picks
-  another, which your own vehicle (by its plate) keeps for itself. The tree shows "+N"
-  beside the key; its menu's Variants list plays one or makes a new one (a copy of what
-  plays), and the menu takes the playing one off. Dropping a
-  preset on a key of yours can add it as a variant.
+- **Picking a variant:** the card's "Variant" picks one for the vehicle in the game (its hook,
+  or your vehicle's plate, remembers it). The tree shows a model's variant that plays and "+N";
+  its menu's Variants list plays one (each says where it plays), makes a new one (a copy of what
+  plays), and takes one off (a shared file is hidden from the model). Two cabs on one hook (the
+  Kenworth W900's sleeper and studio on 3.6 m) are two variants.
+- **Controls:** a key, a controller button (a wheel's, a pad's) or a combination of up to three
+  steps to the model's next or previous variant, to try it, and another goes back to what fitted
+  the cab when you got in; getting out keeps the one tried for that cab. They work while the
+  game has the focus. An English Windows voice says what plays: over everything, or from the cab
+  speakers like the music (muted with it), at a volume of its own.
 - **Labels:** a short coloured tag per preset (up to 32 characters, a longer one than 16
   runs like a ticker), shown beside its keys in the tree. "new" marks a preset the app
   made and goes at its first edit.
 - **Shared presets:**
-  - **Export…** saves presets ticked in a tree as files, one or a folder of them. The
-    plates stay private: a vehicle's own preset goes out for its chassis;
-  - **Import…** makes preset files your presets, on the keys they are for; where one of
-    yours is, both stay as variants and it asks which plays; a file keeps its name and
-    label;
+  - **Export…** saves presets ticked in a tree as files, one or a folder of them: a model's
+    variant for the hooks that play it. The plates stay private: a vehicle's own preset goes
+    out for its hook;
+  - **Import…** makes preset files your presets, a file for a model one of its variants, on the
+    hooks it is for that play nothing of yours; where one of yours plays it asks which plays;
+    a file keeps its name and label;
   - files dropped into `presets/` play without importing, after your own presets.
 - **Defaults:**
   - the presets that come with the app sit in `presets/default/`, under everything else;
@@ -183,8 +191,8 @@ Build the plugins in Visual Studio 2022:
 
 - **The window:** from left to right:
   - the **key tree** with "Unused presets" below it;
-  - the **panel**: audio, game camera (without the camera plugin), the preset and its
-    card, speakers;
+  - the **panel**: audio, controls, game camera (without the camera plugin), the preset and
+    its card, speakers;
   - the **top and side views**;
   - the **3D overview**, with the **bounds** under it.
   - The panel's parts fold at a click on their title, and stay so.
@@ -194,6 +202,12 @@ Build the plugins in Visual Studio 2022:
   - shows the vehicle, what plays and the keys of its vehicle ("Applies to");
   - picking a key there moves the preset up or down, and the app asks first when that
     key is taken.
+- **Controls:** click an action's button, press a key, a controller button or up to three
+  together, and let go; Escape cancels, × clears. Next and Previous play the model's variants as
+  a pick in the list does; Auto goes back to the one that fitted when you got in, and getting
+  out (another vehicle, or the game closed) keeps the one tried for that cab. Voice: Off; System,
+  over everything; AUX, from the cab speakers, muted with the music. The game sees these keys
+  and buttons too, so pick ones it does not use.
 - **Coordinates:**
   - X goes right from the vehicle's centre line;
   - Y goes up and Z goes back, from the driver's default head;
@@ -253,7 +267,8 @@ docs/                       findings from the game, specs and plans
 
 - Windows only.
 - The game doesn't report the cab or the cab's size, so speakers and bounds are set by
-  hand. Chassis are told apart by the fifth-wheel position, which a few chassis share.
+  hand. Cabs are told apart by the fifth-wheel position, which some cabs share: they are
+  variants of their model, picked by hand (or with the controls).
 - Without `trucker_aux_camera.dll` an outside camera can't be told from the cab one: the
   emulated turn look then turns the sound on an outside camera too.
 - `trucker_aux_camera.dll` depends on the game version: after an update it may switch

@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addAlternate, adoptNewChassis, adoptPicked, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
-  levelOf, ownPreset, parseSelection, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
+  addAlternate, adoptVehicle, adoptPicked, cycleVariant, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
+  foldChassis, levelOf, parseSelection, personalOf, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
@@ -77,26 +77,23 @@ test('edit: without a game the preset of all vehicles; a picked preset from any 
   assert.deepEqual(before, snapshot); // the input is not changed
 });
 
-test('chassis: the model preset plays on every chassis until one gets its own', () => {
+test('hooks: every hook plays the model\'s variant; an edit changes it for all of them', () => {
   const store = withPreset();
   assert.equal(resolvePlaying(store, AUTO, SLEEPER).key, 'p.2');
   const edited = editLayout(store, AUTO, SLEEPER, widen);
-  const own = at(edited, variantKey(SLEEPER));
-  assert.equal(own.width, 1.5);
-  assert.equal(own.name, 'ATS › International › International 9900i › hook 3.2 m');
-  assert.equal(at(edited, TRUCK.key).width, 0.5); // the model preset stays
+  assert.deepEqual(Object.keys(edited.presets), ['p.1', 'p.2']); // no copy
+  assert.equal(edited.presets['p.2'].width, 1.5);
   assert.equal(resolvePlaying(edited, AUTO, SHORT).key, 'p.2');
-  assert.equal(presetOptions(edited, SHORT)[0].label, 'Auto — International 9900i (all chassis)');
-  assert.equal(presetOptions(edited, SLEEPER)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(presetOptions(edited, SHORT)[0].label, 'Auto — International 9900i');
 });
 
-test('chassis: without a model preset another chassis plays before the brand', () => {
+test('a model without variants: the first edit makes its first variant, which its hooks play', () => {
   const store = editLayout(storeWith({ 'brand:ats/international': { name: 'Brand' } }), AUTO, SLEEPER, widen);
-  assert.equal(autoPreset(store, SHORT).how, 'sibling');
-  assert.equal(presetOptions(store, SHORT)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m (other chassis)');
-  const both = editLayout(store, AUTO, SHORT, (l) => setWidth(l, 0.3));
-  assert.equal(at(both, variantKey(SHORT)).width, 0.3);
-  assert.equal(at(both, variantKey(SLEEPER)).width, 1.5);
+  assert.equal(store.assignments[TRUCK.key], 'p.3');
+  assert.deepEqual([at(store, TRUCK.key).name, at(store, TRUCK.key).width], ['ATS › International › International 9900i', 1.5]);
+  assert.equal(store.assignments[variantKey(SLEEPER)], 'p.3'); // the hook remembers it
+  assert.equal(autoPreset(store, SHORT).how, 'model'); // another hook plays it too
+  assert.equal(at(store, 'brand:ats/international').width, 1);
 });
 
 test('the ladder: model, brand, game, all vehicles; a vehicle without a game id skips brand and game', () => {
@@ -108,24 +105,23 @@ test('the ladder: model, brand, game, all vehicles; a vehicle without a game id 
   assert.deepEqual(autoPreset(store, OTHER), { key: 'p.3', how: 'game', scope: 'game:ats' });
   assert.deepEqual(autoPreset(store, { ...OTHER, game: 'ets2' }), { key: 'p.1', how: 'all', scope: 'all' });
   assert.equal(autoPreset(store, { ...TRUCK, game: null, brand: null }).how, 'all');
-  // Something wider than the chassis plays: the first edit makes a copy for this chassis.
+  // Something wider than the model plays: the first edit makes the model's first variant.
   const edited = editLayout(store, AUTO, SLEEPER, widen);
-  assert.equal(at(edited, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(at(edited, TRUCK.key).name, 'ATS › International › International 9900i');
   assert.equal(at(edited, 'brand:ats/international').width, 1);
 });
 
-test('this vehicle only: a copy for the plate wins over the chassis and takes the edits', () => {
-  const store = ownPreset(ownPreset(withPreset(), OWNED, 'chassis'), OWNED, 'truck');
-  const key = plateKey(OWNED);
-  assert.equal(at(store, key).name, 'ATS › International › International 9900i › hook 3.2 m › WP-83695');
-  assert.equal(resolvePlaying(store, AUTO, OWNED).key, store.assignments[key]);
-  assert.equal(resolvePlaying(store, AUTO, { ...OWNED, plate: 'OTHER-1' }).key, store.assignments[variantKey(SLEEPER)]);
-  assert.equal(presetOptions(store, OWNED)[0].label, 'Auto — ATS › International › International 9900i › hook 3.2 m › WP-83695 (this vehicle)');
+test('this vehicle only: a preset of its own on the plate wins over the hook, takes the edits, is no variant', () => {
+  const store = assign(createPreset(withPreset(), { ...defaultLayout(), name: 'Mine', width: 0.7 }).store, plateKey(OWNED), 'p.3');
+  assert.equal(resolvePlaying(store, AUTO, OWNED).key, 'p.3');
+  assert.equal(resolvePlaying(store, AUTO, { ...OWNED, plate: 'OTHER-1' }).key, 'p.2');
+  assert.equal(presetOptions(store, OWNED)[0].label, 'Auto — Mine — International 9900i, WP-83695 (this vehicle)');
   const edited = editLayout(store, AUTO, OWNED, widen);
-  assert.equal(at(edited, key).width, 1.5);
-  assert.equal(at(edited, variantKey(SLEEPER)).width, 0.5);
-  assert.equal(ownPreset(store, OWNED, 'truck'), store); // already there
-  assert.equal(ownPreset(store, SLEEPER, 'truck'), store); // no plate
+  assert.equal(edited.presets['p.3'].width, 1.5);
+  assert.equal(edited.presets['p.2'].width, 0.5);
+  assert.deepEqual(alternatesOf(store, TRUCK.key).map((v) => v.key), ['p.2']);
+  assert.deepEqual(personalOf(store, TRUCK.key).map((p) => [p.key, p.plate]), [['p.3', 'WP-83695']]);
+  assert.deepEqual(scopesOf(store, 'p.3'), [plateKey(OWNED)]);
 });
 
 test('assignments: a preset may apply to several scopes; unassign frees one and keeps the preset', () => {
@@ -136,8 +132,9 @@ test('assignments: a preset may apply to several scopes; unassign frees one and 
   assert.equal(resolvePlaying(chassis, AUTO, SLEEPER).key, 'p.3');
   assert.equal(resolvePlaying(chassis, AUTO, SHORT).key, 'p.2');
   assert.equal(editLayout(chassis, AUTO, SLEEPER, widen).presets['p.3'].width, 1.5);
+  assert.deepEqual(scopesOf(chassis, 'p.3'), [TRUCK.key]); // a hook remembers a variant of the model
   const truck = assign(chassis, plateKey(OWNED), 'p.2');
-  assert.deepEqual(scopesOf(truck, 'p.2'), [plateKey(OWNED), TRUCK.key]);
+  assert.deepEqual(scopesOf(truck, 'p.2'), [TRUCK.key]); // your vehicle remembers a variant: no place of its own
   assert.equal(autoPreset(truck, OWNED).how, 'vehicle');
   const freed = unassign(truck, plateKey(OWNED));
   assert.equal(resolvePlaying(freed, AUTO, OWNED).key, 'p.3');
@@ -189,43 +186,48 @@ test('rememberVehicle keeps the name, game and brand of a model; scopes are name
 });
 
 
-test('scopeLadder: this vehicle\'s scopes and what holds them; currentScope: where what plays sits', () => {
+test('scopeLadder: this vehicle\'s scopes and what plays from them; currentScope: where what plays sits', () => {
   const store = rememberVehicle(withPreset(), TRUCK);
   assert.deepEqual(scopeLadder(store, OWNED).map((r) => [r.level, r.label, r.holder]), [
     ['vehicle', 'this vehicle (WP-83695)', null],
-    ['chassis', 'this chassis (hook 3.2 m)', null],
-    ['model', 'all chassis of International 9900i', 'p.2'],
+    ['model', 'International 9900i', 'p.2'],
     ['brand', 'all International', null],
     ['game', 'all ATS vehicles', null],
     ['all', 'all vehicles', 'p.1'],
   ]);
-  assert.deepEqual(scopeLadder(store, LENT).map((r) => r.level), ['chassis', 'model', 'brand', 'game', 'all']); // a random plate
+  assert.deepEqual(scopeLadder(store, LENT).map((r) => r.level), ['model', 'brand', 'game', 'all']); // a random plate
   assert.deepEqual(scopeLadder(store, { ...OTHER, game: null }).map((r) => r.level), ['model', 'all']);
   assert.equal(currentScope(store, AUTO, OWNED), TRUCK.key);
   assert.equal(currentScope(store, AUTO, OTHER), 'all');
   assert.equal(currentScope(store, PICK('p.2'), OWNED), null);
-  assert.equal(currentScope(editLayout(storeWith(), AUTO, SHORT, widen), AUTO, SLEEPER), null); // another chassis's
+  // The variant another hook made plays on this one too: the model's.
+  assert.equal(currentScope(editLayout(storeWith(), AUTO, SHORT, widen), AUTO, SLEEPER), TRUCK.key);
   assert.equal(currentScope(withCollection(storeWith(), MODEL_FILE), AUTO, SLEEPER), null); // a file
+  // Your vehicle's own preset sits on it.
+  assert.equal(currentScope(assign(store, plateKey(OWNED), 'p.1'), AUTO, OWNED), plateKey(OWNED));
 });
 
-test('moving up: the old scope is freed; a taken target and narrower presets are named', () => {
-  // The sleeper's own preset goes to the brand, where another one is; the model has its own too.
-  let store = storeWith({
+test('moving up: off the model, what its hooks remember too; a taken target and the other variants are named', () => {
+  // The sleeper variant (its 3.2 m hook remembers it) goes to the brand, where another one is;
+  // the model has another variant.
+  let store = foldChassis(storeWith({
     [TRUCK.key]: { name: 'Model' },                     // p.2
     [variantKey(SLEEPER)]: { name: 'Sleeper' },          // p.3
     'brand:ats/international': { name: 'Old brand' },    // p.4
-  });
+  }));
+  assert.deepEqual([store.assignments[TRUCK.key], store.alternates], ['p.2', { [TRUCK.key]: ['p.3'] }]);
   const plan = planScope(store, AUTO, SLEEPER, 'brand:ats/international');
   assert.deepEqual(plan, {
-    mode: 'move', key: 'p.3', from: variantKey(SLEEPER), to: 'brand:ats/international', direction: 'up', mustCopy: false,
+    mode: 'move', key: 'p.3', from: TRUCK.key, to: 'brand:ats/international', direction: 'up', mustCopy: false,
     taken: { key: 'p.4', name: 'Old brand', keeps: false },
-    shadow: [{ scope: TRUCK.key, label: 'all chassis of International 9900i', name: 'Model' }],
+    shadow: [{ scope: TRUCK.key, label: 'International 9900i', name: 'Model' }],
     fallback: null,
     outplayed: null,
   });
-  // Without clearing the model, the model keeps playing here; with it, the moved one plays.
+  // Without clearing the model, its other variant plays here; with it, the moved one plays.
   const kept = applyScope(store, plan, SLEEPER);
-  assert.equal(kept.assignments[variantKey(SLEEPER)], undefined);
+  assert.equal(kept.assignments[variantKey(SLEEPER)], undefined); // the hook forgot it
+  assert.equal(kept.alternates, undefined);
   assert.equal(kept.assignments['brand:ats/international'], 'p.3');
   assert.deepEqual(scopesOf(kept, 'p.4'), []); // the old brand preset stays, unassigned
   assert.ok(kept.presets['p.4']);
@@ -237,30 +239,32 @@ test('moving up: the old scope is freed; a taken target and narrower presets are
   assert.equal(planScope(store, AUTO, SLEEPER, 'brand:ats/international'), null);
   assert.equal(planScope(store, AUTO, SLEEPER, 'not on the ladder'), null);
   assert.equal(planScope(store, AUTO, null, 'all'), null);
-  // A shared file for this chassis would keep playing: it cannot be unassigned, so it is named.
+  // A shared file for this hook would keep playing: it cannot be unassigned, so it is named.
   const files = withCollection(storeWith({ [plateKey(OWNED)]: { name: 'Mine' } }), SLEEPER_FILE);
   assert.deepEqual(planScope(files, AUTO, OWNED, 'brand:ats/international').outplayed, { name: 'sleeper', file: true });
 });
 
 test('moving down: move frees the wider scope, copy keeps it; all vehicles always keeps its preset', () => {
   const store = rememberVehicle(storeWith({ 'game:ats': { name: 'ATS' } }), TRUCK); // p.2 for all ATS
-  const plan = planScope(store, AUTO, SLEEPER, variantKey(SLEEPER));
+  const plan = planScope(store, AUTO, SLEEPER, TRUCK.key);
   assert.equal(plan.direction, 'down');
   assert.deepEqual(plan.fallback, { label: 'all vehicles', name: 'Default layout' });
   const moved = applyScope(store, plan, SLEEPER);
   assert.equal(moved.assignments['game:ats'], undefined);
-  assert.equal(moved.assignments[variantKey(SLEEPER)], 'p.2');
+  assert.equal(moved.assignments[TRUCK.key], 'p.2');
+  assert.equal(moved.assignments[variantKey(SLEEPER)], 'p.2'); // the hook plays it
   assert.equal(resolvePlaying(moved, AUTO, OTHER).key, 'p.1');
   const copied = applyScope(store, plan, SLEEPER, { copy: true });
   assert.equal(copied.assignments['game:ats'], 'p.2');
-  assert.equal(at(copied, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
-  assert.deepEqual(at(copied, variantKey(SLEEPER)).speakers, store.presets['p.2'].speakers);
-  // From all vehicles: always a copy.
+  assert.equal(at(copied, TRUCK.key).name, 'ATS › International › International 9900i');
+  assert.deepEqual(at(copied, TRUCK.key).speakers, store.presets['p.2'].speakers);
+  // From all vehicles: always a copy, here your vehicle's own.
   const fromAll = planScope(storeWith(), AUTO, OWNED, plateKey(OWNED));
   assert.equal(fromAll.mustCopy, true);
   const done = applyScope(storeWith(), fromAll, OWNED);
   assert.equal(done.assignments.all, 'p.1');
   assert.equal(at(done, plateKey(OWNED)).name, 'ATS › International › International 9900i › hook 3.2 m › WP-83695');
+  assert.deepEqual(personalOf(done, TRUCK.key).map((p) => p.plate), ['WP-83695']);
   // A preset picked in the list, put to use for the model while this vehicle has its own:
   // the vehicle's keeps playing here, so it is named, to be cleared.
   const plated = assign(store, plateKey(OWNED), 'p.1');
@@ -269,20 +273,13 @@ test('moving down: move frees the wider scope, copy keeps it; all vehicles alway
   ]);
 });
 
-test('copy and use: a preset from another chassis or a file is copied; a picked one is used here too', () => {
-  // Another chassis's preset plays: a copy takes the scope, the other chassis keeps its own.
-  const sibling = editLayout(storeWith(), AUTO, SHORT, widen);
-  const plan = planScope(sibling, AUTO, SLEEPER, variantKey(SLEEPER));
-  assert.equal(plan.mode, 'copy');
-  const copied = applyScope(sibling, plan, SLEEPER);
-  assert.equal(at(copied, variantKey(SLEEPER)).width, 1.5);
-  assert.notEqual(copied.assignments[variantKey(SLEEPER)], copied.assignments[variantKey(SHORT)]);
+test('copy and use: a file is copied; a picked one is used here too', () => {
   // A shared file: your own copy.
   const files = withCollection(storeWith(), MODEL_FILE);
   const fromFile = applyScope(files, planScope(files, AUTO, SLEEPER, 'game:ats'), SLEEPER);
   assert.equal(at(fromFile, 'game:ats').name, 'ATS'); // named by its key
   assert.equal(at(fromFile, 'game:ats').width, 0.8);
-  // Picked in the list: it gets the scope as well and keeps its others.
+  // Picked in the list: a variant of the model, which plays it here; it keeps its others.
   const picked = withPreset();
   const use = planScope(picked, PICK('p.2'), OTHER, OTHER.key);
   assert.equal(use.mode, 'use');
@@ -298,41 +295,44 @@ test('copy and use: a preset from another chassis or a file is copied; a picked 
 const card = (status, ...fields) => Object.fromEntries(fields.map((f) => [f, status[f]]));
 
 test('truckStatus: what plays, where it applies, and the scope choices', () => {
-  const store = withPreset(); // the model preset "International 9900i"
+  const store = withPreset(); // the model's variant "International 9900i"
   const status = truckStatus(store, AUTO, OWNED);
   assert.deepEqual(card(status, 'truck', 'plays', 'appliesTo', 'note', 'useIn', 'buttons'), {
     truck: 'International 9900i · hook 3.2 m · WP-83695',
     plays: 'International 9900i',
-    appliesTo: 'all chassis of International 9900i',
-    note: 'Editing makes a copy for this chassis first.',
+    appliesTo: 'International 9900i',
+    note: null,
     useIn: null,
     buttons: [{ action: 'unbind', label: 'Unbind' }],
   });
   assert.equal(status.scope.value, TRUCK.key);
   assert.deepEqual(status.scope.options.map((o) => o.label), [
-    'this vehicle (WP-83695)', 'this chassis (hook 3.2 m)', 'all chassis of International 9900i', 'all International',
-    'all ATS vehicles', 'all vehicles — "Default layout"',
+    'this vehicle (WP-83695)', 'International 9900i', 'all International', 'all ATS vehicles', 'all vehicles — "Default layout"',
   ]);
-  const chassis = ownPreset(store, OWNED, 'chassis');
-  assert.deepEqual(card(truckStatus(chassis, AUTO, OWNED), 'plays', 'appliesTo', 'note'), {
-    plays: 'ATS › International › International 9900i › hook 3.2 m', appliesTo: 'this chassis (hook 3.2 m)', note: null,
+  // A variant other hooks remember: edits change it there too.
+  const both = assign(assign(store, variantKey(SLEEPER), 'p.2'), variantKey(SHORT), 'p.2');
+  assert.equal(truckStatus(both, AUTO, SLEEPER).note, 'Edits also change it on hook 2.1 m.');
+  // Your vehicle's own preset sits on "this vehicle".
+  const own = assign(createPreset(store, store.presets['p.1']).store, plateKey(OWNED), 'p.3');
+  assert.deepEqual(card(truckStatus(own, AUTO, OWNED), 'plays', 'appliesTo', 'note'), {
+    plays: 'Default layout copy — International 9900i, WP-83695', appliesTo: 'this vehicle (WP-83695)', note: null,
   });
-  assert.equal(truckStatus(chassis, AUTO, OWNED).scope.options[2].label, 'all chassis of International 9900i — "International 9900i"');
-  // Not on this vehicle's ladder: another chassis's, a file's. The first option says where it comes from.
-  const sibling = truckStatus(editLayout(storeWith(), AUTO, SLEEPER, widen), AUTO, { ...SHORT, plate: 'X-1' });
-  assert.equal(sibling.appliesTo, 'another chassis of International 9900i');
-  assert.deepEqual(sibling.scope.options[0], { value: '', label: 'another chassis of International 9900i' });
-  assert.equal(sibling.scope.value, '');
-  assert.deepEqual(sibling.buttons, []);
+  assert.equal(truckStatus(own, AUTO, OWNED).scope.options[1].label, 'International 9900i — "International 9900i"');
+  // A file of the model: the first option says where it comes from.
+  const file = truckStatus(withCollection(storeWith(), MODEL_FILE), AUTO, { ...SHORT, plate: 'X-1' });
+  assert.equal(file.appliesTo, 'International 9900i, from the collection');
+  assert.deepEqual(file.scope.options[0], { value: '', label: 'International 9900i, from the collection' });
+  assert.equal(file.scope.value, '');
+  assert.deepEqual(file.buttons, []);
   // A quick-job truck: its plate is random, so "this vehicle" is not offered.
-  const lent = truckStatus(store, AUTO, LENT);
-  assert.equal(lent.note, 'Editing makes a copy for this chassis first. This quick-job vehicle has a random plate, so "this vehicle" is not offered.');
+  const lent = truckStatus(storeWith(), AUTO, LENT);
+  assert.equal(lent.note, 'Editing makes a variant of International 9900i first. This quick-job vehicle has a random plate, so "this vehicle" is not offered.');
   assert.equal(lent.scope.options.some((o) => o.label.startsWith('this vehicle')), false);
   // All vehicles plays: no Unbind (something must play).
   assert.deepEqual(card(truckStatus(storeWith(), AUTO, OTHER), 'plays', 'appliesTo', 'note', 'buttons'), {
     plays: 'Default layout — all vehicles',
     appliesTo: 'every vehicle without its own preset',
-    note: 'Editing makes a preset for Peterbilt 579 first.',
+    note: 'Editing makes a variant of Peterbilt 579 first.',
     buttons: [],
   });
   assert.equal(truckStatus(storeWith({ 'brand:ats/peterbilt': { name: 'P' } }), AUTO, OTHER).appliesTo, 'all Peterbilt');
@@ -363,20 +363,21 @@ test('truckStatus: what plays, where it applies, and the scope choices', () => {
 });
 
 test('the preset list: Auto, your presets with where they apply, Unassigned, Collection', () => {
-  let store = rememberVehicle(withPreset(), OWNED); // its plate and chassis are known, as after driving it
-  store = editLayout(store, AUTO, SLEEPER, widen);
-  store = ownPreset(store, OWNED, 'truck');
-  store = createPreset(store, store.presets['p.1']).store; // "Default layout copy", unassigned
-  store = { ...store, presets: { ...store.presets, 'p.3': { ...store.presets['p.3'], name: 'Sleeper' } } };
-  store = assign(store, variantKey(SHORT), 'p.3'); // the sleeper's preset on the day cab too
-  assert.deepEqual(presetOptions(store, null), [
-    { value: 'auto', label: 'Auto — no game' },
-    { value: 'truck:p.4', label: 'ATS › International › International 9900i › hook 3.2 m › WP-83695' },
-    { value: 'truck:p.1', label: 'Default layout — all vehicles' },
-    { value: 'truck:p.2', label: 'International 9900i' },
-    { value: 'truck:p.3', label: 'Sleeper — International 9900i, hook 2.1 m +1' },
-    { group: 'Unassigned', options: [{ value: 'truck:p.5', label: 'Default layout copy' }] },
-  ]);
+  let store = rememberVehicle(withPreset(), OWNED); // its plate and hook are known, as after driving it
+  store = createPreset(store, store.presets['p.1']).store; // p.3 "Default layout copy"
+  store = assign(store, plateKey(OWNED), 'p.3'); // this vehicle's own
+  store = createPreset(store, { ...store.presets['p.2'], name: 'Sleeper', label: 'sleeper' }).store; // p.4
+  store = addAlternate(store, TRUCK.key, 'p.4'); // a variant of the model
+  store = createPreset(store, store.presets['p.1']).store; // p.5, unassigned
+  const options = presetOptions(store, null);
+  assert.deepEqual(options[0], { value: 'auto', label: 'Auto — no game' });
+  assert.deepEqual(options.slice(1, -1).map((o) => o.label).sort(), [
+    'Default layout — all vehicles',
+    'Default layout copy — International 9900i, WP-83695',
+    'International 9900i',
+    'Sleeper · sleeper — International 9900i',
+  ].sort());
+  assert.deepEqual(options.at(-1), { group: 'Unassigned', options: [{ value: 'truck:p.5', label: 'Default layout copy 2' }] });
   assert.equal(presetOptions(withPreset(), OTHER)[0].label, 'Auto — Default layout — all vehicles');
   for (const selection of [AUTO, PICK('p.2'), PICK('file:a/b.json')]) {
     assert.deepEqual(parseSelection(selectionValue(selection)), selection);
@@ -392,19 +393,18 @@ const withCollection = (store, ...entries) => ({ ...store, collection: Object.fr
 const SLEEPER_FILE = shared('sleeper.json', 'vehicle.international.9900i@3.2');
 const MODEL_FILE = shared('model.json', 'vehicle.international.9900i');
 
-test('collection: Auto plays it after your own chassis and model presets, before wider ones', () => {
+test('collection: a file for the hook, then the model\'s variant, then the model\'s files, before wider ones', () => {
   const store = withCollection(storeWith(), SLEEPER_FILE, MODEL_FILE);
   assert.deepEqual(autoPreset(store, SLEEPER), { key: 'file:sleeper.json', how: 'collectionChassis', scope: variantKey(SLEEPER) });
   assert.equal(autoPreset(store, SHORT).how, 'collectionModel');
   assert.deepEqual(resolvePlaying(store, AUTO, SLEEPER), { kind: 'collection', key: 'file:sleeper.json', layout: SLEEPER_FILE.layout });
   assert.equal(autoPreset(withCollection(storeWith(), SLEEPER_FILE), SHORT).how, 'collectionSibling');
-  // Your own presets come first, even the model's for all chassis: a file dropped into
-  // presets/ never takes over a truck you have set up.
-  assert.equal(autoPreset(withCollection(withPreset(), SLEEPER_FILE), SLEEPER).how, 'model');
-  // Yours for another chassis beats the collection's for another chassis; the brand comes after both.
-  const ownShort = editLayout(storeWith({ 'brand:ats/international': { name: 'B' } }), AUTO, SHORT, widen);
-  assert.equal(autoPreset(withCollection(ownShort, shared('long.json', 'vehicle.international.9900i@4.0')), SLEEPER).how, 'sibling');
-  // Several files for one chassis: the first by path; another vehicle's files never play.
+  // A file for this very hook plays before the model's variant on a hook new to you; a hook
+  // you have set up plays what it remembers: a file dropped into presets/ never takes it over.
+  assert.equal(autoPreset(withCollection(withPreset(), SLEEPER_FILE), SLEEPER).how, 'collectionChassis');
+  assert.equal(autoPreset(withCollection(withPreset(), SLEEPER_FILE), SHORT).how, 'model');
+  assert.equal(autoPreset(withCollection(assign(withPreset(), variantKey(SLEEPER), 'p.2'), SLEEPER_FILE), SLEEPER).how, 'chassis');
+  // Several files for one hook: the first by path; another vehicle's files never play.
   const two = withCollection(storeWith(), shared('b.json', variantKey(SLEEPER)), shared('a.json', variantKey(SLEEPER)));
   assert.equal(autoPreset(two, SLEEPER).key, 'file:a.json');
   assert.equal(autoPreset(store, OTHER).how, 'all');
@@ -414,12 +414,15 @@ test('collection: Auto plays it after your own chassis and model presets, before
 
 test('collection: editing never changes a file', () => {
   const store = withCollection(storeWith(), SLEEPER_FILE);
-  // Auto: the first edit makes this chassis's own copy, which plays from then on.
+  // Auto: the first edit makes your copy, a variant of the model in the file's place.
   const edited = editLayout(store, AUTO, SLEEPER, widen);
-  assert.equal(at(edited, variantKey(SLEEPER)).width, 1.5);
-  assert.equal(at(edited, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
+  const key = edited.assignments[TRUCK.key];
+  assert.deepEqual([at(edited, TRUCK.key).width, at(edited, TRUCK.key).name], [1.5, 'ATS › International › International 9900i']);
+  assert.equal(at(edited, TRUCK.key).copyOf, 'file:sleeper.json');
+  assert.equal(edited.assignments[variantKey(SLEEPER)], key);
   assert.equal(edited.collection['file:sleeper.json'].layout.width, 0.8);
   assert.equal(autoPreset(edited, SLEEPER).how, 'chassis');
+  assert.deepEqual(alternatesOf(edited, TRUCK.key).map((v) => v.key), [key]); // yours stands for the file
   // Picked in the list: an unassigned copy, chosen instead.
   const adopted = adoptPicked(store, PICK('file:sleeper.json'));
   assert.equal(adopted.selection.key, 'p.2');
@@ -441,15 +444,15 @@ test('collection: the card and the list', () => {
   const store = withCollection(storeWith(), shared('t.json', variantKey(SLEEPER), { name: 'Sleeper cab', author: 'Alex' }), MODEL_FILE);
   assert.deepEqual(card(truckStatus(store, AUTO, SLEEPER), 'plays', 'appliesTo', 'note', 'buttons'), {
     plays: 'Sleeper cab — Alex',
-    appliesTo: 'all International 9900i on this chassis, from the collection',
-    note: 'From the collection: t.json. Editing makes your own copy for this chassis first.',
+    appliesTo: 'International 9900i, from the collection',
+    note: 'From the collection: t.json. Editing makes it your own variant of International 9900i first.',
     buttons: [],
   });
-  assert.equal(truckStatus(store, AUTO, SHORT).appliesTo, 'all chassis of International 9900i, from the collection');
+  assert.equal(truckStatus(store, AUTO, SHORT).appliesTo, 'International 9900i, from the collection');
   const pickedFile = truckStatus(store, PICK('file:t.json'), SLEEPER);
   assert.deepEqual(card(pickedFile, 'plays', 'appliesTo', 'note'), {
     plays: 'Sleeper cab — Alex (picked in the list)',
-    appliesTo: 'International 9900i on the hook 3.2 m chassis',
+    appliesTo: 'International 9900i, a variant for hook 3.2 m',
     note: 'From the collection: t.json. Editing makes your own copy first.',
   });
   assert.equal(pickedFile.useIn.options[0].label, 'Use it in…');
@@ -465,27 +468,34 @@ test('collection: the card and the list', () => {
 const exportPreset = (store, key, truck) => exportFiles(store, [{ scope: scopesOf(store, key)[0] ?? null, key }], truck).files[0];
 
 test('exportFiles: a preset as a file for the key it is on', () => {
-  const store = editLayout(rememberVehicle(withPreset(), TRUCK), AUTO, SLEEPER, widen); // p.2 the model's, p.3 the sleeper's
-  const chassis = exportPreset(store, 'p.3', SLEEPER);
-  assert.equal(chassis.fileName, 'ATS, International, International 9900i, hook 3.2 m.json');
-  assert.deepEqual({ ...chassis.data, layout: null }, {
-    truckerAuxPreset: 1, name: 'ATS › International › International 9900i › hook 3.2 m', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i',
+  // p.2 the model's variant, p.3 another its 3.2 m hook remembers.
+  const store = rememberVehicle(foldChassis(storeWith({
+    [TRUCK.key]: { name: TRUCK.name },
+    [variantKey(SLEEPER)]: { name: 'ATS › International › International 9900i', width: 1.5 },
+  })), TRUCK);
+  const sleeper = exportPreset(store, 'p.3', SLEEPER);
+  assert.equal(sleeper.fileName, 'ATS, International, International 9900i.json');
+  assert.deepEqual({ ...sleeper.data, layout: null }, {
+    truckerAuxPreset: 1, name: 'ATS › International › International 9900i', vehicle: 'vehicle.international.9900i@3.2', vehicleName: 'International 9900i',
     game: 'ats', brand: 'international', brandName: 'International', layout: null,
   });
-  assert.equal(chassis.data.layout.width, 1.5);
+  assert.equal(sleeper.data.layout.width, 1.5);
   assert.equal(exportPreset(store, 'p.2', null).data.vehicle, TRUCK.key);
-  // This vehicle's own preset is shared for its chassis: the plate stays private.
-  const plated = ownPreset(store, OWNED, 'truck');
-  const plateOwn = plated.assignments[plateKey(OWNED)];
-  assert.equal(exportPreset(plated, plateOwn, OWNED).data.vehicle, variantKey(OWNED));
-  assert.equal(exportPreset(plated, plateOwn, null).data.vehicle, TRUCK.key);
+  // A variant several hooks remember: the first in vehicle, all of them in hooks.
+  const two = assign(store, variantKey(SHORT), 'p.3');
+  assert.deepEqual([exportPreset(two, 'p.3', null).data.vehicle, exportPreset(two, 'p.3', null).data.hooks], [variantKey(SHORT), ['2.1', '3.2']]);
+  // This vehicle's own preset is shared for its hook: the plate stays private.
+  const own = createPreset(store, store.presets['p.1']);
+  const plated = assign(own.store, plateKey(OWNED), own.key);
+  assert.equal(exportPreset(plated, own.key, OWNED).data.vehicle, variantKey(OWNED));
+  assert.equal(exportPreset(plated, own.key, null).data.vehicle, TRUCK.key);
   // An unassigned preset is for no vehicle, all vehicles' for "all"; a shared file can go again.
   const custom = createPreset(store, store.presets['p.1']);
   assert.equal('vehicle' in exportPreset(custom.store, custom.key, SLEEPER).data, false);
   assert.equal(exportPreset(store, 'p.1', SLEEPER).data.name, 'Default layout');
   assert.equal(exportPreset(store, 'p.1', SLEEPER).data.vehicle, 'all');
   assert.equal(exportFiles(withCollection(store, MODEL_FILE), [{ scope: TRUCK.key, key: 'file:model.json' }], SLEEPER).files[0].data.vehicle, TRUCK.key);
-  // A model never driven is named after your preset for it; a chassis-only one has no name.
+  // A model never driven is named after your preset for it; a hook-only one has no name.
   assert.equal(exportPreset(withPreset(), 'p.2', null).data.vehicleName, 'International 9900i');
   const chassisOnly = storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } });
   assert.equal('vehicleName' in exportPreset(chassisOnly, 'p.2', null).data, false);
@@ -498,13 +508,13 @@ const lines = (node, depth = 0) => [
   ...node.children.flatMap((c) => lines(c, depth + 1)),
 ];
 
-test('presetTree: registry-like keys for every vehicle driven, scopes with presets and the vehicle in the game', () => {
-  let store = storeWith({
+test('presetTree: registry-like keys for every model driven, keys with presets and the vehicle in the game', () => {
+  let store = foldChassis(storeWith({
     [variantKey(SLEEPER)]: { name: 'Sleeper' },
     'brand:ats/peterbilt': { name: 'Petes' },
     'vehicle.scania.r#AB-1': { name: 'My Scania' },
     'vehicle.mack.anthem': { name: 'Anthem' }, // a model not driven since presets got scopes
-  }, [{ name: 'Spare' }]);
+  }, [{ name: 'Spare' }]));
   store = rememberVehicle(store, OWNED); // driven before: the sleeper with its plate
   store = rememberVehicle(store, OTHER); // a Peterbilt 579, no preset of its own
   store = rememberVehicle(store, { key: 'vehicle.scania.r', name: 'Scania R', game: 'ets2', brand: 'scania', brandName: 'Scania' });
@@ -514,44 +524,35 @@ test('presetTree: registry-like keys for every vehicle driven, scopes with prese
     '● All vehicles = Default layout',
     '  ● ATS (Default layout)',
     '    ● International (Default layout)',
-    '      ▶ International 9900i = model (file)',
-    '        ● hook 2.1 m (model)',
-    '          ● X-1 (model)',
-    '        hook 3.2 m = Sleeper',
-    '          WP-83695 (Sleeper)',
+    '      ▶ International 9900i = Sleeper',
     '    Peterbilt = Petes',
     '      Peterbilt 579 (Petes)',
     '  ETS2 (Default layout)',
     '    Scania (Default layout)',
     '      Scania R (Default layout)',
-    '        AB-1 = My Scania',
     '  Game not known yet (drive a vehicle once) (Default layout)',
     '    Anthem = Anthem',
   ]);
-  const sleeper = map.root.children[0].children[0].children[0].children[1];
-  assert.deepEqual(sleeper.children[0].inherited, { key: 'p.2', name: 'Sleeper', from: 'hook 3.2 m' });
-  assert.deepEqual(sleeper.moveTo.map((o) => o.value), [TRUCK.key, 'brand:ats/international', 'game:ats', 'all', plateKey(OWNED)]);
+  const find = (n, scope) => (n.scope === scope ? n : n.children.map((c) => find(c, scope)).find(Boolean));
+  assert.deepEqual(find(map.root, TRUCK.key).alternates.map((v) => v.key), ['file:model.json']);
+  assert.deepEqual(find(map.root, TRUCK.key).own.hooks, ['3.2']);
+  // A vehicle's own preset shows among its model's, with its plate.
+  assert.deepEqual(find(map.root, 'vehicle.scania.r').alternates.map((v) => [v.key, v.plate]), [['p.4', 'AB-1']]);
   assert.equal(map.root.children.at(-1).pseudo, true); // that folder is no scope
   assert.deepEqual(map.unassigned, [{ key: 'p.6', name: 'Spare', label: null, labelColor: 'blue' }]);
   assert.deepEqual(map.files, [{ key: 'file:loose.json', name: 'loose', default: false, label: null, labelColor: 'blue' }]);
-  // A model not driven goes up only to all vehicles: its game is not known.
-  const anthem = map.root.children.at(-1).children[0];
-  assert.deepEqual(anthem.moveTo.map((o) => o.value), ['all']);
 });
 
-test('presetTree: ▶ also on another chassis whose preset or file plays', () => {
-  // Yours on the 3.2 m chassis plays in the 2.1 m one.
-  const sibling = presetTree(storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } }), SHORT);
-  assert.deepEqual(lines(sibling.root).slice(3), [
-    '      ● International 9900i (Default layout)',
-    '        ● hook 2.1 m (Default layout)',
-    '        ▶ hook 3.2 m = Sleeper',
-  ]);
-  // A shared file (a default) for the 3.2 m chassis plays in the 2.1 m one.
-  const file = presetTree(withCollection(storeWith(), SLEEPER_FILE), SHORT);
-  assert.ok(lines(file.root).includes('        ▶ hook 3.2 m = sleeper (file)'));
+test('presetTree: the model in the game shows what plays in it, others their current one; ▶ only in Auto', () => {
+  const store = foldChassis(storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' }, [variantKey(SHORT)]: { name: 'Day' } }));
+  assert.equal(store.assignments[TRUCK.key], 'p.3'); // the first by hook: the 2.1 m day cab
+  const find = (n, scope) => (n.scope === scope ? n : n.children.map((c) => find(c, scope)).find(Boolean));
+  const model = find(presetTree(store, SLEEPER).root, TRUCK.key);
+  assert.deepEqual([model.own.key, model.plays, model.alternates.map((v) => v.key)], ['p.2', true, ['p.3']]);
+  assert.deepEqual([model.own.hooks, model.own.plates], [['3.2'], []]);
+  assert.equal(find(presetTree(store, OTHER).root, TRUCK.key).own.key, 'p.3');
   // Not in Auto: no ▶.
-  const picked = presetTree(storeWith({ [variantKey(SLEEPER)]: { name: 'Sleeper' } }), SHORT, { mode: 'scope', scope: 'all' });
+  const picked = presetTree(store, SHORT, { mode: 'scope', scope: 'all' });
   assert.ok(!lines(picked.root).some((l) => l.includes('▶')));
 });
 
@@ -565,11 +566,12 @@ test('model names: models of a brand the game names alike get the year from thei
   const tree = lines(presetTree(store, C24).root);
   assert.ok(tree.includes('      ● Freightliner Cascadia 2024 (Default layout)'));
   assert.ok(tree.includes('      Freightliner Cascadia 2019 (Default layout)'));
-  // A new chassis's preset is named with it.
-  const adopted = adoptNewChassis(store, C24);
-  assert.equal(at(adopted, variantKey(C24)).name, 'ATS › Freightliner › Freightliner Cascadia 2024 › hook 2.7 m');
+  // A new model's first variant is named with it.
+  const adopted = adoptVehicle(store, C24);
+  assert.equal(at(adopted, C24.key).name, 'ATS › Freightliner › Freightliner Cascadia 2024');
+  assert.equal(adopted.assignments[variantKey(C24)], adopted.assignments[C24.key]);
   // A file keeps the game's name: the app tells the twins apart when it shows them.
-  const picks = [{ scope: variantKey(C24), key: adopted.assignments[variantKey(C24)] }];
+  const picks = [{ scope: C24.key, key: adopted.assignments[C24.key] }];
   assert.equal(exportFiles(adopted, picks).files[0].data.vehicleName, 'Freightliner Cascadia');
   // Alone, a model keeps the game's name; one already ending with the year is not given it twice.
   assert.equal(scopeLabel(rememberVehicle(storeWith(), C24), C24.key), 'Freightliner Cascadia');
@@ -590,45 +592,51 @@ test('model names: a shared file\'s vehicleName before your preset\'s name, neve
 
 test('planAssign: one of your presets put at a key of the map', () => {
   const store = withPreset();
+  // On a model: a variant more, its current one; nothing is taken.
   const plan = planAssign(store, 'p.1', TRUCK.key);
-  assert.deepEqual(plan.taken, { key: 'p.2', name: 'International 9900i', keeps: false });
+  assert.equal(plan.taken, null);
   const done = applyScope(store, plan, null);
   assert.equal(done.assignments[TRUCK.key], 'p.1');
+  assert.deepEqual(done.alternates, { [TRUCK.key]: ['p.2'] });
   assert.deepEqual(scopesOf(done, 'p.1'), [TRUCK.key, 'all']);
   assert.equal(planAssign(done, 'p.1', TRUCK.key), null);
   assert.equal(planAssign(done, 'p.1', '?unknown'), null);
+  // On a brand's key: the one there is taken.
+  const brand = storeWith({ 'brand:ats/international': { name: 'B' } });
+  assert.deepEqual(planAssign(brand, 'p.1', 'brand:ats/international').taken, { key: 'p.2', name: 'B', keeps: false });
 });
 
-test('planMove: moving a preset in the map, up its chain or down to a narrower scope', () => {
-  const store = rememberVehicle(storeWith({
+test('planMove: moving a preset in the map, up its chain, down or across', () => {
+  const store = rememberVehicle(foldChassis(storeWith({
     [TRUCK.key]: { name: 'Model' },                   // p.2
-    [variantKey(SLEEPER)]: { name: 'Sleeper' },        // p.3
+    [variantKey(SLEEPER)]: { name: 'Sleeper' },        // p.3, a variant its 3.2 m hook remembers
     'game:ats': { name: 'ATS' },                       // p.4
-  }), TRUCK);
-  // Up from the chassis to the game: the model in between keeps playing on this chassis.
-  const up = planMove(store, variantKey(SLEEPER), 'game:ats');
+  })), TRUCK);
+  // Up from the model to the game: the sleeper variant leaves the model; its hook forgets it.
+  const up = planMove(store, TRUCK.key, 'game:ats', null, 'p.3');
   assert.deepEqual({ ...up, shadow: up.shadow.map((s) => s.scope) }, {
-    mode: 'move', key: 'p.3', from: variantKey(SLEEPER), to: 'game:ats', direction: 'up', mustCopy: false,
-    taken: { key: 'p.4', name: 'ATS', keeps: false }, shadow: [TRUCK.key], fallback: null, outplayed: null,
+    mode: 'move', key: 'p.3', from: TRUCK.key, to: 'game:ats', direction: 'up', mustCopy: false,
+    taken: { key: 'p.4', name: 'ATS', keeps: false }, shadow: [], fallback: null, outplayed: null,
   });
-  const moved = applyScope(store, up, null, { clear: [TRUCK.key] });
+  const moved = applyScope(store, up, null);
   assert.equal(moved.assignments['game:ats'], 'p.3');
-  assert.equal(moved.assignments[TRUCK.key], undefined);
-  assert.ok(moved.presets['p.2'] && moved.presets['p.4']); // unassigned, not deleted
-  // Down from the game to the chassis: what plays there afterwards is named.
-  const down = planMove(store, 'game:ats', variantKey(SLEEPER));
+  assert.equal(moved.assignments[variantKey(SLEEPER)], undefined);
+  assert.equal(moved.assignments[TRUCK.key], 'p.2');
+  assert.ok(moved.presets['p.4']); // unassigned, not deleted
+  // Down from the game to the model: a variant more there; what plays where it was is named.
+  const down = planMove(store, 'game:ats', TRUCK.key);
   assert.equal(down.direction, 'down');
+  assert.equal(down.taken, null);
   assert.deepEqual(down.fallback, { label: 'all vehicles', name: 'Default layout' });
   const copied = applyScope(store, down, null, { copy: true });
   assert.equal(copied.assignments['game:ats'], 'p.4');
-  assert.equal(at(copied, variantKey(SLEEPER)).name, 'ATS › International › International 9900i › hook 3.2 m');
-  // Across, to a key on another chain (dragging): the old key is freed, what it plays next is named.
-  const across = planMove(store, variantKey(SLEEPER), variantKey(SHORT));
+  assert.equal(at(copied, TRUCK.key).name, 'ATS › International › International 9900i');
+  // Across, to another model (dragging): it leaves this one.
+  const across = planMove(store, TRUCK.key, OTHER.key, null, 'p.3');
   assert.equal(across.direction, 'across');
-  assert.deepEqual(across.fallback, { label: 'International 9900i', name: 'Model' });
   const acrossDone = applyScope(store, across, null);
-  assert.equal(acrossDone.assignments[variantKey(SHORT)], 'p.3');
-  assert.equal(acrossDone.assignments[variantKey(SLEEPER)], undefined);
+  assert.equal(acrossDone.assignments[OTHER.key], 'p.3');
+  assert.equal(acrossDone.alternates, undefined);
   assert.equal(planMove(store, TRUCK.key, 'brand:ats/peterbilt').direction, 'across');
   assert.equal(planMove(store, TRUCK.key, '?unknown'), null); // a folder
   // A file, nothing there: no plan.
@@ -647,76 +655,67 @@ test('a shared file may say the game and brand of its vehicle: the map places it
     '● All vehicles = Default layout',
     '  ATS (Default layout)',
     '    Mack (Default layout)',
-    '      Mack Anthem (Default layout)',
-    '        hook 2.4 m = anthem (file)',
+    '      Mack Anthem = anthem (file)',
   ]);
   // Exported again, the file keeps saying where the vehicle is from.
   const own = assign(withCollection(storeWith(), file), 'vehicle.mack.anthem@2.4', 'p.1');
   assert.equal(exportPreset(own, 'p.1', null).data.game, 'ats');
 });
 
-test('adoptNewChassis: a chassis seen without a preset of its own gets a copy of what it would play', () => {
+test('adoptVehicle: a new model gets its first variant; a new hook remembers what it plays', () => {
   const store = storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } });
-  // A model new to the app: a copy of what it would inherit, on this chassis.
-  const adopted = adoptNewChassis(store, SLEEPER);
-  const chassis32 = variantKey(SLEEPER);
-  assert.equal(adopted.assignments[chassis32], 'p.3');
-  assert.equal(adopted.assignments[TRUCK.key], undefined); // not the model's: each chassis gets its own
-  assert.equal(at(adopted, chassis32).name, 'ATS › International › International 9900i › hook 3.2 m');
-  assert.equal(at(adopted, chassis32).width, 0.4); // the brand's, copied
-  assert.equal(at(adopted, chassis32).label, 'new'); // stands out in the tree until labelled
-  assert.equal(at(adopted, chassis32).labelColor, 'green');
-  assert.notEqual(at(adopted, chassis32).speakers, store.presets['p.2'].speakers);
-  // Another chassis of the model: a copy of that chassis's preset at once, so nothing plays
-  // from another chassis. Labelled "new" too, not with the other chassis's label.
-  const chassis21 = variantKey(SHORT);
-  const labelled = editLayout(adopted, AUTO, SLEEPER, (l) => ({ ...l, label: 'sleeper', labelColor: 'blue' }));
-  const second = adoptNewChassis(labelled, SHORT);
-  assert.notEqual(second.assignments[chassis21], second.assignments[chassis32]);
-  assert.equal(at(second, chassis21).name, 'ATS › International › International 9900i › hook 2.1 m');
-  assert.equal(at(second, chassis21).width, 0.4); // the 3.2 m chassis's
-  assert.deepEqual([at(second, chassis21).label, at(second, chassis21).labelColor], ['new', 'green']);
-  assert.equal(autoPreset(second, SHORT).how, 'chassis');
-  assert.equal(adoptNewChassis(second, SHORT), second); // it has its own now
-  // A shared file (a default) for another chassis: copied too.
-  const fromFile = adoptNewChassis(withCollection(storeWith(), SLEEPER_FILE), SHORT);
-  assert.equal(at(fromFile, chassis21).name, 'ATS › International › International 9900i › hook 2.1 m');
-  assert.equal(at(fromFile, chassis21).width, 0.8); // the file's
-  assert.equal(at(fromFile, chassis21).label, 'new');
-  // The game reports no chassis: the model gets it.
-  assert.equal(at(adoptNewChassis(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
-  // Its own plays, or the model's (yours or a shared file for the model), or a vehicle of the
-  // model has a key: nothing new.
-  const own = storeWith({ [chassis21]: { name: 'Day cab' } });
-  assert.equal(adoptNewChassis(own, SHORT), own);
-  const model = storeWith({ [TRUCK.key]: { name: 'Model' } });
-  assert.equal(adoptNewChassis(model, SHORT), model);
-  const modelFile = withCollection(storeWith(), MODEL_FILE);
-  assert.equal(adoptNewChassis(modelFile, SHORT), modelFile);
+  // A model new to the app: a copy of what it would inherit, its hook remembering it.
+  const adopted = adoptVehicle(store, SLEEPER);
+  assert.deepEqual([adopted.assignments[TRUCK.key], adopted.assignments[variantKey(SLEEPER)]], ['p.3', 'p.3']);
+  assert.equal(at(adopted, TRUCK.key).name, 'ATS › International › International 9900i');
+  assert.equal(at(adopted, TRUCK.key).width, 0.4); // the brand's, copied
+  assert.deepEqual([at(adopted, TRUCK.key).label, at(adopted, TRUCK.key).labelColor], ['new', 'green']); // stands out until labelled
+  assert.notEqual(at(adopted, TRUCK.key).speakers, store.presets['p.2'].speakers);
+  // Another hook: it remembers the model's current variant, no copy.
+  const second = adoptVehicle(adopted, SHORT);
+  assert.deepEqual(Object.keys(second.presets), Object.keys(adopted.presets));
+  assert.equal(second.assignments[variantKey(SHORT)], 'p.3');
+  assert.equal(adoptVehicle(second, SHORT), second); // remembered now
+  // A variant made later on another hook does not move it.
+  const two = newAlternate(second, TRUCK.key, SLEEPER);
+  assert.equal(two.assignments[variantKey(SLEEPER)], 'p.4');
+  assert.equal(autoPreset(two, SHORT).key, 'p.3');
+  // A file for the model: a new hook remembers it; a file for that very hook plays without a memory.
+  const fromFile = adoptVehicle(withCollection(storeWith(), MODEL_FILE), SHORT);
+  assert.equal(fromFile.assignments[variantKey(SHORT)], 'file:model.json');
+  const hookFile = withCollection(storeWith(), SLEEPER_FILE);
+  assert.equal(adoptVehicle(hookFile, SLEEPER), hookFile);
+  assert.equal(adoptVehicle(hookFile, SHORT).assignments[variantKey(SHORT)], 'file:sleeper.json'); // another hook's file
+  // The game reports no hook: the model gets it.
+  assert.equal(at(adoptVehicle(storeWith(), OTHER), OTHER.key).name, 'ATS › Peterbilt › Peterbilt 579'); // all vehicles' copied
+  // Your vehicle remembering a preset: nothing new.
   const plate = storeWith({ [plateKey(OWNED)]: { name: 'Mine' } });
-  assert.equal(adoptNewChassis(plate, SHORT), plate);
-  assert.equal(adoptNewChassis(store, null), store);
+  assert.equal(adoptVehicle(plate, OWNED), plate);
+  assert.equal(adoptVehicle(store, null), store);
 });
 
 test('a key picked in the map: it plays what it has or inherits; editing gives it its own first', () => {
   const store = rememberVehicle(storeWith({ 'brand:ats/international': { name: 'Brand', width: 0.4 } }), OWNED);
-  const KEY = { mode: 'scope', scope: variantKey(SLEEPER) };
+  const KEY = { mode: 'scope', scope: TRUCK.key };
   assert.deepEqual(scopePreset(store, KEY.scope), { key: 'p.2', at: 'brand:ats/international' });
   assert.equal(resolvePlaying(store, KEY, null).key, 'p.2');
   assert.equal(truckStatus(store, KEY, null).note,
-    'It inherits this from all International: editing gives International 9900i, hook 3.2 m a preset of its own first.');
+    'It inherits this from all International: editing gives International 9900i a preset of its own first.');
   const edited = editLayout(store, KEY, null, widen);
   assert.equal(at(edited, KEY.scope).width, 1.5);
-  assert.equal(at(edited, KEY.scope).name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(at(edited, KEY.scope).name, 'ATS › International › International 9900i');
   assert.equal(at(edited, 'brand:ats/international').width, 0.4); // the brand's stays
-  assert.equal(truckStatus(edited, KEY, null).note, 'Editing changes the preset of International 9900i, hook 3.2 m.');
+  assert.equal(truckStatus(edited, KEY, null).note, 'Editing changes the preset of International 9900i.');
   const again = editLayout(edited, KEY, null, (l) => setWidth(l, 0.2));
   assert.equal(Object.keys(again.presets).length, Object.keys(edited.presets).length); // no second copy
-  // A plate's key inherits through its chassis; a shared file counts on the way.
-  assert.equal(scopePreset(edited, plateKey(OWNED)).at, KEY.scope);
-  assert.equal(scopePreset(withCollection(store, MODEL_FILE), plateKey(OWNED)).key, 'file:model.json');
+  // A model's file plays on its key; editing it makes your copy in its place.
+  const files = withCollection(store, SLEEPER_FILE);
+  assert.equal(scopePreset(files, TRUCK.key).key, 'file:sleeper.json');
+  assert.equal(truckStatus(files, KEY, null).note, 'A shared file of International 9900i: editing makes your own copy in its place first.');
+  const copied = editLayout(files, KEY, null, widen);
+  assert.deepEqual([at(copied, TRUCK.key).copyOf, copied.assignments[variantKey(SLEEPER)]], ['file:sleeper.json', copied.assignments[TRUCK.key]]);
   // The list shows the key; values round-trip.
-  assert.equal(presetOptions(store, null, KEY)[1].label, 'Key: International 9900i, hook 3.2 m');
+  assert.equal(presetOptions(store, null, KEY)[1].label, 'Key: International 9900i');
   assert.deepEqual(parseSelection(selectionValue(KEY)), KEY);
 });
 
@@ -743,7 +742,7 @@ test('the card offers Back to Auto when a key or a preset is picked', () => {
   assert.equal(truckStatus(store, AUTO, OWNED).buttons.some((b) => b.action === 'auto'), false);
 });
 
-test('exportFiles: each ticked preset goes for its key; plates go for their chassis; clashes are told', () => {
+test('exportFiles: each ticked preset goes for its key; a vehicle\'s own goes for its hook', () => {
   let store = storeWith({
     'game:ats': { name: 'ATS' },
     'brand:ats/international': { name: 'International' },
@@ -760,11 +759,14 @@ test('exportFiles: each ticked preset goes for its key; plates go for their chas
     { game: set.files[0].data.game, brand: set.files[0].data.brand, brandName: set.files[0].data.brandName },
     { game: 'ats', brand: 'international', brandName: 'International' },
   );
-  assert.deepEqual([set.clashes, set.plates], [[], 0]);
-  // A vehicle's own goes for its chassis: with the chassis' own, two files for one key.
-  const both = exportFiles(store, [variantKey(SLEEPER), plateKey(OWNED)].map((scope) => ({ scope, key: store.assignments[scope] })), null);
+  assert.equal(set.plates, 0);
+  // A vehicle's own goes for its hook, beside the variant the hook remembers: variants, no clash.
+  const both = exportFiles(store, [
+    { scope: TRUCK.key, key: store.assignments[variantKey(SLEEPER)] },
+    { scope: plateKey(OWNED), key: store.assignments[plateKey(OWNED)] },
+  ], null);
   assert.deepEqual(both.files.map((f) => f.data.vehicle), [variantKey(OWNED), variantKey(OWNED)]);
-  assert.deepEqual([both.clashes, both.plates], [['International 9900i, hook 3.2 m'], 1]);
+  assert.equal(both.plates, 1);
   // A shared file keeps its author; one on no key goes for none.
   const file = withCollection(store, { ...MODEL_FILE, author: 'Alex' });
   const loose = exportFiles(file, [{ scope: null, key: 'file:model.json' }], null).files[0].data;
@@ -816,115 +818,129 @@ test('dropImportedDefaults: 0.1.1\'s copies of the defaults give way to them; ch
 });
 
 const CHASSIS = variantKey(SLEEPER);
-// p.2 the studio plays on the 3.2 m chassis, p.3 the sleeper waits on it.
-const twoCabs = () => addAlternate(storeWith({ [CHASSIS]: { name: 'Studio', label: 'studio' } }, [{ name: 'Sleeper' }]), CHASSIS, 'p.3');
+const MODEL = TRUCK.key;
+// p.2 the studio is the model's current variant, p.3 the sleeper waits.
+const twoCabs = () => addAlternate(storeWith({ [MODEL]: { name: 'Studio', label: 'studio' } }, [{ name: 'Sleeper' }]), MODEL, 'p.3');
 const nodeAt = (root, scope) => (function find(n) { return n.scope === scope ? n : n.children.map(find).find(Boolean); })(root);
 
-test('variants: a key holds one that plays and others that wait; picking one swaps them', () => {
+test('variants: a model holds a current one and others that wait; picking one swaps them', () => {
   const store = twoCabs();
-  assert.deepEqual(store.alternates, { [CHASSIS]: ['p.3'] });
-  assert.deepEqual(alternatesOf(store, CHASSIS).map((a) => [a.key, a.name, a.label, a.active]), [['p.2', 'Studio', 'studio', true], ['p.3', 'Sleeper', null, false]]);
-  assert.deepEqual(presetTree(store, null).unassigned, []); // it waits on the key, not among the unused
-  assert.deepEqual(nodeAt(presetTree(store, SLEEPER).root, CHASSIS).alternates.map((a) => a.key), ['p.3']);
-  const picked = pickAlternate(store, CHASSIS, 'p.3');
-  assert.equal(picked.assignments[CHASSIS], 'p.3');
-  assert.deepEqual(picked.alternates, { [CHASSIS]: ['p.2'] });
+  assert.deepEqual(store.alternates, { [MODEL]: ['p.3'] });
+  assert.deepEqual(alternatesOf(store, MODEL).map((a) => [a.key, a.name, a.label, a.active]), [['p.2', 'Studio', 'studio', true], ['p.3', 'Sleeper', null, false]]);
+  assert.deepEqual(presetTree(store, null).unassigned, []); // it waits on the model, not among the unused
+  assert.deepEqual(nodeAt(presetTree(store, SLEEPER).root, MODEL).alternates.map((a) => a.key), ['p.3']);
+  const picked = pickAlternate(store, MODEL, 'p.3');
+  assert.equal(picked.assignments[MODEL], 'p.3');
+  assert.deepEqual(picked.alternates, { [MODEL]: ['p.2'] });
   assert.equal(autoPreset(picked, SLEEPER).key, 'p.3');
-  assert.equal(pickAlternate(picked, CHASSIS, 'p.3'), picked); // it plays already
-  // The playing one, or one waiting already, is not added again.
-  assert.equal(addAlternate(store, CHASSIS, 'p.2'), store);
-  assert.equal(addAlternate(store, CHASSIS, 'p.3'), store);
-  // A deleted preset leaves the key's variants.
+  assert.equal(pickAlternate(picked, MODEL, 'p.3'), picked); // it plays already
+  // The current one, or one waiting already, is not added again.
+  assert.equal(addAlternate(store, MODEL, 'p.2'), store);
+  assert.equal(addAlternate(store, MODEL, 'p.3'), store);
+  // A deleted preset leaves the model's variants.
   assert.equal(deletePreset(store, 'p.3').alternates, undefined);
 });
 
-test('variants: taking one off the key; the next one plays, the preset stays', () => {
-  const store = twoCabs();
-  const off = dropAlternate(store, CHASSIS, 'p.2'); // the one that plays
-  assert.equal(off.assignments[CHASSIS], 'p.3');
-  assert.equal(off.alternates, undefined);
+test('variants: taking one off the model; the next one plays, its hooks forget it, the preset stays', () => {
+  const store = assign(twoCabs(), CHASSIS, 'p.2'); // the 3.2 m hook remembers the studio
+  const off = dropAlternate(store, MODEL, 'p.2');
+  assert.deepEqual([off.assignments[MODEL], off.assignments[CHASSIS], off.alternates], ['p.3', undefined, undefined]);
+  assert.equal(autoPreset(off, SLEEPER).key, 'p.3');
   assert.deepEqual(presetTree(off, null).unassigned.map((p) => p.key), ['p.2']);
-  const waiting = dropAlternate(store, CHASSIS, 'p.3');
-  assert.deepEqual([waiting.assignments[CHASSIS], waiting.alternates], ['p.2', undefined]);
-  assert.equal(dropAlternate(off, CHASSIS, 'p.3').assignments[CHASSIS], undefined); // the last one: the key is free
+  const waiting = dropAlternate(store, MODEL, 'p.3');
+  assert.deepEqual([waiting.assignments[MODEL], waiting.alternates], ['p.2', undefined]);
+  assert.equal(dropAlternate(off, MODEL, 'p.3').assignments[MODEL], undefined); // the last one: the model is free
 });
 
-test('variants: a new one is a copy of what plays on the key, named by the key, labelled new; it plays', () => {
-  const store = storeWith({ [CHASSIS]: { name: 'Studio', label: 'studio', width: 0.7 } });
-  const next = newAlternate(store, CHASSIS, SLEEPER);
-  const key = next.assignments[CHASSIS];
+test('variants: a new one is a copy of the model\'s, named by it, labelled new; it plays in the vehicle', () => {
+  const store = assign(storeWith({ [MODEL]: { name: 'Studio', label: 'studio', width: 0.7 } }), CHASSIS, 'p.2');
+  const next = newAlternate(store, MODEL, SLEEPER);
+  const key = next.assignments[MODEL];
   assert.notEqual(key, 'p.2');
-  assert.equal(next.presets[key].name, 'ATS › International › International 9900i › hook 3.2 m');
+  assert.equal(next.presets[key].name, 'ATS › International › International 9900i');
   assert.deepEqual([next.presets[key].label, next.presets[key].labelColor, next.presets[key].width], ['new', 'green', 0.7]);
-  assert.deepEqual(next.alternates, { [CHASSIS]: ['p.2'] });
-  // A key with nothing of its own: a copy of what it inherits, and nothing waits.
-  const fresh = newAlternate(storeWith(), CHASSIS, SLEEPER);
-  assert.equal(at(fresh, CHASSIS).label, 'new');
+  assert.deepEqual(next.alternates, { [MODEL]: ['p.2'] });
+  assert.equal(next.assignments[CHASSIS], key); // the vehicle in the game plays it
+  assert.equal(newAlternate(store, MODEL, SHORT).assignments[CHASSIS], 'p.2'); // another hook keeps its own
+  // A model with nothing of its own: a copy of what it inherits, and nothing waits.
+  const fresh = newAlternate(storeWith(), MODEL, SLEEPER);
+  assert.equal(at(fresh, MODEL).label, 'new');
   assert.equal(fresh.alternates, undefined);
   // A copy of another preset (the menu's "copy current": what plays now).
-  const fromAll = newAlternate(store, CHASSIS, SLEEPER, 'p.1');
-  assert.deepEqual([at(fromAll, CHASSIS).width, at(fromAll, CHASSIS).speakers.length], [1, 2]);
-  assert.deepEqual(fromAll.alternates, { [CHASSIS]: ['p.2'] });
+  const fromAll = newAlternate(store, MODEL, SLEEPER, 'p.1');
+  assert.deepEqual([at(fromAll, MODEL).width, at(fromAll, MODEL).speakers.length], [1, 2]);
+  assert.deepEqual(fromAll.alternates, { [MODEL]: ['p.2'] });
 });
 
-test('variants: shared files for one key are variants too; picking one sets it on the key', () => {
+test('variants: the files for a model and its hooks are variants too; picking one makes it current', () => {
   const studio = shared('studio.json', CHASSIS);
   const files = withCollection(storeWith(), SLEEPER_FILE, studio);
-  assert.deepEqual(alternatesOf(files, CHASSIS).map((a) => [a.key, a.file, a.active]), [['file:sleeper.json', true, true], ['file:studio.json', true, false]]);
-  const picked = pickAlternate(files, CHASSIS, 'file:studio.json');
-  assert.equal(picked.assignments[CHASSIS], 'file:studio.json');
-  assert.equal(picked.alternates, undefined); // a file needs no place: it is the key's by its vehicle
-  assert.equal(autoPreset(picked, SLEEPER).key, 'file:studio.json');
-  assert.deepEqual(alternatesOf(picked, CHASSIS).map((a) => [a.key, a.active]), [['file:studio.json', true], ['file:sleeper.json', false]]);
-  // Yours on the key plays before the files; picking a file keeps yours waiting.
-  const own = withCollection(storeWith({ [CHASSIS]: { name: 'Mine' } }), SLEEPER_FILE);
-  assert.deepEqual(alternatesOf(own, CHASSIS).map((a) => [a.key, a.active]), [['p.2', true], ['file:sleeper.json', false]]);
-  const toFile = pickAlternate(own, CHASSIS, 'file:sleeper.json');
-  assert.deepEqual([toFile.assignments[CHASSIS], toFile.alternates], ['file:sleeper.json', { [CHASSIS]: ['p.2'] }]);
-  assert.deepEqual(pickAlternate(toFile, CHASSIS, 'p.2').assignments[CHASSIS], 'p.2');
-  // A file with the same speakers as one of yours on the key (yours a copy of it) is no variant
-  // of its own; nor is all vehicles' file, which plays only when picked by hand.
-  const copied = withCollection(storeWith({ [CHASSIS]: { ...SLEEPER_FILE.layout, name: 'My copy' } }), SLEEPER_FILE);
-  assert.deepEqual(alternatesOf(copied, CHASSIS).map((a) => a.key), ['p.2']);
+  assert.deepEqual(alternatesOf(files, MODEL).map((a) => [a.key, a.file, a.active, a.hooks]), [['file:sleeper.json', true, true, ['3.2']], ['file:studio.json', true, false, ['3.2']]]);
+  const picked = pickAlternate(files, MODEL, 'file:studio.json');
+  assert.equal(picked.assignments[MODEL], 'file:studio.json');
+  assert.equal(picked.alternates, undefined); // a file needs no place: it is the model's by its vehicle
+  assert.equal(autoPreset(picked, SHORT).key, 'file:studio.json'); // a hook without a file of its own
+  assert.equal(autoPreset(picked, SLEEPER).key, 'file:sleeper.json'); // the hook's files, first by path
+  assert.deepEqual(alternatesOf(picked, MODEL).map((a) => [a.key, a.active]), [['file:studio.json', true], ['file:sleeper.json', false]]);
+  // Yours plays before the files; picking a file keeps yours waiting.
+  const own = withCollection(storeWith({ [MODEL]: { name: 'Mine' } }), SLEEPER_FILE);
+  assert.deepEqual(alternatesOf(own, MODEL).map((a) => [a.key, a.active]), [['p.2', true], ['file:sleeper.json', false]]);
+  const toFile = pickAlternate(own, MODEL, 'file:sleeper.json');
+  assert.deepEqual([toFile.assignments[MODEL], toFile.alternates], ['file:sleeper.json', { [MODEL]: ['p.2'] }]);
+  assert.deepEqual(pickAlternate(toFile, MODEL, 'p.2').assignments[MODEL], 'p.2');
+  // A file one of yours was copied from, or has the same speakers as, is no variant of its own;
+  // nor is all vehicles' file, which plays only when picked by hand.
+  const copied = withCollection(storeWith({ [MODEL]: { ...SLEEPER_FILE.layout, name: 'My copy' } }), SLEEPER_FILE);
+  assert.deepEqual(alternatesOf(copied, MODEL).map((a) => a.key), ['p.2']);
+  const edited = withCollection(storeWith({ [MODEL]: { name: 'Edited', copyOf: 'file:sleeper.json' } }), SLEEPER_FILE);
+  assert.deepEqual(alternatesOf(edited, MODEL).map((a) => a.key), ['p.2']);
+  assert.equal(autoPreset(edited, SLEEPER).key, 'p.2'); // yours stands for it on its hook too
   const allFile = withCollection(storeWith(), shared('everything.json', 'all'));
   assert.deepEqual(alternatesOf(allFile, 'all').map((a) => a.key), ['p.1']);
 });
 
-test('variants: the card picks one; your own vehicle keeps its choice by its plate', () => {
+test('variants: the card picks one; your own vehicle keeps it by its plate, another by its hook', () => {
   const store = twoCabs();
-  assert.deepEqual(variantChoice(store, SLEEPER), { scope: CHASSIS, value: 'p.2', options: [{ value: 'p.2', label: 'studio' }, { value: 'p.3', label: 'Sleeper' }] });
-  assert.equal(variantChoice(storeWith({ [CHASSIS]: { name: 'Studio' } }), SLEEPER), null); // one is no choice
-  // A quick-job vehicle: the key's choice.
+  assert.deepEqual(variantChoice(store, SLEEPER), { scope: MODEL, value: 'p.2', options: [{ value: 'p.2', label: 'studio' }, { value: 'p.3', label: 'Sleeper' }] });
+  assert.equal(variantChoice(storeWith({ [MODEL]: { name: 'Studio' } }), SLEEPER), null); // one is no choice
+  // A quick-job vehicle: its hook remembers it, and it is the model's current one now.
   const lent = chooseVariant(store, LENT, 'p.3');
-  assert.deepEqual([lent.assignments[CHASSIS], lent.assignments[plateKey(LENT)]], ['p.3', undefined]);
-  // Your own vehicle: on its plate; the key keeps playing the studio for the others.
-  const own = chooseVariant(store, OWNED, 'p.3');
+  assert.deepEqual([lent.assignments[CHASSIS], lent.assignments[plateKey(LENT)], lent.assignments[MODEL]], ['p.3', undefined, 'p.3']);
+  // Your own vehicle: on its plate; the hook keeps playing the studio for the others.
+  const own = chooseVariant(assign(store, CHASSIS, 'p.2'), OWNED, 'p.3');
   assert.deepEqual([own.assignments[plateKey(OWNED)], own.assignments[CHASSIS]], ['p.3', 'p.2']);
   assert.equal(variantChoice(own, OWNED).value, 'p.3');
   assert.equal(variantChoice(own, SLEEPER).value, 'p.2');
   assert.equal(autoPreset(own, OWNED).key, 'p.3');
-  // Your vehicle with a preset of its own that is no variant: no choice offered.
-  assert.equal(variantChoice(assign(store, plateKey(OWNED), 'p.1'), OWNED), null);
+  // Your vehicle with a preset of its own: offered beside the variants, with its plate.
+  const mine = assign(store, plateKey(OWNED), 'p.1');
+  assert.deepEqual(variantChoice(mine, OWNED).options.map((o) => o.label), ['studio', 'Sleeper', 'Default layout (WP-83695 only)']);
+  assert.equal(variantChoice(mine, OWNED).value, 'p.1');
 });
 
-test('applyScope: "Add as a variant" keeps what the key had waiting; a key a preset leaves plays its next variant', () => {
-  const store = twoCabs();
-  // Another preset put on the key as a variant: it plays, the studio waits beside the sleeper.
-  const spare = applyScope(store, planAssign(store, 'p.1', CHASSIS), SLEEPER, { variant: true });
-  assert.equal(spare.assignments[CHASSIS], 'p.1');
-  assert.deepEqual(spare.alternates[CHASSIS], ['p.3', 'p.2']);
-  // Without it, the studio leaves the key, as before; the sleeper still waits.
-  const replaced = applyScope(store, planAssign(store, 'p.1', CHASSIS), SLEEPER);
-  assert.deepEqual(replaced.alternates[CHASSIS], ['p.3']);
-  // The studio moved up to the model: the 3.2 m chassis plays the sleeper waiting there.
-  const moved = applyScope(store, planMove(store, CHASSIS, TRUCK.key, SLEEPER), SLEEPER);
-  assert.deepEqual([moved.assignments[TRUCK.key], moved.assignments[CHASSIS], moved.alternates], ['p.2', 'p.3', undefined]);
+test('applyScope: "Add as a variant" on a brand keeps the one there waiting; a model takes a variant more', () => {
+  const BRAND = 'brand:ats/international';
+  const store = addAlternate(storeWith({ [BRAND]: { name: 'Studio' } }, [{ name: 'Sleeper' }]), BRAND, 'p.3');
+  const spare = applyScope(store, planAssign(store, 'p.1', BRAND), SLEEPER, { variant: true });
+  assert.equal(spare.assignments[BRAND], 'p.1');
+  assert.deepEqual(spare.alternates[BRAND], ['p.3', 'p.2']);
+  const replaced = applyScope(store, planAssign(store, 'p.1', BRAND), SLEEPER);
+  assert.deepEqual(replaced.alternates[BRAND], ['p.3']);
+  // Put on the model: a variant more, which the vehicle in the game plays; nothing is taken.
+  const cabs = twoCabs();
+  const plan = planAssign(cabs, 'p.1', MODEL);
+  assert.equal(plan.taken, null);
+  const added = applyScope(cabs, plan, SLEEPER);
+  assert.deepEqual([added.assignments[MODEL], added.alternates[MODEL], added.assignments[CHASSIS]], ['p.1', ['p.2', 'p.3'], 'p.1']);
+  // The studio moved up to the brand: the model plays the sleeper.
+  const moved = applyScope(cabs, planMove(cabs, MODEL, BRAND, SLEEPER), SLEEPER);
+  assert.deepEqual([moved.assignments[BRAND], moved.assignments[MODEL], moved.alternates], ['p.2', 'p.3', undefined]);
 });
 
-test('exportFiles: the variants of a key are a file each, for that key, and no clash', () => {
-  const { files, clashes } = exportFiles(twoCabs(), [{ scope: CHASSIS, key: 'p.2' }, { scope: CHASSIS, key: 'p.3' }]);
-  assert.deepEqual(files.map((f) => [f.data.name, f.data.vehicle]), [['Studio', CHASSIS], ['Sleeper', CHASSIS]]);
-  assert.deepEqual(clashes, []);
+test('exportFiles: the variants of a model are a file each, for the hooks remembering them', () => {
+  const store = assign(twoCabs(), CHASSIS, 'p.3');
+  const { files } = exportFiles(store, [{ scope: MODEL, key: 'p.2' }, { scope: MODEL, key: 'p.3' }]);
+  assert.deepEqual(files.map((f) => [f.data.name, f.data.vehicle]), [['Studio', MODEL], ['Sleeper', CHASSIS]]);
 });
 
 test('editLayout: a preset labelled "new" loses the label at its first edit, not at a label edit', () => {
@@ -936,27 +952,31 @@ test('editLayout: a preset labelled "new" loses the label at its first edit, not
   assert.equal(at(editLayout(store, AUTO, SHORT, (l) => ({ ...l })), variantKey(SHORT)).label, 'new'); // nothing changed
 });
 
-test('importPresets: files on their keys; a key of yours is replaced only when asked', () => {
+test('importPresets: a file becomes a variant of its model; what yours play changes only when asked', () => {
   const file = (name, vehicle, width) => ({ ...shared(`${name}.json`, vehicle), key: null, name, layout: { ...defaultLayout(), name, width } });
-  const store = rememberVehicle(storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } }), TRUCK);
+  const store = assign(rememberVehicle(storeWith({ [TRUCK.key]: { name: 'Mine', width: 0.5 } }), TRUCK), CHASSIS, 'p.2');
   const model = file('Theirs', TRUCK.key, 0.8);
-  const chassis = file('Sleeper', variantKey(SLEEPER), 0.6);
-  assert.deepEqual(importClashes(store, [model, chassis]), [{ scope: TRUCK.key, label: 'International 9900i', yours: 'Mine', theirs: 'Theirs' }]);
-  const kept = importPresets(store, [model, chassis]);
-  assert.deepEqual([kept.placed, kept.variants, kept.unused, kept.same], [1, 1, 0, 0]);
+  const chassis = file('Sleeper', CHASSIS, 0.6);
+  const day = file('Day', variantKey(SHORT), 0.4);
+  assert.deepEqual(importClashes(store, [model, chassis, day]), [
+    { scope: TRUCK.key, label: 'International 9900i', yours: 'Mine', theirs: 'Theirs' },
+    { scope: CHASSIS, label: 'International 9900i, hook 3.2 m', yours: 'Mine', theirs: 'Sleeper' },
+  ]);
+  const kept = importPresets(store, [model, chassis, day]);
+  assert.deepEqual([kept.placed, kept.variants, kept.unused, kept.same], [1, 2, 0, 0]);
   assert.equal(at(kept.store, TRUCK.key).name, 'Mine');
-  assert.equal(at(kept.store, variantKey(SLEEPER)).name, 'Sleeper');
-  // Theirs waits on the key as a variant, not among the unused.
-  assert.deepEqual(kept.store.alternates[TRUCK.key].map((k) => kept.store.presets[k].name), ['Theirs']);
+  assert.equal(at(kept.store, CHASSIS).name, 'Mine');
+  assert.equal(at(kept.store, variantKey(SHORT)).name, 'Day'); // a hook that remembered nothing
+  assert.deepEqual(kept.store.alternates[TRUCK.key].map((k) => kept.store.presets[k].name), ['Day', 'Sleeper', 'Theirs']);
   assert.deepEqual(presetTree(kept.store, null).unassigned, []);
-  const replaced = importPresets(store, [model], new Set([TRUCK.key]));
+  const replaced = importPresets(store, [model, chassis], new Set([TRUCK.key, CHASSIS]));
   assert.equal(at(replaced.store, TRUCK.key).name, 'Theirs');
-  assert.deepEqual(replaced.store.alternates[TRUCK.key], ['p.2']); // yours waits as a variant
-  assert.deepEqual(presetTree(replaced.store, null).unassigned, []);
+  assert.equal(at(replaced.store, CHASSIS).name, 'Sleeper');
+  assert.deepEqual(replaced.store.alternates[TRUCK.key].map((k) => replaced.store.presets[k].name), ['Mine', 'Sleeper']);
   // The same layout as yours: no copy, no clash.
-  const again = importPresets(kept.store, [chassis]);
+  const again = importPresets(kept.store, [day]);
   assert.deepEqual([again.same, Object.keys(again.store.presets).length], [1, Object.keys(kept.store.presets).length]);
-  assert.deepEqual(importClashes(kept.store, [chassis]), []);
+  assert.deepEqual(importClashes(kept.store, [day]), []);
 });
 
 test('importPresets: a file keeps its name and label; only the very same preset of yours is reused', () => {
@@ -986,4 +1006,76 @@ test('shared files for a brand or a game play after yours there, before wider on
   assert.equal(autoPreset(withCollection(storeWith({ 'brand:ats/international': { name: 'Mine' } }), brandFile), TRUCK).how, 'brand');
   assert.equal(autoPreset(withCollection(storeWith(), gameFile), { ...TRUCK, game: 'ets2' }).how, 'all');
   assert.equal(truckStatus(withCollection(storeWith(), brandFile), AUTO, TRUCK).appliesTo, 'all International, from the collection');
+});
+
+test('foldChassis: presets on chassis keys become variants of their model; the hooks remember them', () => {
+  const store = addAlternate(storeWith({
+    [CHASSIS]: { name: 'Sleeper' },        // p.2
+    [variantKey(SHORT)]: { name: 'Day' },  // p.3
+  }, [{ name: 'Studio' }]), CHASSIS, 'p.4'); // the studio waits on the 3.2 m chassis key
+  const folded = foldChassis(store);
+  assert.equal(folded.assignments[MODEL], 'p.3'); // the first by hook
+  assert.deepEqual(folded.alternates, { [MODEL]: ['p.2', 'p.4'] });
+  assert.deepEqual([folded.assignments[CHASSIS], folded.assignments[variantKey(SHORT)]], ['p.2', 'p.3']);
+  assert.equal(autoPreset(folded, SLEEPER).key, 'p.2');
+  assert.equal(autoPreset(folded, { ...TRUCK, variant: '2.6' }).key, 'p.3'); // a hook new to you: the current one
+  assert.deepEqual(scopesOf(folded, 'p.4'), [MODEL]); // waiting on the model: a variant of it
+  assert.equal(foldChassis(folded), folded); // nothing more to fold
+  // The model's own preset stays its current one.
+  const withModel = foldChassis(storeWith({ [MODEL]: { name: 'Model' }, [CHASSIS]: { name: 'Sleeper' } }));
+  assert.deepEqual([withModel.assignments[MODEL], withModel.alternates[MODEL]], ['p.2', ['p.3']]);
+});
+
+test('a file for several hooks plays on each; an import, or your copy of it, is remembered on them', () => {
+  const both = shared('both.json', CHASSIS, { hooks: ['2.1'] });
+  assert.deepEqual(both.hooks, ['2.1', '3.2']);
+  const files = withCollection(storeWith(), both);
+  assert.equal(autoPreset(files, SHORT).how, 'collectionChassis');
+  assert.equal(autoPreset(files, SLEEPER).how, 'collectionChassis');
+  const imported = importPresets(storeWith(), [{ ...both, key: null }]).store;
+  assert.deepEqual([imported.assignments[CHASSIS], imported.assignments[variantKey(SHORT)], imported.assignments[MODEL]], ['p.2', 'p.2', 'p.2']);
+  const edited = editLayout(files, AUTO, SHORT, widen);
+  assert.deepEqual([edited.assignments[CHASSIS], edited.assignments[variantKey(SHORT)], edited.assignments[MODEL]], ['p.2', 'p.2', 'p.2']);
+  assert.deepEqual(exportFiles(edited, [{ scope: MODEL, key: 'p.2' }]).files[0].data.hooks, ['2.1', '3.2']);
+});
+
+test('variants: a shared file taken off a model is hidden from its variants; the file stays', () => {
+  const files = withCollection(storeWith({ [MODEL]: { name: 'Mine' } }), SLEEPER_FILE, MODEL_FILE);
+  assert.deepEqual(alternatesOf(files, MODEL).map((v) => v.key), ['p.2', 'file:model.json', 'file:sleeper.json']); // files by path
+  const off = dropAlternate(assign(files, CHASSIS, 'file:sleeper.json'), MODEL, 'file:sleeper.json');
+  assert.deepEqual(off.hiddenFiles, { [MODEL]: ['file:sleeper.json'] });
+  assert.equal(off.assignments[CHASSIS], undefined); // the hook forgot it
+  assert.deepEqual(alternatesOf(off, MODEL).map((v) => v.key), ['p.2', 'file:model.json']);
+  assert.equal(autoPreset(off, SLEEPER).key, 'p.2'); // no longer the hook's file
+  assert.ok(off.collection['file:sleeper.json']);
+  assert.deepEqual(normalizeStore(off).hiddenFiles, { [MODEL]: ['file:sleeper.json'] });
+  // The model's current one: the next variant plays.
+  const current = dropAlternate(pickAlternate(files, MODEL, 'file:model.json'), MODEL, 'file:model.json');
+  assert.equal(current.assignments[MODEL], 'p.2');
+});
+
+test('cycleVariant: the next or previous of the model\'s variants, round; a vehicle\'s own is skipped', () => {
+  const store = assign(withCollection(twoCabs(), SLEEPER_FILE), plateKey(OWNED), 'p.1'); // p.1 your vehicle's own
+  assert.deepEqual(alternatesOf(store, MODEL).map((v) => v.key), ['p.2', 'p.3', 'file:sleeper.json']);
+  assert.deepEqual(cycleVariant(store, OWNED, 'p.2', 1), { key: 'p.3', index: 1, count: 3, label: null });
+  assert.deepEqual(cycleVariant(store, OWNED, 'file:sleeper.json', 1), { key: 'p.2', index: 0, count: 3, label: 'studio' });
+  assert.equal(cycleVariant(store, OWNED, 'p.2', -1).key, 'file:sleeper.json');
+  assert.equal(cycleVariant(store, OWNED, 'p.1', 1).key, 'p.2'); // from the vehicle's own: the first
+  assert.equal(cycleVariant(store, OWNED, 'p.1', -1).key, 'file:sleeper.json');
+  assert.equal(cycleVariant(store, null, 'p.2', 1), null);
+  assert.equal(cycleVariant(storeWith(), OTHER, 'p.1', 1), null); // no variant
+});
+
+test('the card: a variant tried with the controls says the cab keeps it on getting out', () => {
+  const store = twoCabs();
+  const tried = truckStatus(store, { mode: 'truck', key: 'p.3', cycled: true }, SLEEPER);
+  assert.equal(tried.plays, 'Sleeper — International 9900i (tried with the controls)');
+  assert.equal(tried.note, 'Tried with the controls: this cab keeps it when you get out, unless Auto goes back first. Editing changes this preset.');
+  assert.deepEqual(tried.buttons, [{ action: 'auto', label: 'Back to Auto' }]);
+  // Getting out keeps it as a pick on the card would (app.js): the hook remembers it.
+  assert.equal(autoPreset(chooseVariant(store, SLEEPER, 'p.3'), SLEEPER).key, 'p.3');
+  // A tried file edited becomes your copy, still tried.
+  const files = withCollection(store, SLEEPER_FILE);
+  const adopted = adoptPicked(files, { mode: 'truck', key: 'file:sleeper.json', cycled: true });
+  assert.deepEqual(adopted.selection, { mode: 'truck', key: 'p.4', cycled: true });
 });

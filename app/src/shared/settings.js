@@ -1,4 +1,5 @@
 // settings.json: which devices to use, where the audio comes from and when to mute it.
+import { normalizeControls } from './controls.js';
 
 // Mute the music like a car radio: never, when the engine is off, or when the electrics are off.
 export const MUTE_MODES = ['never', 'engine', 'electric'];
@@ -25,6 +26,15 @@ function reverseMode(value) {
 
 const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 
+// The voice: off; 'system', over everything on the output device (no speakers, not muted, not
+// at the music's volume); 'aux', from the cab's speakers as the music is, muted with it.
+export const VOICE_MODES = ['off', 'system', 'aux'];
+
+function voiceMode(value) {
+  if (value === false) return 'off'; // the first version had a checkbox
+  return VOICE_MODES.includes(value) ? value : 'system';
+}
+
 function turnLookSettings(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   // The first version saved the angle at full lock in degrees.
@@ -49,5 +59,10 @@ export function normalizeSettings(raw) {
     // The volume slider's place, 0..2 (up to 200 %, to the percent); loudness.js perceptualGain
     // makes it a gain.
     volume: finite(src.volume) ? Math.round(Math.min(2, Math.max(0, src.volume)) * 100) / 100 : 1,
+    // Keys and controller buttons for the actions in the cab (controls.js), and the voice that
+    // says what plays then (VOICE_MODES) at a volume of its own, 0..2 as the music's.
+    controls: normalizeControls(src.controls),
+    voice: voiceMode(src.voice),
+    voiceVolume: finite(src.voiceVolume) ? Math.round(Math.min(2, Math.max(0, src.voiceVolume)) * 100) / 100 : 1,
   };
 }

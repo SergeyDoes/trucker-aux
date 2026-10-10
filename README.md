@@ -38,9 +38,10 @@ Have fun!
 
 - **Presets per vehicle:** Create your presets per vehicle
   - Presets can auto switch on car change
-  - Preset can be assigned to a model, to one of its chassis (told apart by the fifth-wheel position), or to a single vehicle by its plate (owned vehicles only)
+  - A model can have several variants (its cabs): each chassis (told apart by the fifth-wheel position) and each of your owned vehicles (by plate) remembers which one it plays
   - Presets can be shared and imported
 
+- **Cab controls:** bind keyboard keys or controller buttons (combinations too) to try the variants while driving, or go back to Auto; the one you leave the cab with stays for that cab. A voice tells which one plays, over everything or from the cab speakers
 - **Loudness matching:** An option to adjust the current preset volume to stay nearly the same when switching between presets with different speaker counts
 - **Like a car radio:** "Mute when" option mutes the music while the engine or the electrics are off;
 
@@ -141,7 +142,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 
 ## Workarounds and Limitations
 
-- The game telemetry doesn't report the truck upgrades, so Day Cabs and Sleepers are distinguished by the fifth-wheel position. Ambiguities may appear on certain chassis.
+- The game telemetry doesn't report the truck upgrades, so Day Cabs and Sleepers are distinguished by the fifth-wheel position. Ambiguities may appear on certain chassis: such cabs are variants of the model, switched on the card or with the cab controls.
 - **Fallback method** (when *trucker_aux_camera.dll* doesn't read the game's camera, see below): The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.

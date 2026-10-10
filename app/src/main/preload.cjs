@@ -11,4 +11,15 @@ contextBridge.exposeInMainWorld('aux', {
   exportPresets: (files, name) => ipcRenderer.invoke('collection:export', files, name),
   // Asks for preset files (Open) and reads them: { entries, warnings } or { canceled }.
   importPresets: () => ipcRenderer.invoke('collection:import'),
+  // The cab's keys and controller buttons (main/controls.js): the bindings, a combination
+  // pressed (ids, or null), the controllers' names, the actions as they fire, warnings.
+  setControls: (bindings) => ipcRenderer.invoke('controls:set', bindings),
+  captureControl: () => ipcRenderer.invoke('controls:capture'),
+  cancelCapture: () => ipcRenderer.invoke('controls:cancel'),
+  controlNames: () => ipcRenderer.invoke('controls:names'),
+  onControl: (listener) => ipcRenderer.on('controls:action', (_event, action) => listener(action)),
+  onControlWarning: (listener) => ipcRenderer.on('controls:warning', (_event, message) => listener(message)),
+  // The voice (main/voice.js): started ahead, and a phrase as WAV bytes (or null).
+  warmVoice: () => ipcRenderer.invoke('voice:warm'),
+  speak: (text) => ipcRenderer.invoke('voice:speak', text),
 });

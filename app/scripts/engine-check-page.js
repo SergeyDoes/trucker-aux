@@ -196,6 +196,31 @@ const checks = [
     const peak = Math.max(...[loud.left, loud.right].map((x) => tail(x).reduce((m, v) => Math.max(m, Math.abs(v)), 0)));
     return [Math.abs(change) <= 0.05 && peak <= 1, `below: ${change.toFixed(3)} dB; boosted: peak ${(20 * Math.log10(peak)).toFixed(2)} dBFS`];
   }],
+  ['the voice: "system" over everything, at its own volume; "aux" from the cab speakers, muted with the music', async () => {
+    // A 700 Hz tone for the voice, at half its volume (well under the limiter).
+    const voice = (mode, gain = 0.5, more = () => {}) => (e) => {
+      const tone = new OscillatorNode(e.voice.context, { frequency: 700 });
+      tone.connect(e.voice);
+      tone.start();
+      e.setVoice(mode, gain);
+      more(e);
+    };
+    const mute = (e) => {
+      e.setSilent(true);
+      e.setVolume(0);
+    };
+    const system = await render({ layout: PAIR, setup: voice('system') });
+    const systemMuted = await render({ layout: PAIR, setup: voice('system', 0.5, mute) });
+    const quieter = await render({ layout: PAIR, setup: voice('system', 0.25) });
+    const aux = await render({ layout: PAIR, setup: voice('aux') });
+    const auxMuted = await render({ layout: PAIR, setup: voice('aux', 0.5, (e) => e.setSilent(true)) });
+    const muted = db(both(systemMuted, 700), both(system, 700));
+    const centred = db(power(tail(system.left), 700), power(tail(system.right), 700));
+    const half = db(both(quieter, 700), both(system, 700));
+    const aux0 = db(both(aux, 700), both(auxMuted, 700));
+    const pass = Math.abs(muted) <= 0.05 && Math.abs(centred) <= 0.05 && Math.abs(half + 6.02) <= 0.1 && aux0 >= 40; // the gate fades over 0.1 s
+    return [pass, `system: with the music muted ${muted.toFixed(2)} dB, left vs right ${centred.toFixed(2)} dB, half the gain ${half.toFixed(2)} dB; aux: muted ${aux0.toFixed(1)} dB down`];
+  }],
   ['switching layouts mid-stream: no NaN, not silent', async () => {
     const next = { ...PAIR, speakers: [speaker('c', 'M', [0, 0, -1], 'tweeter'), speaker('d', 'M', [0, -0.5, 0], 'sub')] };
     const r = await render({ layout: PAIR, left: [200, 5000], right: [200, 5000], change: { at: 0.5, run: (e) => e.sync(next) } });

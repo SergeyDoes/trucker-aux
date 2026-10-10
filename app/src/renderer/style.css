@@ -182,3 +182,8 @@ dialog.ask.export { width: min(560px, 90vw); max-width: none; font-size: 12px; }
 .export-notes .warn { color: #c46900; }
 .ask-buttons .spacer { flex: 1; }
 #tree header .reg-file { font-size: 12px; padding: 1px 6px; }
+
+/* The Controls fieldset: a binding's button, waiting for a combination while it pulses. */
+.bind { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bind.waiting { border-color: var(--front); color: var(--front); animation: bind-wait 1s ease-in-out infinite alternate; }
+@keyframes bind-wait { to { opacity: 0.55; } }

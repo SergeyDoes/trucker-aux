@@ -5,9 +5,12 @@ import { fileURLToPath } from 'node:url';
 import { resolveDataDir } from './paths.js';
 import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js';
 import { openCamera, openTelemetry } from './telemetry.js';
+import { createControls } from './controls.js';
+import { createVoice } from './voice.js';
 import { presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
 import { parsePresetFile, presetFileName } from '../shared/collection.js';
-import { dropImportedDefaults, seedAll } from '../shared/presets.js';
+import { normalizeControls } from '../shared/controls.js';
+import { dropImportedDefaults, foldChassis, seedAll } from '../shared/presets.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
@@ -31,7 +34,9 @@ app.setPath('userData', path.join(dataDir, 'profile'));
 const presetsDir = presetsDirFor(dataDir);
 
 // A new store (no layouts.json yet) starts with the default preset for all vehicles (seedAll);
-// one from 0.1.1 lets its copies of the defaults give way to them (dropImportedDefaults).
+// one from 0.1.1 lets its copies of the defaults give way to them (dropImportedDefaults). Presets
+// an older store has on chassis keys become variants of their model, the hooks remembering them
+// (foldChassis): saved with the next change.
 ipcMain.handle('store:load', () => {
   const data = loadData(dataDir);
   const shared = readCollection(presetsDir);
@@ -41,6 +46,7 @@ ipcMain.handle('store:load', () => {
     const warning = saveLayouts(dataDir, data.store);
     if (warning) data.warnings.push(warning);
   }
+  data.store = foldChassis(data.store);
   return { ...data, collection: shared, debug };
 });
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
@@ -139,6 +145,28 @@ function startPoseFeed(win) {
   win.on('closed', () => clearInterval(timer));
 }
 
+// The cab's keys and controller buttons (controls.js), and the voice that says what plays then
+// (voice.js), for the window; a warning goes to its list.
+let mainWindow = null;
+const toWindow = (channel, value) => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, value);
+};
+const controls = createControls({ onAction: (action) => toWindow('controls:action', action), onError: (message) => toWindow('controls:warning', message) });
+const voice = createVoice({ onError: (message) => toWindow('controls:warning', message) });
+ipcMain.handle('controls:set', (_event, bindings) => controls.setBindings(normalizeControls(bindings)));
+ipcMain.handle('controls:capture', () => controls.capture());
+ipcMain.handle('controls:cancel', () => controls.cancelCapture());
+ipcMain.handle('controls:names', () => controls.names());
+ipcMain.handle('voice:warm', () => voice.warm());
+ipcMain.handle('voice:speak', async (_event, text) => {
+  const wav = await voice.speak(text);
+  return wav ? new Uint8Array(wav) : null;
+});
+app.on('will-quit', () => {
+  controls.stop();
+  voice.stop();
+});
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1600,
@@ -147,6 +175,7 @@ function createWindow() {
     webPreferences: { preload: path.join(here, 'preload.cjs') },
   });
   win.loadFile(path.join(here, '../renderer/index.html'));
+  mainWindow = win;
   startPoseFeed(win);
   const stopWatching = watchCollection(presetsDir, () => {
     if (!win.isDestroyed()) win.webContents.send('collection', readCollection(presetsDir));

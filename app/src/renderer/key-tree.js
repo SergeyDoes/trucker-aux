@@ -1,8 +1,10 @@
 // The preset map (presets.js presetTree) as a standing panel on the left, like the registry
 // editor's key tree. A key with a preset of its own is bold with a "preset" mark (it
 // overrides what it would inherit, as a prefab override in Unity); a shared file's says
-// "shared file"; the others inherit. Click a key to play and edit what it has; right-click
-// for its menu; drag a key's preset onto another key to move it (Ctrl: set it there as well).
+// "shared file"; the others inherit. A model shows the variant that plays in the vehicle in the
+// game (else its current one) and "+N" for the others. Click a key to play and edit what it
+// has; right-click for its menu; drag a key's preset onto another key to move it (Ctrl: set it
+// there as well).
 import { labelBadge } from './badge.js';
 import { variantLabel } from '../shared/presets.js';
 
@@ -11,6 +13,14 @@ const el = (tag, props = {}, children = []) => {
   node.append(...children);
   return node;
 };
+
+// Where a model's variant plays: the hooks and your vehicles remembering it, or its plate for
+// a vehicle's own preset.
+function whereText(v) {
+  if (v.plate) return `only ${v.plate}`;
+  const at = [...(v.hooks ?? []).map((h) => `hook ${h} m`), ...(v.plates ?? [])];
+  return at.length ? `plays on ${at.join(', ')}` : '';
+}
 
 const FOLDER = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" fill="#e8b84a" stroke="#b8862a" stroke-width="1"/></svg>';
 const DRAG_TYPE = 'application/x-trucker-aux-preset';
@@ -35,7 +45,7 @@ export function createKeyTree(root, actions) {
     el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
-      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
+      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit; "+N": more variants (right-click › Variants). ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
     }),
     el('div', { className: 'reg-keys' }, [tree]),
     splitter,
@@ -144,9 +154,10 @@ export function createKeyTree(root, actions) {
 
   function showMenu(event, node, map) {
     event.preventDefault();
-    const item = (label, run, disabled = false) => el('button', {
+    const item = (label, run, disabled = false, title = '') => el('button', {
       textContent: label,
       disabled,
+      title,
       onclick: () => {
         closeMenu();
         run();
@@ -169,16 +180,18 @@ export function createKeyTree(root, actions) {
     if (!node.pseudo) {
       if (!(node.own && node.own.key === map.currentKey)) items.push(item('Set the current preset here', () => actions.assignCurrent(node.scope)));
       items.push(item('Copy the current preset here', () => actions.copyCurrent(node.scope)));
-      // The key's variants (two cabs on one chassis): the one that plays ticked, the others play
-      // when picked; a new one is a copy of what plays now.
+      // The key's variants (a model's cabs): the one shown ticked, the others play when picked
+      // (on the model in the game: in that vehicle, remembered by its hook or plate); a new one
+      // is a copy of what plays now. Each says where it plays.
       const variants = [...(node.own ? [{ ...node.own, active: true }] : []), ...node.alternates];
       items.push(submenu('Variants', [
-        ...variants.map((v) => item(`${v.active ? '✓ ' : ''}${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key), v.active)),
+        ...variants.map((v) => item(`${v.active ? '✓ ' : ''}${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key), v.active, whereText(v))),
         ...(variants.length ? [el('hr')] : []),
         item('New variant (copy current)', () => actions.newVariant(node.scope)),
       ]));
-      if (node.own && !node.own.file && node.scope !== 'all') {
-        items.push(item(node.alternates.length ? 'Take this variant off' : 'Unassign', () => actions.unassignScope(node.scope)));
+      // A shared file is taken off a model only: it stays in its folder, hidden from the variants.
+      if (node.own && node.scope !== 'all' && (!node.own.file || node.level === 'model')) {
+        items.push(item(node.alternates.length ? 'Take this variant off' : 'Unassign', () => actions.dropVariant(node.scope, node.own.key)));
       }
       items.push(item('Export…', () => actions.exportPresets(node.scope)));
       if (node.children.length) items.push(el('hr'));
@@ -220,13 +233,15 @@ export function createKeyTree(root, actions) {
     const badge = node.own ? node.own.label || KIND_BADGE[kind] : '';
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.picked ? ' selected' : ''}${node.pseudo ? ' pseudo' : ''}`,
-      title: node.own ? `${node.own.name}${node.own.default ? ' (comes with the app; editing gives the key a copy of yours)' : ''}` : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
+      title: node.own
+        ? [`${node.own.name}${node.own.default ? ' (comes with the app; editing gives the key a copy of yours)' : ''}`, whereText(node.own)].filter(Boolean).join('\n')
+        : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
     }, [
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
       ...(badge ? [labelBadge(badge, `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`)] : []),
-      // Variants waiting on the key (two cabs on one chassis): how many, and which.
+      // The key's other variants (a model's cabs): how many, and which.
       ...(node.alternates.length ? [el('span', {
         className: 'reg-more',
         textContent: `+${node.alternates.length}`,

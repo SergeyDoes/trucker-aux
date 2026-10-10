@@ -133,6 +133,9 @@ export function normalizeLayout(raw, fallbackName = 'Default layout') {
     name: text(src.name) || fallbackName,
     ...(label ? { label } : {}), // a short tag shown beside its keys in the preset map
     ...(label && LABEL_COLORS.includes(src.labelColor) && src.labelColor !== 'blue' ? { labelColor: src.labelColor } : {}),
+    // The shared file this preset was copied from to be edited: it stands for that file among
+    // the model's variants (presets.js alternatesOf).
+    ...(typeof src.copyOf === 'string' && src.copyOf.startsWith('file:') ? { copyOf: src.copyOf } : {}),
     width: clamp(isNum(src.width) ? src.width : 1, 0, 2),
     bounds,
     speakers: fixPairs(speakers),
@@ -146,6 +149,9 @@ export const ALL_SCOPE = 'all';
 //   presets      { "p.N": layout }
 //   assignments  { scope: preset key or "file:…" } — "all", "game:ats", "brand:ats/peterbilt",
 //                a model "<truck id>", a chassis "<truck id>@<hook>", a vehicle "<truck id>#<plate>"
+//                (a chassis or a vehicle: what that hook or vehicle of the model plays, presets.js)
+//   alternates   { scope: [preset key] } the variants waiting on a key (optional)
+//   hiddenFiles  { "<truck id>": ["file:…"] } shared files taken off a model's variants (optional)
 //   vehicles     { "<truck id>": { name, game, brand, brandName, chassis: [hook], plates: { plate: hook } } }
 //                learned in the game: every model driven, its chassis and your own vehicles
 // Older files are converted: version 1 to 2 (coordinates), then 2 to 3 (migrateV2).
@@ -203,11 +209,21 @@ function normalizeV3(src) {
       if (kept.length) alternates[scope] = kept;
     }
   }
+  // Shared files taken off a model's variants (presets.js dropAlternate): "file:" keys, once each.
+  const hiddenFiles = {};
+  if (src.hiddenFiles && typeof src.hiddenFiles === 'object') {
+    for (const [model, keys] of Object.entries(src.hiddenFiles)) {
+      if (!model || !Array.isArray(keys)) continue;
+      const kept = [...new Set(keys.filter((k) => typeof k === 'string' && k.startsWith('file:')))];
+      if (kept.length) hiddenFiles[model] = kept;
+    }
+  }
   return {
     version: STORE_VERSION,
     presets,
     assignments,
     ...(Object.keys(alternates).length ? { alternates } : {}),
+    ...(Object.keys(hiddenFiles).length ? { hiddenFiles } : {}),
     vehicles,
     ...(src.defaultsImported === true ? { defaultsImported: true } : {}),
   };

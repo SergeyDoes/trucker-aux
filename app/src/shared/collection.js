@@ -2,7 +2,7 @@
 // presets/ next to the data folder (main/collection.js reads it). The app only reads
 // these files; edits go to your own presets in layouts.json (presets.js).
 //
-//   { "truckerAuxPreset": 1, "name": "...", "vehicle": "<truck id>[@<hook>]",
+//   { "truckerAuxPreset": 1, "name": "...", "vehicle": "<truck id>[@<hook>]", "hooks": ["<hook>"],
 //     "vehicleName": "...", "game": "ats" | "ets2", "brand": "<brand id>", "brandName": "...",
 //     "author": "...", "layout": { width, bounds, speakers } }
 //
@@ -11,6 +11,8 @@
 //
 // vehicle is a model or chassis key as in layouts.json, never a plate: plates are
 // personal (and random in quick jobs). Without it the preset is only picked by hand.
+// hooks (optional) names more hooks of the model the file plays on (a variant several chassis
+// share); an older build reads the file as for the hook in vehicle.
 import { normalizeLayout } from './layout.js';
 
 export const PRESET_FORMAT = 1; // coordinates as in store version 2
@@ -20,6 +22,17 @@ const PREFIX = 'file:';
 export const isCollectionKey = (key) => typeof key === 'string' && key.startsWith(PREFIX);
 
 const optionalText = (value) => (typeof value === 'string' && value.trim() ? value.trim() : null);
+
+const isModelScope = (vehicle) => Boolean(vehicle) && vehicle !== 'all' && !vehicle.startsWith('game:') && !vehicle.startsWith('brand:');
+export const byHook = (a, b) => Number(a) - Number(b) || a.localeCompare(b);
+
+// The hooks a file for a model plays on: the one in its vehicle and those listed, sorted, once each.
+function hooksOf(vehicle, listed) {
+  if (!isModelScope(vehicle)) return [];
+  const own = vehicle.includes('@') ? [vehicle.slice(vehicle.indexOf('@') + 1)] : [];
+  const more = Array.isArray(listed) ? listed.map(optionalText).filter((h) => h && /^[\d.]+$/.test(h)) : [];
+  return [...new Set([...own, ...more])].sort(byHook);
+}
 
 // raw: the parsed JSON of presets/<file>. Gives { entry } or { warning }.
 export function parsePresetFile(raw, file) {
@@ -39,6 +52,7 @@ export function parsePresetFile(raw, file) {
       default: file.startsWith('default/'), // shipped with the app: the bottom layer
       name,
       vehicle: vehicle && !vehicle.includes('#') ? vehicle : null,
+      hooks: vehicle && !vehicle.includes('#') ? hooksOf(vehicle, raw.hooks) : [],
       vehicleName: optionalText(raw.vehicleName),
       game: raw.game === 'ats' || raw.game === 'ets2' ? raw.game : null,
       brand: optionalText(raw.brand),
@@ -55,12 +69,14 @@ export function collectionLabel(entry) {
 }
 
 // The file to share a layout; fields without a value are left out.
-export function presetFile({ name, author, vehicle, vehicleName, game, brand, brandName, layout }) {
+// hooks: written only when more than the one in vehicle.
+export function presetFile({ name, author, vehicle, hooks = [], vehicleName, game, brand, brandName, layout }) {
   return {
     truckerAuxPreset: PRESET_FORMAT,
     name,
     ...(author ? { author } : {}),
     ...(vehicle ? { vehicle } : {}),
+    ...(vehicle && hooks.length > 1 ? { hooks } : {}),
     ...(vehicleName ? { vehicleName } : {}),
     ...(game ? { game } : {}),
     ...(brand ? { brand } : {}),

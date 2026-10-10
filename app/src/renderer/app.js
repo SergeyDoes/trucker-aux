@@ -11,9 +11,10 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptNewChassis, adoptPicked, allPresetKey, applyScope, chooseVariant, createPreset, currentScope, deletePreset, editLayout, exportFiles, importClashes, importPresets, keyPath, levelOf,
-  newAlternate, parseSelection, pickAlternate, planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder, scopesOf,
-  selectionValue, truckStatus, unassign, variantChoice, variantKey,
+  adoptPicked, adoptVehicle, allPresetKey, alternatesOf, applyScope, chooseVariant, createPreset, currentScope, cycleVariant, deletePreset, dropAlternate, editLayout, exportFiles,
+  importClashes, importPresets,
+  keyPath, newAlternate, parseSelection, pickAlternate, planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder,
+  scopesOf, selectionValue, truckStatus, variantChoice, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
@@ -21,6 +22,7 @@ import { createKeyTree } from './key-tree.js';
 import { branchIds, chooseExport, exportItems } from './export-dialog.js';
 import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
+import { isBound } from '../shared/controls.js';
 import { isSilenced } from '../shared/dsp.js';
 import { perceptualGain, trimFromLevels } from '../shared/loudness.js';
 import { measureLoudness } from './loudness-meter.js';
@@ -66,6 +68,9 @@ const state = {
   storeWarnings: loaded.warnings,
   audioWarnings: [],
   pluginWarning: null, // an scs-telemetry revision the offsets were not made for (pose.js)
+  controlWarning: null, // the keys and buttons, or the voice, do not work (main/controls.js, voice.js)
+  capturing: null,      // the action whose binding is being pressed (Controls)
+  controlNames: {},     // the controllers' names: { "vid:pid": name }
 };
 let audio = null; // { ctx, engine, stream, player }
 
@@ -96,6 +101,11 @@ let loudnessRun = 0;
 
 function applyVolume() {
   audio?.engine.setVolume(perceptualGain(state.settings.volume));
+}
+
+// The voice's way (over everything, or from the cab's speakers) and its own volume.
+function applyVoice() {
+  audio?.engine.setVoice(state.settings.voice, perceptualGain(state.settings.voiceVolume));
 }
 
 function applyTrim() {
@@ -290,6 +300,7 @@ async function startAudio() {
   syncEngine();
   applyTrim(); // the last measured trim right away; syncEngine measures again
   applyVolume();
+  applyVoice();
   engine.setSolo(state.solo);
   for (const id of state.muted) engine.setMuted(id, true);
   engine.setPose(state.pose, headRestX(state.truck));
@@ -302,6 +313,68 @@ let audioTask = Promise.resolve();
 function restartAudio() {
   audioTask = audioTask.then(startAudio).catch((err) => {
     state.audioWarnings = [`Audio failed: ${err.message}`];
+    render();
+  });
+}
+
+// The cab's buttons (shared/controls.js): Next and Previous try the model's variants as a
+// pick in the list does; Auto goes back to what fitted the cab when you got in (nothing is
+// remembered while trying). Getting out keeps the one tried for the cab (see onPose). The voice
+// says what plays then.
+function controlAction(action) {
+  if (action === 'auto') {
+    actions.selectPreset('auto');
+    const what = spokenName(playing().key);
+    say(what ? `Auto, ${what}` : 'Auto');
+    return;
+  }
+  if (!state.truck) return say('No vehicle');
+  const from = playing().key;
+  const next = cycleVariant(state.store, state.truck, from, action === 'next' ? 1 : -1);
+  if (!next) return say('No variants');
+  if (next.key === from) return say('One variant');
+  state.selection = { mode: 'truck', key: next.key, cycled: true };
+  resetSession();
+  syncEngine();
+  render();
+  say(next.label || `variant ${next.index + 1}`);
+}
+
+// What plays, as the voice says it: its label, else its place among the model's variants.
+function spokenName(key) {
+  const label = playing().layout.label;
+  if (label) return label;
+  const index = state.truck ? alternatesOf(state.store, state.truck.key).findIndex((v) => v.key === key) : -1;
+  return index >= 0 ? `variant ${index + 1}` : '';
+}
+
+// Says a phrase on the output device (main/voice.js, engine.voice); a newer one cuts it short.
+let sayRun = 0;
+let voiceSource = null;
+async function say(text) {
+  if (state.settings.voice === 'off' || !audio) return;
+  const run = ++sayRun;
+  try {
+    const bytes = await window.aux.speak(text);
+    if (!bytes || run !== sayRun || !audio) return;
+    const buffer = await audio.ctx.decodeAudioData(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
+    if (run !== sayRun || !audio) return;
+    voiceSource?.stop();
+    voiceSource = new AudioBufferSourceNode(audio.ctx, { buffer });
+    voiceSource.connect(audio.engine.voice);
+    voiceSource.start();
+  } catch (err) {
+    console.error('Voice failed', err);
+  }
+}
+
+// The bindings go to the poller (main/controls.js); the voice helper starts ahead when one is
+// bound, so the first phrase comes without its start-up.
+function applyControls() {
+  window.aux.setControls(state.settings.controls);
+  if (state.settings.voice !== 'off' && isBound(state.settings.controls)) window.aux.warmVoice();
+  window.aux.controlNames().then((names) => {
+    state.controlNames = names;
     render();
   });
 }
@@ -325,9 +398,9 @@ async function putAtScope(to) {
   return carryOut(plan, labelOf, resolvePlaying(state.store, state.selection, truck).layout.name, true);
 }
 
-// The preset map's Move: a preset of yours from its scope to another on its chain.
-async function moveInMap(from, to) {
-  const plan = planMove(state.store, from, to, state.truck);
+// The preset map's Move: a preset of yours (key, the one shown on `from`) from its key to another.
+async function moveInMap(from, to, key) {
+  const plan = planMove(state.store, from, to, state.truck, key);
   if (!plan) {
     render();
     return false;
@@ -341,7 +414,7 @@ async function carryOut(plan, labelOf, name, inVehicle) {
   const { to } = plan;
   const truck = state.truck;
   const lines = [];
-  // A preset of yours there can stay on the key as a variant (two cabs on one chassis).
+  // A preset of yours there can stay on the key as a variant (a brand's, a game's; a model takes variants anyway).
   const asVariant = Boolean(plan.taken && !plan.taken.keeps && !plan.taken.key.startsWith('file:'));
   if (plan.taken) {
     lines.push(`"${plan.taken.name}" will no longer apply to ${labelOf(to)}.${plan.taken.keeps ? '' : ' It stays in the list, unassigned.'}`);
@@ -452,6 +525,45 @@ const actions = {
     applySilence();
     render();
   },
+  // Controls: waits for a combination for the action (a second click cancels), or clears it.
+  async bindControl(action) {
+    if (state.capturing) {
+      window.aux.cancelCapture();
+      return;
+    }
+    state.capturing = action;
+    document.activeElement?.blur?.(); // Space or Enter must not press the button again
+    render();
+    const ids = await window.aux.captureControl();
+    state.capturing = null;
+    if (ids?.length) {
+      state.settings = normalizeSettings({ ...state.settings, controls: { ...state.settings.controls, [action]: ids } });
+      saveSettings();
+      applyControls();
+    }
+    render();
+  },
+  clearControl(action) {
+    state.settings = normalizeSettings({ ...state.settings, controls: { ...state.settings.controls, [action]: [] } });
+    saveSettings();
+    applyControls();
+    render();
+  },
+  // The voice: 'off', 'system' or 'aux' (settings.js VOICE_MODES), and its own volume (the
+  // slider, 0..2; saved when it is let go).
+  setVoice(mode) {
+    state.settings = normalizeSettings({ ...state.settings, voice: mode });
+    saveSettings();
+    applyVoice();
+    if (mode !== 'off') applyControls();
+    render();
+  },
+  setVoiceVolume(fraction, save = true) {
+    state.settings = normalizeSettings({ ...state.settings, voiceVolume: fraction });
+    applyVoice();
+    if (save) saveSettings();
+    render();
+  },
   setPauseBehavior(mode) {
     state.settings = { ...state.settings, pauseBehavior: mode };
     saveSettings();
@@ -499,8 +611,8 @@ const actions = {
     if (await putAtScope(to)) state.selection = { mode: 'auto' };
     render();
   },
-  // A variant picked on the card plays at once, back in Auto; your own vehicle keeps it by
-  // its plate (presets.js chooseVariant).
+  // A variant picked on the card plays at once, back in Auto; your own vehicle remembers it by
+  // its plate, another by its hook (presets.js chooseVariant).
   cardVariant(key) {
     const before = speakerIds();
     remember();
@@ -508,11 +620,14 @@ const actions = {
     state.selection = { mode: 'auto' };
     afterScopeChange(before);
   },
-  // The tree's menu: one of a key's variants plays there; a new one, a copy of what plays.
+  // The tree's menu: one of a key's variants plays there (on the model of the vehicle in the
+  // game, in that vehicle, as the card picks); a new one, a copy of what plays, which plays; one
+  // taken off (off a model, its hooks and vehicles forget it; the preset stays).
   playVariant(scope, key) {
     const before = speakerIds();
     remember();
-    state.store = pickAlternate(state.store, scope, key);
+    const inGame = state.truck?.key === scope;
+    state.store = inGame ? chooseVariant(state.store, state.truck, key) : pickAlternate(state.store, scope, key);
     afterScopeChange(before);
   },
   newVariant(scope) {
@@ -520,6 +635,12 @@ const actions = {
     const current = playing().key;
     remember();
     state.store = newAlternate(state.store, scope, state.truck, current);
+    afterScopeChange(before);
+  },
+  dropVariant(scope, key) {
+    const before = speakerIds();
+    remember();
+    state.store = dropAlternate(state.store, scope, key);
     afterScopeChange(before);
   },
   // A key clicked in the preset map: it plays what it has or inherits; editing gives it its own.
@@ -548,9 +669,9 @@ const actions = {
   redo() {
     stepHistory(history.redo, history.undo);
   },
-  // Move in the map: the preset of `from` up or down its chain, with the card's dialogs.
-  async moveInMap(from, to) {
-    await moveInMap(from, to);
+  // Move in the map: the preset shown on `from` (key) to another key, with the card's dialogs.
+  async moveInMap(from, to, key) {
+    await moveInMap(from, to, key);
   },
   // Set preset in the map: one of your presets (or a file) on that key, asking first when it
   // takes the key from another.
@@ -563,17 +684,14 @@ const actions = {
   // Dragging in the map: a preset of yours from its key onto another moves it there; with Ctrl,
   // or for a preset or file on no key, it is set there as well.
   async dropInMap({ from, key }, to, alsoHere) {
-    if (from && !alsoHere) await moveInMap(from, to);
+    if (from && !alsoHere) await moveInMap(from, to, key);
     else await actions.assignInMap(to, key);
   },
   // A key's preset dropped among the unused presets: it leaves that key (the preset stays).
   // With Ctrl, from all vehicles (something must play) or for a shared file: a copy instead.
   dropToUnused({ from, key, file }, copy) {
     if (copy || file || from === 'all' || !from) return actions.duplicatePresetKey(key);
-    const before = speakerIds();
-    remember();
-    state.store = unassign(state.store, from);
-    afterScopeChange(before);
+    actions.dropVariant(from, key);
   },
   // The unused presets' menu and in-place rename.
   // The short label of what plays, shown beside its keys in the map; empty removes it.
@@ -617,38 +735,27 @@ const actions = {
     if (state.selection.mode === 'truck' && state.selection.key === key) state.selection = { mode: 'auto' };
     afterScopeChange(before);
   },
-  // Unassign in the map: frees that scope; the preset stays.
-  unassignScope(scope) {
-    const before = speakerIds();
-    remember();
-    state.store = unassign(state.store, scope);
-    afterScopeChange(before);
-  },
-  // Unbind: frees the scope the preset that plays holds here; the preset stays.
+  // Unbind: the preset that plays leaves the scope it holds here (off the model as a variant,
+  // off your vehicle, off the brand or the game); the preset stays.
   truckAction(action) {
     if (action === 'auto') return actions.selectPreset('auto');
     if (action !== 'unbind' || !state.truck) return;
     const from = currentScope(state.store, state.selection, state.truck);
-    if (!from) return;
-    const before = speakerIds();
-    remember();
-    state.store = unassign(state.store, from);
-    afterScopeChange(before);
+    if (from) actions.dropVariant(from, playing().key);
   },
   // The export window, ticked at first: from: a key of the tree (its presets and those under
-  // it, a vehicle's own only when that is the key), 'playing' (the preset that plays), or
-  // nothing (all your presets on keys but vehicles' own). Then Save As in main.
+  // it, but vehicles' own), 'playing' (the preset that plays), or nothing (all your presets on
+  // keys but vehicles' own). Then Save As in main.
   async exportPresets(from = null) {
     const map = presetTree(state.store, state.truck, state.selection);
     const items = exportItems(map);
-    const notPlate = (n) => levelOf(n.scope) !== 'vehicle';
     const find = (n, scope) => (n.scope === scope ? n : n.children.map((c) => find(c, scope)).find(Boolean));
     let checked;
     if (from === 'playing') checked = [...items].filter(([, item]) => item.key === playing().key).map(([id]) => id);
     else if (from) {
       const node = find(map.root, from);
-      checked = node ? branchIds(node, (n) => n === node || notPlate(n)) : [];
-    } else checked = branchIds(map.root, (n) => notPlate(n) && !n.own.file);
+      checked = node ? branchIds(node, (item) => !item.personal) : [];
+    } else checked = branchIds(map.root, (item) => !item.personal && !item.file);
     const picks = await chooseExport({ map, checked, check: (p) => exportFiles(state.store, p, state.truck) });
     if (!picks) return;
     const set = exportFiles(state.store, picks, state.truck);
@@ -658,10 +765,10 @@ const actions = {
     state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
     render();
   },
-  // Import: preset files (main asks which) become your presets, each on the key its file
-  // says (importPresets). Keys that have a preset of yours are listed: on the ticked ones the
-  // file's plays, on the others it waits; either way both stay on the key as variants. Undo
-  // takes it all back.
+  // Import: preset files (main asks which) become your presets, a file for a model a variant of
+  // it (importPresets). The hooks (or models, brands, games) that play a preset of yours are
+  // listed: on the ticked ones the imported one plays, on the others yours keeps playing; both
+  // stay variants. Undo takes it all back.
   async importPresets() {
     const result = await window.aux.importPresets();
     if (result.canceled) return;
@@ -671,7 +778,7 @@ const actions = {
     if (clashes.length) {
       const answer = await ask({
         title: `Import ${entries.length} preset(s)`,
-        lines: ['These keys have a preset of yours. Both stay on the key as variants, the card picks between them. Tick the keys where the imported one should play; on the others yours keeps playing.'],
+        lines: ['These play a preset of yours. The imported ones become variants either way (the card picks between them). Tick where the imported one should play; elsewhere yours keeps playing.'],
         checks: clashes.map((c) => ({ value: c.scope, label: `${c.label}: ${c.yours} → ${c.theirs}`, checked: false })),
         buttons: [{ value: null, label: 'Cancel' }, { value: 'import', label: 'Import', primary: true }],
       });
@@ -838,7 +945,7 @@ function render() {
   // Speakers you do not hear (muted, or another one soloed) are drawn grey.
   const silentIds = layout.speakers.filter((s) => isSilenced(s, state.solo, state.muted)).map((s) => s.id);
   panel.update({
-    warnings: [...(state.pluginWarning ? [state.pluginWarning] : []), ...state.storeWarnings, ...state.collectionWarnings, ...state.audioWarnings],
+    warnings: [state.pluginWarning, state.controlWarning, ...state.storeWarnings, ...state.collectionWarnings, ...state.audioWarnings].filter(Boolean),
     inputs: state.devices.filter((d) => d.kind === 'audioinput' && d.deviceId !== 'communications'),
     outputs: state.devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'communications'),
     inputId: state.inputId,
@@ -851,6 +958,11 @@ function render() {
     cameraFallback: state.cameraFallback,
     pauseBehavior: state.settings.pauseBehavior,
     volume: state.settings.volume,
+    controls: state.settings.controls,
+    controlNames: state.controlNames,
+    capturing: state.capturing,
+    voice: state.settings.voice,
+    voiceVolume: state.settings.voiceVolume,
     player: audio?.player ?? null,
     presets: presetOptions(state.store, state.truck, state.selection),
     card: truckStatus(state.store, state.selection, state.truck),
@@ -935,11 +1047,23 @@ window.aux.onPose((pose) => {
   const identity = (t) => (t ? `${variantKey(t)}#${t.plate ?? ''}` : null);
   const otherTruck = identity(truck) !== identity(state.truck);
   if (otherTruck || (truck?.centerX ?? null) !== (state.truck?.centerX ?? null)) {
+    const left = state.truck;
     state.truck = truck;
     if (otherTruck) resetSession();
-    // Its name, game and brand name the model's scopes while you drive something else; a
-    // chassis new to the app gets a preset of its own (a copy of what it would play).
-    const learned = adoptNewChassis(rememberVehicle(state.store, truck), truck);
+    // Getting out of a cab (another vehicle, or the game gone) after trying variants with the
+    // cab's buttons: the one tried stays the cab's, remembered as a pick on the card is (by the
+    // hook, or your vehicle's plate); the next vehicle plays in Auto.
+    if (otherTruck && state.selection.cycled) {
+      if (left) {
+        remember();
+        state.store = chooseVariant(state.store, left, state.selection.key);
+        scheduleSave();
+      }
+      state.selection = { mode: 'auto' };
+    }
+    // Its name, game and brand name the model's scopes while you drive something else; a model
+    // new to the app gets its first variant, a hook new to you remembers what it plays.
+    const learned = adoptVehicle(rememberVehicle(state.store, truck), truck);
     if (learned !== state.store) {
       state.store = learned;
       scheduleSave();
@@ -986,6 +1110,13 @@ window.aux.onPose((pose) => {
   }
 });
 
+window.aux.onControl(controlAction);
+window.aux.onControlWarning((message) => {
+  if (message === state.controlWarning) return;
+  state.controlWarning = message;
+  render();
+});
+
 navigator.mediaDevices.addEventListener('devicechange', async () => {
   const active = [state.inputId, state.outputId];
   state.devices = await listDevices();
@@ -1004,6 +1135,14 @@ const SHORTCUTS = {
   v: () => actions.paste(),
   d: () => actions.duplicateSelected(),
 };
+// While a binding is pressed (Controls) the keys are for it alone.
+for (const type of ['keydown', 'keyup']) {
+  document.addEventListener(type, (event) => {
+    if (!state.capturing) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+}
 document.addEventListener('keydown', (event) => {
   if (event.target instanceof Element && event.target.closest('input, select, textarea')) return;
   const shortcut = (event.ctrlKey || event.metaKey) && !event.altKey && SHORTCUTS[event.key.toLowerCase()];
@@ -1021,3 +1160,4 @@ document.addEventListener('keydown', (event) => {
 
 render();
 restartAudio();
+applyControls();

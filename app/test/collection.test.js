@@ -67,3 +67,16 @@ test('presetFileName makes a safe Windows file name', () => {
   assert.equal(presetFileName(''), 'preset.json');
   assert.equal(presetFileName('x'.repeat(200)).length, 80 + '.json'.length);
 });
+
+test('hooks: the vehicle\'s own hook and the ones listed, sorted, once each; only for a model', () => {
+  const read = (raw) => parsePresetFile({ ...SHARED, ...raw }, 'a.json').entry.hooks;
+  assert.deepEqual(read({}), ['2.7']);
+  assert.deepEqual(read({ hooks: ['3.1', '2.7', 'x', 4, '3.1'] }), ['2.7', '3.1']);
+  assert.deepEqual(read({ vehicle: 'vehicle.kenworth.t680', hooks: ['3.1'] }), ['3.1']);
+  assert.deepEqual(read({ vehicle: 'vehicle.kenworth.t680' }), []);
+  assert.deepEqual(read({ vehicle: 'brand:ats/kenworth', hooks: ['3.1'] }), []);
+  assert.deepEqual(read({ vehicle: null }), []);
+  const layout = { ...defaultLayout(), name: 'Cab' };
+  assert.deepEqual(presetFile({ name: 'Cab', vehicle: 'vehicle.a@1.5', hooks: ['1.5', '2.6'], layout }).hooks, ['1.5', '2.6']);
+  assert.equal('hooks' in presetFile({ name: 'Cab', vehicle: 'vehicle.a@1.5', hooks: ['1.5'], layout }), false);
+});

@@ -14,22 +14,26 @@ const el = (tag, props = {}, children = []) => {
 
 const FOLDER = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" fill="#e8b84a" stroke="#b8862a" stroke-width="1"/></svg>';
 
-// The ids of the presets in the map: { id: { scope, key } }, in the tree's order.
+// A preset of the map to export: { scope, key, file, personal } (personal: a vehicle's own).
+const item = (scope, v) => ({ scope, key: v.key, file: Boolean(v.file), personal: Boolean(v.plate) });
+
+// The ids of the presets in the map: { id: item }, in the tree's order.
 export function exportItems(map) {
   const items = new Map();
   (function walk(node) {
-    if (node.own) items.set(node.scope, { scope: node.scope, key: node.own.key });
-    // A key's variants waiting go with it, a file each for the same key.
-    for (const v of node.alternates ?? []) items.set(`${node.scope}+${v.key}`, { scope: node.scope, key: v.key });
+    if (node.own) items.set(node.scope, item(node.scope, node.own));
+    // A key's other variants go with it, a file each for the same key.
+    for (const v of node.alternates ?? []) items.set(`${node.scope}+${v.key}`, item(node.scope, v));
     node.children.forEach(walk);
   })(map.root);
-  for (const p of [...map.unassigned, ...map.files]) items.set(`~${p.key}`, { scope: null, key: p.key });
+  for (const p of [...map.unassigned, ...map.files]) items.set(`~${p.key}`, item(null, p));
   return items;
 }
 
-// The ids under a node (itself included).
+// The ids under a node (itself included), of the items keep(item) takes.
 export function branchIds(node, keep = () => true) {
-  const own = node.own && keep(node) ? [node.scope, ...(node.alternates ?? []).map((v) => `${node.scope}+${v.key}`)] : [];
+  const own = [...(node.own ? [[node.scope, node.own]] : []), ...(node.alternates ?? []).map((v) => [`${node.scope}+${v.key}`, v])]
+    .filter(([, v]) => keep(item(node.scope, v))).map(([id]) => id);
   return [...own, ...node.children.flatMap((c) => branchIds(c, keep))];
 }
 
@@ -45,7 +49,7 @@ export function chooseExport({ map, checked, check }) {
     el('h3', { textContent: 'Export presets' }),
     el('p', {
       className: 'hint',
-      textContent: 'Tick what to share. Each preset becomes a file for its key; a vehicle\'s own (by plate) goes for its chassis, so the plate stays private.',
+      textContent: 'Tick what to share. Each preset becomes a file for its key: a model\'s variants for the hooks that play them, a vehicle\'s own (by plate) for its hook, so the plate stays private.',
     }),
     el('div', { className: 'export-tree' }, [tree, loose]),
     notes,
@@ -112,11 +116,10 @@ export function chooseExport({ map, checked, check }) {
       ])),
     ] : []));
     const picks = [...items].filter(([id]) => ticked.has(id)).map(([, item]) => item);
-    const { clashes, plates } = check(picks);
+    const { plates } = check(picks);
     notes.replaceChildren(
       el('p', { textContent: picks.length ? `${picks.length} preset(s) ticked.` : 'Nothing ticked.' }),
-      ...(plates ? [el('p', { className: 'hint', textContent: `${plates} vehicle preset(s) go for their chassis.` })] : []),
-      ...clashes.map((label) => el('p', { className: 'warn', textContent: `More than one preset goes for ${label}: only one of them would play there.` })),
+      ...(plates ? [el('p', { className: 'hint', textContent: `${plates} vehicle preset(s) go for their hook.` })] : []),
     );
     exportButton.disabled = !picks.length;
     return picks;

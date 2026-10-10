@@ -6,19 +6,22 @@
 // telemetry, or null. Layouts are measured from the truck's axis, so one layout fits every truck.
 //
 // Presets ("p.N", store.presets) live apart from the scopes they apply to
-// (store.assignments: scope -> preset or shared file). A vehicle's scopes, narrowest first:
-//   this vehicle  "<truck id>#<plate>"
-//   this chassis  "<truck id>@<fifth wheel>"
-//   the model     "<truck id>"
+// (store.assignments: scope -> preset or shared file). The keys of the map, narrowest first:
+//   the model     "<truck id>": its variants (docs/superpowers/specs/2026-10-10-model-variants-
+//                 design.md): the current one here (the last picked), yours waiting in
+//                 store.alternates, and the shared files for the model or its hooks
 //   the brand     "brand:<game>/<brand id>"
 //   the game      "game:<ats|ets2>"
 //   all vehicles  "all" (always assigned: it is what the default layout was)
-// Auto plays the narrowest assigned one; shared files (collection.js) for this chassis or
-// the model come after your own of both; another chassis of the model comes before the brand.
+// and what a model's vehicles remember, no keys of the map:
+//   a hook        "<truck id>@<fifth wheel>": the variant a chassis plays
+//   your vehicle  "<truck id>#<plate>": the variant it plays, or a preset of its own
+// Auto: your vehicle, the hook, a shared file (collection.js) for the hook, the model's current
+// variant, a file for the model or another hook of it, then the brand, the game, all vehicles.
 // The game reports neither the cab nor the chassis; the fifth wheel sits further back
 // on a longer chassis, so its position (to 10 cm) names the chassis (telemetry.js).
 import { ALL_SCOPE, freePresetKey, uniqueName } from './layout.js';
-import { collectionLabel, isCollectionKey, presetFile, presetFileName } from './collection.js';
+import { byHook, collectionLabel, isCollectionKey, presetFile, presetFileName } from './collection.js';
 
 export const plateKey = (truck) => (truck.plate ? `${truck.key}#${truck.plate}` : null);
 const chassisKey = (truck) => (truck.variant ? `${truck.key}@${truck.variant}` : null);
@@ -42,10 +45,29 @@ export function levelOf(scope) {
 
 const modelOf = (scope) => scope.split(/[@#]/)[0];
 const byLevel = (a, b) => LEVELS.indexOf(levelOf(a)) - LEVELS.indexOf(levelOf(b)) || a.localeCompare(b);
+const hookOf = (scope) => scope.slice(scope.indexOf('@') + 1);
+const plateOf = (scope) => scope.slice(scope.indexOf('#') + 1);
+// A model, one of its hooks or one of your vehicles of it.
+const isModelLevel = (scope) => Boolean(scope) && ['model', 'chassis', 'vehicle'].includes(levelOf(scope));
+const isMemory = (scope) => levelOf(scope) === 'chassis' || levelOf(scope) === 'vehicle';
 
-// The scopes a preset applies to, narrowest first.
+// What a model's hooks and your vehicles of it remember: [[scope, key]].
+const memoriesOf = (store, model) => Object.entries(store.assignments).filter(([s]) => isMemory(s) && modelOf(s) === model);
+
+// Where a preset shows, narrowest first: the models it is a variant of, the vehicles it is the
+// own preset of, the brands, games and all vehicles it is on. What hooks remember is no place.
 export function scopesOf(store, key) {
-  return Object.entries(store.assignments).filter(([, k]) => k === key).map(([scope]) => scope).sort(byLevel);
+  const places = new Set();
+  for (const [scope, k] of Object.entries(store.assignments)) {
+    if (k !== key) continue;
+    if (levelOf(scope) === 'chassis') places.add(modelOf(scope));
+    else if (levelOf(scope) === 'vehicle' && ownVariants(store, modelOf(scope)).includes(key)) places.add(modelOf(scope));
+    else places.add(scope);
+  }
+  for (const [scope, keys] of Object.entries(store.alternates ?? {})) {
+    if (keys.includes(key)) places.add(isModelLevel(scope) ? modelOf(scope) : scope);
+  }
+  return [...places].sort(byLevel);
 }
 
 export const allPresetKey = (store) => store.assignments[ALL_SCOPE];
@@ -64,58 +86,87 @@ const kindOf = (key) => (isCollectionKey(key) ? 'collection' : 'preset');
 const sharedFiles = (store) => Object.values(store.collection ?? {}).filter((e) => e.vehicle)
   .sort((a, b) => Number(a.default) - Number(b.default) || (a.key < b.key ? -1 : 1));
 
-// The preset Auto plays in a truck: { key, how, scope }. how: vehicle, chassis,
-// collectionChassis, model, collectionModel, sibling (another chassis), collectionSibling,
-// brand, game, all. Several files for one scope: others' before the defaults, then by path.
+// The hooks a file for a model plays on (collection.js; an entry made without them: the hook in
+// its vehicle).
+const fileHooks = (entry) => entry.hooks ?? (levelOf(entry.vehicle) === 'chassis' ? [hookOf(entry.vehicle)] : []);
+
+// Your presets that are variants of a model: its current one, those waiting, and any a hook
+// remembers (foldChassis puts those among the waiting).
+function ownVariants(store, model) {
+  const hooked = memoriesOf(store, model).filter(([s]) => levelOf(s) === 'chassis').map(([, k]) => k);
+  return [...new Set([store.assignments[model], ...waitingOn(store, model), ...hooked])].filter((k) => k && store.presets[k]);
+}
+
+// The shared files that are variants of a model (sharedFiles' order): those for it or its
+// hooks, but not one taken off the model (store.hiddenFiles), nor one a variant of yours was
+// copied from (copyOf) or has the same speakers as: yours stands for it. One the model or a
+// vehicle of it holds stays.
+function modelFiles(store, model) {
+  const yours = ownVariants(store, model).map((k) => store.presets[k]);
+  const held = new Set([store.assignments[model], ...memoriesOf(store, model).map(([, k]) => k)]);
+  const hidden = new Set(store.hiddenFiles?.[model] ?? []);
+  return sharedFiles(store).filter((e) => isModelLevel(e.vehicle) && modelOf(e.vehicle) === model)
+    .filter((e) => held.has(e.key) || (!hidden.has(e.key) && !yours.some((l) => l.copyOf === e.key || sameLayout(l, e.layout))));
+}
+
+// The file a model plays without a current variant: one for the model, else one for a hook.
+const modelFile = (store, model) => {
+  const files = modelFiles(store, model);
+  return files.find((e) => e.vehicle === model) ?? files[0] ?? null;
+};
+
+// The preset Auto plays in a truck: { key, how, scope }. how: vehicle (the plate remembers it),
+// chassis (the hook remembers it), collectionChassis (a file for the hook), model (the model's
+// current variant), collectionModel (a file for the model), collectionSibling (a file for
+// another hook), brand, game, all. Several files for one scope: others' before the defaults,
+// then by path.
 export function autoPreset(store, truck) {
   const assigned = (scope) => {
     const key = scope && store.assignments[scope];
     return key && presetLayout(store, key) ? key : null;
   };
-  const files = sharedFiles(store);
-  const file = (match) => files.find((e) => match(e.vehicle))?.key ?? null;
+  const files = modelFiles(store, truck.key);
   const steps = [
     ['vehicle', plateKey(truck), assigned],
     ['chassis', chassisKey(truck), assigned],
+    // A file for this very hook before the model's current variant: a hook new to you plays the
+    // cab made for it. A file never takes over a hook you have set up.
+    ['collectionChassis', chassisKey(truck), (scope) => (scope && files.find((e) => fileHooks(e).includes(truck.variant))?.key) ?? null],
     ['model', truck.key, assigned],
-    // Shared files after your own: a file dropped into presets/ never takes over a truck
-    // you have set up.
-    ['collectionChassis', chassisKey(truck), (scope) => scope && file((v) => v === scope)],
-    ['collectionModel', truck.key, (scope) => file((v) => v === scope)],
+    ['collectionModel', truck.key, () => files.find((e) => e.vehicle === truck.key)?.key ?? null],
+    ['collectionSibling', truck.key, () => files[0]?.key ?? null],
   ];
   for (const [how, scope, find] of steps) {
     const key = find(scope);
     if (key) return { key, how, scope };
   }
-  const isSibling = (scope) => scope.startsWith(`${truck.key}@`);
-  const sibling = Object.keys(store.assignments).filter((s) => isSibling(s) && assigned(s)).sort()[0];
-  if (sibling) return { key: assigned(sibling), how: 'sibling', scope: sibling };
-  const ofSibling = file(isSibling);
-  if (ofSibling) return { key: ofSibling, how: 'collectionSibling', scope: store.collection[ofSibling].vehicle };
   // The brand, then the game: yours, then a shared file for it (a file exported from a
   // key of the tree carries those, exportFiles).
+  const shared = sharedFiles(store);
   for (const [how, scope] of [['brand', brandKey(truck)], ['game', gameKey(truck)], ['all', ALL_SCOPE]]) {
-    const key = assigned(scope) ?? (scope && how !== 'all' ? file((v) => v === scope) : null);
+    const key = assigned(scope) ?? (scope && how !== 'all' ? shared.find((e) => e.vehicle === scope)?.key ?? null : null);
     if (key) return { key, how: isCollectionKey(key) ? `collection${how[0].toUpperCase()}${how.slice(1)}` : how, scope };
   }
   return null;
 }
 
-// Whether Auto's edits go to what plays: a preset for this vehicle or this chassis, or the
-// model's on a model without chassis. Anything wider first gets a copy for this chassis.
-function ownsEdits(auto, truck) {
-  if (!auto) return false;
-  return auto.how === 'vehicle' || auto.how === 'chassis' || (auto.how === 'model' && !truck.variant);
+// What Auto plays comes from the model (a variant, a vehicle's own preset or a file of it).
+const MODEL_HOWS = new Set(['vehicle', 'chassis', 'collectionChassis', 'model', 'collectionModel', 'collectionSibling']);
+
+// Whether Auto's edits go to what plays: a preset of yours the vehicle, the hook or the model
+// plays. A file, or a wider preset, first becomes a variant of yours (ownVariant).
+function ownsEdits(auto) {
+  return Boolean(auto) && ['vehicle', 'chassis', 'model'].includes(auto.how) && !isCollectionKey(auto.key);
 }
 
 // What a key of the map plays: { key, at } its own preset or file, else what it inherits up
-// its chain (chainOf; a chassis or model also from a shared file for it).
+// its chain (chainOf; a model also from a shared file for it or its hooks).
 export function scopePreset(store, scope, truck = null) {
   const files = sharedFiles(store);
   for (const at of chainOf(store, scope, truck)) {
     const key = store.assignments[at];
     if (key && presetLayout(store, key)) return { key, at };
-    const file = files.find((e) => e.vehicle === at);
+    const file = levelOf(at) === 'model' ? modelFile(store, at) : files.find((e) => e.vehicle === at);
     if (file) return { key: file.key, at };
   }
   return { key: allPresetKey(store), at: ALL_SCOPE };
@@ -134,35 +185,57 @@ export function resolvePlaying(store, selection, truck) {
   return { kind: kindOf(key), key, layout: presetLayout(store, key) };
 }
 
-// A copy of what plays as this chassis's preset (or the model's, without chassis
-// variants), or as this truck's; nothing happens when that scope has one already.
-export function ownPreset(store, truck, scope = 'chassis') {
-  const where = scope === 'truck' ? plateKey(truck) : variantKey(truck);
-  if (!where || store.assignments[where]) return store;
+// The file of a model that `from` is, or null.
+function fileOfModel(store, model, from) {
+  const entry = isCollectionKey(from) ? store.collection?.[from] : null;
+  return entry && isModelLevel(entry.vehicle) && modelOf(entry.vehicle) === model ? entry : null;
+}
+
+// A preset of yours in the place of a model's file: the model's current place and what its
+// vehicles remember that held the file, and the file's hooks that remember nothing yet.
+function replaceFile(store, model, file, key) {
+  const assignments = { ...store.assignments };
+  for (const [scope, k] of memoriesOf(store, model)) if (k === file.key) assignments[scope] = key;
+  for (const hook of fileHooks(file)) assignments[`${model}@${hook}`] ??= key;
+  if (!assignments[model] || assignments[model] === file.key) assignments[model] = key;
+  return addAlternate({ ...store, assignments }, model, key);
+}
+
+// What plays in the vehicle, made yours to edit (routeEdit): a shared file of the model becomes
+// your copy in its place (copyOf, replaceFile); a model without variants gets its first one, a
+// copy of what it inherits, the model's current one. The vehicle's hook remembers it.
+function ownVariant(store, truck, from) {
+  const model = truck.key;
+  const file = fileOfModel(store, model, from);
   const key = freePresetKey(store.presets);
-  const preset = { ...structuredClone(resolvePlaying(store, { mode: 'auto' }, truck).layout), name: keyPath(store, where, truck) };
-  return { ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [where]: key } };
+  const preset = { ...structuredClone(presetLayout(store, from)), name: keyPath(store, model, truck), ...(file ? { copyOf: file.key } : {}) };
+  let next = { ...store, presets: { ...store.presets, [key]: preset } };
+  next = file ? replaceFile(next, model, file, key) : joinModel(next, model, key);
+  const hook = chassisKey(truck);
+  if (hook && !next.assignments[hook]) next = { ...next, assignments: { ...next.assignments, [hook]: key } };
+  return { store: next, key };
 }
 
 export function routeEdit(store, selection, truck) {
   if (selection.mode === 'truck') return { store, key: selection.key };
   if (selection.mode === 'scope') {
-    // A key of the map: its own preset, else a copy of what it inherits becomes its own.
-    const own = store.assignments[selection.scope];
+    // A key of the map: its own preset, else a copy of what it plays becomes its own (a file
+    // of the model: in the file's place).
+    const { scope } = selection;
+    const own = store.assignments[scope];
     if (own && store.presets[own]) return { store, key: own };
-    const { layout } = resolvePlaying(store, selection, truck);
+    const { key: from } = scopePreset(store, scope, truck);
     const key = freePresetKey(store.presets);
-    const name = nameFor(store, selection.scope, truck);
-    return {
-      store: { ...store, presets: { ...store.presets, [key]: { ...structuredClone(layout), name } }, assignments: { ...store.assignments, [selection.scope]: key } },
-      key,
-    };
+    const file = levelOf(scope) === 'model' ? fileOfModel(store, scope, from) : null;
+    const preset = { ...structuredClone(presetLayout(store, from)), name: nameFor(store, scope, truck), ...(file ? { copyOf: file.key } : {}) };
+    const next = { ...store, presets: { ...store.presets, [key]: preset } };
+    if (file) return { store: replaceFile(next, scope, file, key), key };
+    return { store: { ...next, assignments: { ...next.assignments, [scope]: key } }, key };
   }
   if (!truck) return { store, key: allPresetKey(store) };
   const auto = autoPreset(store, truck);
-  if (ownsEdits(auto, truck)) return { store, key: auto.key };
-  const owned = ownPreset(store, truck, 'chassis');
-  return { store: owned, key: owned.assignments[variantKey(truck)] };
+  if (ownsEdits(auto)) return { store, key: auto.key };
+  return ownVariant(store, truck, auto?.key ?? allPresetKey(store));
 }
 
 export function editLayout(store, selection, truck, edit) {
@@ -173,7 +246,7 @@ export function editLayout(store, selection, truck, edit) {
   return { ...routed.store, presets: { ...routed.store.presets, [routed.key]: unlabelNew(current, edit(current)) } };
 }
 
-// A preset labelled "new" (one the app made: adoptNewChassis, newAlternate) loses the label at
+// A preset labelled "new" (one the app made: adoptVehicle, newAlternate) loses the label at
 // its first edit, so the tree tells what is still untouched; an edit of the label itself, or
 // no change, keeps it.
 function unlabelNew(before, after) {
@@ -214,7 +287,8 @@ function learnPlace(store, entry) {
     brand: known.brand ?? (entry.game && entry.brand),
     brandName: known.brandName ?? (entry.game && entry.brandName),
   };
-  if (levelOf(entry.vehicle) === 'chassis') info.chassis = [...new Set([...known.chassis, entry.vehicle.slice(entry.vehicle.indexOf('@') + 1)])].sort();
+  const hooks = fileHooks(entry);
+  if (hooks.length) info.chassis = [...new Set([...known.chassis, ...hooks])].sort();
   return { ...store, vehicles: { ...store.vehicles, [model]: info } };
 }
 
@@ -224,45 +298,78 @@ const sameLayout = (a, b) => JSON.stringify([a.width, a.bounds, a.speakers]) ===
 const samePreset = (a, b) => sameLayout(a, b) && a.name === b.name
   && (a.label ?? null) === (b.label ?? null) && (a.labelColor ?? null) === (b.labelColor ?? null);
 
-// Preset files (collection.js entries) made your presets. Each goes on the key its file says
-// when no preset of yours is there, or the key is in replace (the one there stays, among the
-// unused if it is on no other key); else among the unused ones. One the very same as a preset
-// of yours (samePreset) is not added again: that one goes on the key instead; the same speakers
-// under another name or label make a preset of their own. A key that held the file itself
-// ("file:<path>") gets the preset. What a file says of its vehicle is kept (learnPlace).
-// { store, placed, unused, same }: how many went on keys, among the unused, and were yours already.
+// Preset files (collection.js entries) made your presets. A file for a model (or a hook of it)
+// becomes a variant of the model: its current one when it has none, and what the hooks it names
+// remember when they remember nothing yet or are in replace (as the model's current one, for a
+// file naming no hook, when the model is in replace). A file for a brand, a game or all vehicles
+// goes on that key when no preset of yours is there, or the key is in replace (yours waits as a
+// variant); else it waits there. One the very same as a preset of yours (samePreset) is not
+// added again: that one is used instead; the same speakers under another name or label make a
+// preset of their own. A key that held the file itself ("file:<path>") gets the preset. What a
+// file says of its vehicle is kept (learnPlace).
+// { store, placed, variants, unused, same }: how many play somewhere new, only wait as variants,
+// are among the unused, and were yours already.
 export function importPresets(store, entries, replace = new Set()) {
-  let next = { ...store, assignments: { ...store.assignments } };
+  let next = store;
   const counts = { placed: 0, variants: 0, unused: 0, same: 0 };
+  const set = (scope, key) => ({ ...next, assignments: { ...next.assignments, [scope]: key } });
   for (const entry of [...entries].sort((a, b) => ((a.file ?? '') < (b.file ?? '') ? -1 : 1))) {
     let key = Object.keys(next.presets).find((k) => samePreset(next.presets[k], entry.layout));
     if (key) counts.same++;
     else ({ store: next, key } = createPreset(next, entry.layout));
     const scope = entry.vehicle;
-    const held = scope && next.assignments[scope];
-    if (scope && (!held || held === key || (entry.key && held === entry.key) || replace.has(scope))) {
-      next.assignments[scope] = key;
-      if (held && held !== key) next = addAlternate(next, scope, held); // yours waits as a variant
-      counts.placed++;
+    const theirs = (held) => !held || held === key || (entry.key && held === entry.key);
+    if (scope && isModelLevel(scope)) {
+      const model = modelOf(scope);
+      const hadCurrent = Boolean(next.assignments[model]);
+      next = joinModel(next, model, key);
+      let placed = !hadCurrent;
+      for (const hook of fileHooks(entry)) {
+        const at = `${model}@${hook}`;
+        if (theirs(next.assignments[at]) || replace.has(at)) {
+          next = set(at, key);
+          placed = true;
+        }
+      }
+      if (!fileHooks(entry).length && replace.has(model)) {
+        next = pickAlternate(next, model, key);
+        placed = true;
+      }
+      counts[placed ? 'placed' : 'variants']++;
     } else if (scope) {
-      next = addAlternate(next, scope, key);
-      counts.variants++;
+      const held = next.assignments[scope];
+      if (theirs(held) || replace.has(scope)) {
+        next = withWaiting(set(scope, key), scope, waitingOn(next, scope).filter((k) => k !== key));
+        if (held && held !== key) next = addAlternate(next, scope, held); // yours waits as a variant
+        counts.placed++;
+      } else {
+        next = addAlternate(next, scope, key);
+        counts.variants++;
+      }
     } else if (!Object.values(next.assignments).includes(key)) counts.unused++;
-    if (entry.key) for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next.assignments[s] = key;
+    if (entry.key) for (const [s, k] of Object.entries(next.assignments)) if (k === entry.key) next = set(s, key);
     next = learnPlace(next, entry);
   }
   return { store: next, ...counts };
 }
 
-// The keys where an import would meet a preset of yours (importPresets' replace): [{ scope,
-// label, yours, theirs }]. A key holding the very same preset, or the file itself, is no clash.
+// Where an import would meet a preset of yours (importPresets' replace): [{ scope, label, yours,
+// theirs }]: a hook the file names, the model for a file naming none, or the brand's, game's or
+// all vehicles' key. One holding the very same preset, or the file itself, is no clash.
 export function importClashes(store, entries, truck = null) {
   return entries.flatMap((entry) => {
     const scope = entry.vehicle;
-    const held = scope && store.assignments[scope];
-    const yours = held && presetLayout(store, held);
-    if (!yours || held === entry.key || samePreset(yours, entry.layout)) return [];
-    return [{ scope, label: scopeLabel(store, scope, truck), yours: yours.name, theirs: entry.name }];
+    if (!scope) return [];
+    const model = isModelLevel(scope) ? modelOf(scope) : null;
+    const hooks = model ? fileHooks(entry) : [];
+    let at = [scope];
+    if (model) at = hooks.length ? hooks.map((h) => `${model}@${h}`) : [model];
+    return at.flatMap((s) => {
+      const held = store.assignments[s];
+      const yours = held && presetLayout(store, held);
+      if (!yours || held === entry.key || samePreset(yours, entry.layout)) return [];
+      return [{ scope: s, label: scopeLabel(store, s, truck), yours: yours.name, theirs: entry.name }];
+    });
   });
 }
 
@@ -293,12 +400,13 @@ export function dropImportedDefaults(store, collection) {
 }
 
 // A shared file picked in the list is never changed: before the first edit it becomes an
-// unassigned copy ("New preset"), chosen instead. Anything else is left as it is.
+// unassigned copy ("New preset"), chosen instead (one tried with the cab's buttons stays tried).
+// Anything else is left as it is.
 export function adoptPicked(store, selection) {
   const entry = selection.mode === 'truck' && isCollectionKey(selection.key) ? store.collection?.[selection.key] : null;
   if (!entry) return { store, selection };
   const created = createPreset(store, entry.layout);
-  return { store: created.store, selection: { mode: 'truck', key: created.key } };
+  return { store: created.store, selection: { ...selection, key: created.key } };
 }
 
 // Removes a preset and its scopes. The preset of all vehicles stays: something must play.
@@ -315,7 +423,9 @@ export function deletePreset(store, key) {
 
 // Variants on a key (docs/superpowers/specs/2026-10-08-key-variants-design.md): one plays, the
 // key's preset; presets of yours wait in store.alternates[scope]; the shared files for the key
-// are its variants too, the key's by their vehicle.
+// are its variants too, the key's by their vehicle. A model's variants
+// (2026-10-10-model-variants-design.md) also take in the files for its hooks, and what its hooks
+// remember.
 const waitingOn = (store, scope) => store.alternates?.[scope] ?? [];
 
 // The store with scope's waiting variants set; an empty list, and an empty map, left out.
@@ -334,25 +444,64 @@ function promoteWaiting(store, scope) {
   return withWaiting({ ...store, assignments: { ...store.assignments, [scope]: next } }, scope, rest);
 }
 
+// One of your presets among a model's variants: its current one when it has none, else waiting.
+function joinModel(store, model, key) {
+  if (!store.presets[key] || store.assignments[model]) return addAlternate(store, model, key);
+  return withWaiting({ ...store, assignments: { ...store.assignments, [model]: key } }, model, waitingOn(store, model).filter((k) => k !== key));
+}
+
+// Where a model's variant is remembered: { hooks, plates } (a file also on its own hooks that
+// remember nothing).
+function rememberedAt(store, model, key) {
+  const at = memoriesOf(store, model).filter(([, k]) => k === key).map(([s]) => s);
+  const file = fileOfModel(store, model, key);
+  const free = file ? fileHooks(file).filter((h) => !store.assignments[`${model}@${h}`]) : [];
+  return {
+    hooks: [...new Set([...at.filter((s) => levelOf(s) === 'chassis').map(hookOf), ...free])].sort(byHook),
+    plates: at.filter((s) => levelOf(s) === 'vehicle').map(plateOf).sort(),
+  };
+}
+
+const describe = (store, key) => {
+  const layout = presetLayout(store, key);
+  const file = isCollectionKey(key);
+  return {
+    key, name: holderName(store, key), label: layout.label ?? null, labelColor: layout.labelColor ?? 'blue',
+    file, default: Boolean(file && store.collection[key].default),
+  };
+};
+
 // The variants of a key: [{ key, name, label, labelColor, file, default, active }], the one
 // that plays first (the key's preset, else its first shared file), then yours waiting, then
 // the key's other files: not one with the same speakers as one of yours there (yours is a copy
-// of it), nor all vehicles' files, which play only when picked by hand.
+// of it), nor all vehicles' files, which play only when picked by hand. A model's: its current
+// one, yours, then its files (modelFiles), each with where it is remembered ({ hooks, plates }).
 export function alternatesOf(store, scope) {
+  if (levelOf(scope) === 'model') {
+    const files = modelFiles(store, scope);
+    const held = store.assignments[scope];
+    const playing = held && presetLayout(store, held) ? held : modelFile(store, scope)?.key ?? null;
+    const keys = [...new Set([playing, ...ownVariants(store, scope), ...files.map((e) => e.key)])];
+    return keys.filter((k) => k && presetLayout(store, k))
+      .map((key) => ({ ...describe(store, key), active: key === playing, ...rememberedAt(store, scope, key) }));
+  }
   const files = scope === ALL_SCOPE ? [] : sharedFiles(store).filter((e) => e.vehicle === scope);
   const held = store.assignments[scope];
   const playing = held && presetLayout(store, held) ? held : files[0]?.key ?? null;
   const yours = [held, ...waitingOn(store, scope)].filter((k) => k && store.presets[k]).map((k) => store.presets[k]);
   const copied = (e) => e.key !== playing && yours.some((l) => sameLayout(l, e.layout));
   const keys = [...new Set([playing, ...waitingOn(store, scope), ...files.filter((e) => !copied(e)).map((e) => e.key)])];
-  return keys.filter((k) => k && presetLayout(store, k)).map((key) => {
-    const layout = presetLayout(store, key);
-    const file = isCollectionKey(key);
-    return {
-      key, name: holderName(store, key), label: layout.label ?? null, labelColor: layout.labelColor ?? 'blue',
-      file, default: Boolean(file && store.collection[key].default), active: key === playing,
-    };
-  });
+  return keys.filter((k) => k && presetLayout(store, k)).map((key) => ({ ...describe(store, key), active: key === playing }));
+}
+
+// The presets your vehicles of a model have of their own: on a plate, no variant of the model.
+// [{ key, name, label, labelColor, file, default, plate }]
+export function personalOf(store, model) {
+  const variants = new Set(alternatesOf(store, model).map((v) => v.key));
+  return memoriesOf(store, model)
+    .filter(([s, k]) => levelOf(s) === 'vehicle' && !variants.has(k) && presetLayout(store, k))
+    .map(([s, k]) => ({ ...describe(store, k), plate: plateOf(s) }))
+    .sort((a, b) => a.plate.localeCompare(b.plate));
 }
 
 // Plays one of a key's variants there; the one that played waits (a file needs no place).
@@ -372,85 +521,135 @@ export function addAlternate(store, scope, key) {
 }
 
 // A variant taken off a key: one waiting just leaves; the one that plays leaves and the next
-// waiting one plays (all vehicles keeps its last). The preset stays.
+// waiting one plays (all vehicles keeps its last). The preset stays. Off a model, its hooks and
+// vehicles forget it too; a shared file of the model is hidden from its variants
+// (store.hiddenFiles), as it cannot leave its folder.
 export function dropAlternate(store, scope, key) {
-  const waiting = waitingOn(store, scope);
-  if (waiting.includes(key)) return withWaiting(store, scope, waiting.filter((k) => k !== key));
-  if (store.assignments[scope] !== key || (scope === ALL_SCOPE && !waiting.length)) return store;
-  const assignments = { ...store.assignments };
+  let next = store;
+  if (levelOf(scope) === 'model') {
+    const forgotten = memoriesOf(store, scope).filter(([, k]) => k === key);
+    if (forgotten.length) {
+      const assignments = { ...store.assignments };
+      for (const [s] of forgotten) delete assignments[s];
+      next = { ...store, assignments };
+    }
+    if (fileOfModel(store, scope, key)) {
+      const hidden = [...new Set([...(store.hiddenFiles?.[scope] ?? []), key])];
+      next = { ...next, hiddenFiles: { ...store.hiddenFiles, [scope]: hidden } };
+    }
+  }
+  const waiting = waitingOn(next, scope);
+  if (waiting.includes(key)) return withWaiting(next, scope, waiting.filter((k) => k !== key));
+  if (next.assignments[scope] !== key || (scope === ALL_SCOPE && !waiting.length)) return next;
+  const assignments = { ...next.assignments };
   delete assignments[scope];
-  return promoteWaiting({ ...store, assignments }, scope);
+  return promoteWaiting({ ...next, assignments }, scope);
+}
+
+// Presets on chassis keys (before a model's variants) become variants of their model: the first
+// by hook its current one when it had none, the others waiting; the chassis keys stay, as what
+// the hooks remember. Variants waiting on a chassis key move to the model. The same store when
+// there is nothing to fold.
+export function foldChassis(store) {
+  const chassis = [...new Set([...Object.keys(store.assignments), ...Object.keys(store.alternates ?? {})])]
+    .filter((s) => levelOf(s) === 'chassis')
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  let next = store;
+  for (const scope of chassis) {
+    const model = modelOf(scope);
+    const keys = [next.assignments[scope], ...waitingOn(next, scope)].filter((k) => k && next.presets[k]);
+    if (waitingOn(next, scope).length) next = withWaiting(next, scope, []);
+    for (const key of keys) next = joinModel(next, model, key);
+  }
+  return next;
 }
 
 // A new variant on a key: a copy of `from` (what plays now, the menu's "copy current"), else of
 // what the key plays (or inherits), named by the key and labelled "new"; it plays, the one that
-// played waits.
+// played waits. On the model of the vehicle in the game it plays there (chooseVariant).
 export function newAlternate(store, scope, truck = null, from = null) {
   const layout = presetLayout(store, from ?? scopePreset(store, scope, truck).key);
   const key = freePresetKey(store.presets);
   const preset = { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' };
   const held = store.assignments[scope];
   const waiting = held && !isCollectionKey(held) ? [held, ...waitingOn(store, scope)] : waitingOn(store, scope);
-  return withWaiting({ ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [scope]: key } }, scope, waiting);
+  const next = withWaiting({ ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [scope]: key } }, scope, waiting);
+  return truck?.key === scope ? chooseVariant(next, truck, key) : next;
 }
 
-// A variant as the card and the tree's menu name it: its label, else its name; a file says so.
-export const variantLabel = (v) => `${v.label || v.name}${v.default ? ' (default)' : v.file ? ' (shared file)' : ''}`;
+// A variant as the card and the tree's menu name it: its label, else its name; a file says so,
+// and a vehicle's own preset its plate.
+export const variantLabel = (v) => `${v.label || v.name}${v.default ? ' (default)' : v.file ? ' (shared file)' : ''}${v.plate ? ` (${v.plate} only)` : ''}`;
 
 // Your own vehicle's key (a plate, not a quick job), where its choice of a variant goes.
 const ownPlate = (truck) => (truck?.plate && !truck.quickJob ? plateKey(truck) : null);
 
-// The card's choice of the variants on the vehicle's chassis (the model without one):
-// { scope, value, options: [{ value, label }] }, or null under two, or when your vehicle has a
-// preset of its own that is none of them.
+// The card's choice of the model's variants, and your vehicle's own preset:
+// { scope, value, options: [{ value, label }] }, or null under two, or when what plays is none
+// of them.
 export function variantChoice(store, truck) {
   if (!truck) return null;
-  const scope = variantKey(truck);
-  const variants = alternatesOf(store, scope);
-  if (variants.length < 2) return null;
   const plate = ownPlate(truck);
-  const onPlate = plate ? store.assignments[plate] : null;
-  if (onPlate && !variants.some((v) => v.key === onPlate)) return null;
-  return { scope, value: onPlate ?? variants.find((v) => v.active).key, options: variants.map((v) => ({ value: v.key, label: variantLabel(v) })) };
+  const own = personalOf(store, truck.key).filter((p) => `${truck.key}#${p.plate}` === plate);
+  const options = [...alternatesOf(store, truck.key), ...own];
+  const plays = autoPreset(store, truck)?.key;
+  if (options.length < 2 || !options.some((v) => v.key === plays)) return null;
+  return { scope: truck.key, value: plays, options: options.map((v) => ({ value: v.key, label: variantLabel(v) })) };
 }
 
-// A variant picked on the card: for your own vehicle it goes on "this vehicle", so the others
-// on the chassis keep theirs; else it plays on the chassis.
+// A variant picked for the vehicle in the game (the card, the tree): your own vehicle remembers
+// it by its plate, any other its hook; a variant of the model becomes its current one, which a
+// hook new to you plays. The vehicle's own preset stays its own.
 export function chooseVariant(store, truck, key) {
   const plate = ownPlate(truck);
-  if (plate) return { ...store, assignments: { ...store.assignments, [plate]: key } };
-  return pickAlternate(store, variantKey(truck), key);
+  const memory = plate ?? chassisKey(truck);
+  const next = memory ? { ...store, assignments: { ...store.assignments, [memory]: key } } : store;
+  return pickAlternate(next, truck.key, key);
+}
+
+// The cab's buttons (2026-10-10-controls-voice-design.md): the variant `step` (1 next, -1
+// previous) from `from` among the model's variants (alternatesOf: yours and its files, not a
+// vehicle's own preset): { key, index, count, label }. From one that is none of them: the first
+// (or the last). Null without a vehicle or a variant.
+export function cycleVariant(store, truck, from, step) {
+  if (!truck) return null;
+  const variants = alternatesOf(store, truck.key);
+  if (!variants.length) return null;
+  const at = variants.findIndex((v) => v.key === from);
+  let index = (at + step + variants.length) % variants.length;
+  if (at < 0) index = step > 0 ? 0 : variants.length - 1;
+  return { key: variants[index].key, index, count: variants.length, label: variants[index].label };
 }
 
 export const NEW_LABEL = 'new';
 
-// A chassis seen without a preset of its own gets one (the model gets it when the game reports
-// no chassis), so what plays in it is its own to tune:
-// - a model new to the app (no key for the model, its chassis or its vehicles, and no shared
-//   file for it): a copy of what it would inherit, the brand's, the game's or all vehicles'
-//   preset, which serve as templates;
-// - another chassis of a model you have a chassis preset or file for: a copy of the one Auto
-//   would play from another chassis, so nothing plays from another chassis.
-// Named after the key and labelled "new", not with another chassis's label. On the chassis, not
-// the model, so no chassis falls back to the model. The same store when its own plays, or the
-// model's (yours or a shared file for the model), or a vehicle of the model has a key.
-export function adoptNewChassis(store, truck) {
+// The vehicle in the game, seen (app.js, on every vehicle change):
+// - a model new to the app (no variant of yours, no file for it, no vehicle of it remembering
+//   anything) gets its first variant: a copy of what it would inherit, the brand's, the game's
+//   or all vehicles' preset, which serve as templates; named after the model and labelled
+//   "new" until you give it a label of your own. Its hook remembers it;
+// - a hook new to you remembers what it plays from the model (its current variant or a file),
+//   so a variant picked later on another hook does not move it. A file for that very hook plays
+//   without a memory, as do your vehicles that remember something.
+// The same store when nothing is new.
+export function adoptVehicle(store, truck) {
   if (!truck) return store;
-  const how = autoPreset(store, truck)?.how;
-  if (how !== 'sibling' && how !== 'collectionSibling') {
-    const ofModel = (scope) => modelOf(scope) === truck.key && levelOf(scope) !== 'brand' && levelOf(scope) !== 'game' && scope !== ALL_SCOPE;
-    if (Object.keys(store.assignments).some(ofModel)) return store;
-    if (Object.values(store.collection ?? {}).some((e) => e.vehicle && modelOf(e.vehicle) === truck.key)) return store;
+  const auto = autoPreset(store, truck);
+  const hook = chassisKey(truck);
+  if (!auto || !MODEL_HOWS.has(auto.how)) {
+    const { layout } = resolvePlaying(store, { mode: 'auto' }, truck);
+    const key = freePresetKey(store.presets);
+    const preset = { ...structuredClone(layout), name: keyPath(store, truck.key, truck), label: NEW_LABEL, labelColor: 'green' };
+    return {
+      ...store,
+      presets: { ...store.presets, [key]: preset },
+      assignments: { ...store.assignments, [truck.key]: key, ...(hook ? { [hook]: key } : {}) },
+    };
   }
-  const { layout } = resolvePlaying(store, { mode: 'auto' }, truck);
-  const key = freePresetKey(store.presets);
-  const scope = variantKey(truck);
-  return {
-    ...store,
-    // Labelled "new" so it stands out in the key tree until you give it a label of your own.
-    presets: { ...store.presets, [key]: { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' } },
-    assignments: { ...store.assignments, [scope]: key },
-  };
+  if (hook && !store.assignments[hook] && ['model', 'collectionModel', 'collectionSibling'].includes(auto.how)) {
+    return { ...store, assignments: { ...store.assignments, [hook]: auto.key } };
+  }
+  return store;
 }
 
 // Keeps what the game tells about a model (name, game, brand) for naming its scopes when
@@ -540,18 +739,19 @@ export function scopeLabel(store, scope, truck = null) {
   return name;
 }
 
-// A preset as people read it: its name, then where it applies when the name does not say
-// it ("Default layout — all vehicles", "Long nose — Peterbilt 389 +1").
+// A preset as people read it: its name and label, then where it applies when the name does not
+// say it ("Default layout — all vehicles", "Long nose · studio — Peterbilt 389 +1").
 function displayName(store, key, truck = null) {
   if (isCollectionKey(key)) return collectionLabel(store.collection[key]);
-  const { name } = store.presets[key];
+  const { name, label } = store.presets[key];
+  const named = label ? `${name} · ${label}` : name;
   const scopes = scopesOf(store, key);
-  if (!scopes.length) return name;
+  if (!scopes.length) return named;
   const where = scopeLabel(store, scopes[0], truck);
   const more = scopes.length > 1 ? ` +${scopes.length - 1}` : '';
   // A name that is the key's path (or the older "Model, hook 2.7 m") says where it applies.
   const said = name === where || name === keyPath(store, scopes[0], truck);
-  return said ? `${name}${more}` : `${name} — ${where}${more}`;
+  return said ? `${named}${more}` : `${named} — ${where}${more}`;
 }
 
 // What a preset picked in the list applies to by itself.
@@ -559,8 +759,10 @@ function scopeOfKey(store, key, truck) {
   if (isCollectionKey(key)) {
     const { vehicle } = store.collection[key];
     if (!vehicle) return 'only where it is chosen';
+    if (!isModelLevel(vehicle)) return scopeLabel(store, vehicle, truck);
     const name = modelName(store, modelOf(vehicle), truck);
-    return levelOf(vehicle) === 'chassis' ? `${name} on the hook ${vehicle.slice(vehicle.indexOf('@') + 1)} m chassis` : `all ${name}`;
+    const hooks = fileHooks(store.collection[key]);
+    return hooks.length ? `${name}, a variant for hook ${hooks.join(', ')} m` : `${name}, a variant`;
   }
   const scopes = scopesOf(store, key);
   if (!scopes.length) return 'only where it is chosen';
@@ -570,7 +772,6 @@ function scopeOfKey(store, key, truck) {
 const EVERY = 'every vehicle without its own preset';
 // Picking a key or a preset stops following the vehicle in the game; this goes back.
 const BACK_TO_AUTO = { action: 'auto', label: 'Back to Auto' };
-const chassisScope = (name, truck) => (truck.variant ? `all ${name} on this chassis` : `all ${name}`);
 
 // Where a model belongs: { game, brand }, as the game said (the vehicle in it, or when it
 // was driven), else as a shared file for it says. Null parts are not known: no guesses.
@@ -607,22 +808,26 @@ export function chainOf(store, scope, truck = null) {
   return [scope, ...(plateChassis(store, scope, truck) ? [plateChassis(store, scope, truck)] : []), ...wider];
 }
 
-// Moving your preset from one scope to another in the map: up its chain, down to a scope
-// whose chain passes through it, or across to any other key (dragging). A plan as
-// planScope gives (mode 'move'; direction 'up', 'down' or 'across'), or null.
-export function planMove(store, from, to, truck = null) {
-  const key = store.assignments[from];
+// The other preset at `to` that putting `key` there takes it from: { key, name, keeps } (keeps:
+// it still shows elsewhere, or it is a file), or null. A model takes a variant more, nothing
+// is taken there.
+function takenAt(store, to, key) {
+  const holder = levelOf(to) === 'model' ? null : store.assignments[to];
+  if (!holder || holder === key) return null;
+  return { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).some((s) => s !== to) };
+}
+
+// Moving your preset `key` (by default the one on `from`) from one key of the map to another: up
+// its chain, down to a key whose chain passes through it, or across to any other (dragging). A
+// plan as planScope gives (mode 'move'; direction 'up', 'down' or 'across'), or null.
+export function planMove(store, from, to, truck = null, key = store.assignments[from]) {
   if (!key || isCollectionKey(key) || from === to) return null;
+  if (to.startsWith('?')) return null; // a folder, no scope
   const up = chainOf(store, from, truck);
   const down = chainOf(store, to, truck);
-  if (to.startsWith('?')) return null; // a folder, no scope
   let direction = 'across';
   if (up.includes(to)) direction = 'up';
   else if (down.includes(from)) direction = 'down';
-  const holder = store.assignments[to];
-  const taken = holder && holder !== key
-    ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
-    : null;
   let between = [];
   if (direction === 'up') between = up.slice(1, up.indexOf(to));
   else if (direction === 'down') between = down.slice(1, down.indexOf(from));
@@ -633,53 +838,58 @@ export function planMove(store, from, to, truck = null) {
     const wider = up.slice(1).find((s) => store.assignments[s] && store.assignments[s] !== key);
     fallback = wider ? { label: scopeLabel(store, wider, truck), name: holderName(store, store.assignments[wider]) } : null;
   }
-  return { mode: 'move', key, from, to, direction, mustCopy: from === ALL_SCOPE, taken, shadow, fallback, outplayed: null };
+  return { mode: 'move', key, from, to, direction, mustCopy: from === ALL_SCOPE, taken: takenAt(store, to, key), shadow, fallback, outplayed: null };
 }
 
 // A vehicle's scopes for the card, narrowest first: { level, scope, label, holder } where
-// holder is the preset or file assigned there, or null. "This vehicle" only for a plate
-// of your own (a quick job's is random).
+// holder is what plays from there in this vehicle: your vehicle's preset (its own or a variant
+// it remembers), the model's variant (by the hook, a file, the current one), or the key's
+// preset; null when none. "This vehicle" only for a plate of your own (a quick job's is random).
 export function scopeLadder(store, truck) {
   const brand = brandKey(truck);
   const game = gameKey(truck);
   const name = modelName(store, truck.key, truck);
+  const fromModel = autoPreset(store, { ...truck, plate: null });
+  const holder = (level, scope) => {
+    if (level === 'model') return fromModel && MODEL_HOWS.has(fromModel.how) ? fromModel.key : null;
+    return store.assignments[scope] ?? null;
+  };
   return [
-    truck.plate && !truck.quickJob && ['vehicle', plateKey(truck), `this vehicle (${truck.plate})`],
-    truck.variant && ['chassis', chassisKey(truck), `this chassis (hook ${truck.variant} m)`],
-    ['model', truck.key, truck.variant ? `all chassis of ${name}` : `all ${name}`],
+    ownPlate(truck) && ['vehicle', plateKey(truck), `this vehicle (${truck.plate})`],
+    ['model', truck.key, name],
     brand && ['brand', brand, scopeLabel(store, brand, truck)],
     game && ['game', game, scopeLabel(store, game, truck)],
     ['all', ALL_SCOPE, 'all vehicles'],
-  ].filter(Boolean).map(([level, scope, label]) => ({ level, scope, label, holder: store.assignments[scope] ?? null }));
+  ].filter(Boolean).map(([level, scope, label]) => ({ level, scope, label, holder: holder(level, scope) }));
 }
 
-const LADDER_HOWS = new Set(['vehicle', 'chassis', 'model', 'brand', 'game', 'all']);
-
-// Where the preset that plays in Auto sits on this vehicle's ladder, or null: another
-// chassis's preset, a shared file, or a preset picked in the list.
+// Where the preset that plays in Auto sits on this vehicle's ladder, or null (a shared file,
+// or a preset picked in the list): your vehicle for its own preset, the model for a variant of
+// yours (whoever remembers it), the brand, the game or all vehicles.
 export function currentScope(store, selection, truck) {
   if (selection.mode !== 'auto' || !truck) return null;
   const auto = autoPreset(store, truck);
-  if (!auto || !LADDER_HOWS.has(auto.how) || isCollectionKey(auto.key)) return null;
-  return scopeLadder(store, truck).some((r) => r.scope === auto.scope) ? auto.scope : null;
+  if (!auto || isCollectionKey(auto.key)) return null;
+  if (auto.how === 'vehicle') return ownVariants(store, truck.key).includes(auto.key) ? truck.key : auto.scope;
+  if (auto.how === 'chassis' || auto.how === 'model') return truck.key;
+  return ['brand', 'game', 'all'].includes(auto.how) ? auto.scope : null;
 }
 
 const holderName = (store, key) => (isCollectionKey(key) ? store.collection?.[key]?.name ?? key : store.presets[key]?.name ?? key);
 
 // What putting the preset that plays at the scope `to` means, for the card's dialogs:
-//   mode       'move' (Auto, from its scope on this ladder), 'copy' (Auto, from another
-//              chassis or a file: a copy takes `to`), 'use' (a preset picked in the list:
-//              it gets `to` as well)
+//   mode       'move' (Auto, from its scope on this ladder), 'copy' (Auto, from a file: a copy
+//              takes `to`), 'use' (a preset picked in the list: it gets `to` as well)
 //   direction  'up' | 'down' for a move
 //   mustCopy   moving away from all vehicles leaves a copy there instead (something must play)
 //   taken      { key, name, keeps } the other preset at `to`, which loses it (keeps: it still
-//              applies elsewhere, or it is a file)
+//              applies elsewhere, or it is a file); never on a model, which takes a variant more
 //   shadow     [{ scope, label, name }] narrower scopes of this vehicle with other presets,
-//              which would keep playing here
+//              which would keep playing here (a model: all its variants of yours)
 //   fallback   for a move down: { label, name } what plays from then on where it was
 //   outplayed  { name, file } what would still play in this vehicle, narrower than `to`, with
-//              the shadow cleared: a shared file for this chassis or the model (files are
-//              never unassigned), or null
+//              the shadow cleared: a shared file of the model (files are never unassigned), or
+//              another variant of it, or null
 // Null when nothing would change.
 export function planScope(store, selection, truck, to) {
   if (!truck) return null;
@@ -688,35 +898,71 @@ export function planScope(store, selection, truck, to) {
   if (index(to) < 0) return null;
   const { key } = resolvePlaying(store, selection, truck);
   const from = currentScope(store, selection, truck);
-  if (from === to || (selection.mode !== 'auto' && store.assignments[to] === key)) return null;
+  if (from === to || (selection.mode !== 'auto' && ladder[index(to)].holder === key)) return null;
   let mode = 'copy';
   if (selection.mode !== 'auto') mode = 'use';
   else if (from) mode = 'move';
   const direction = mode === 'move' ? (index(to) > index(from) ? 'up' : 'down') : null;
-  const holder = store.assignments[to];
-  const taken = holder && holder !== key
-    ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
-    : null;
-  const shadow = ladder.slice(0, index(to))
-    .filter((r) => r.holder && r.holder !== key && !(mode === 'move' && r.scope === from))
-    .map((r) => ({ scope: r.scope, label: r.label, name: holderName(store, r.holder) }));
+  // What keeps playing on the narrower rungs: your vehicle's preset, the model's variants of
+  // yours (a model cleared loses them all, so all are named; the one moved off it is not).
+  const others = (r) => {
+    if (r.level === 'model') return ownVariants(store, r.scope).filter((k) => k !== key);
+    return r.holder && r.holder !== key && !(mode === 'move' && r.scope === from) ? [r.holder] : [];
+  };
+  const shadow = ladder.slice(0, index(to)).filter((r) => others(r).length)
+    .map((r) => ({ scope: r.scope, label: r.label, name: others(r).map((k) => holderName(store, k)).join('", "') }));
   let fallback = null;
   if (direction === 'down') {
     const wider = ladder.slice(index(from) + 1).find((r) => r.holder && r.holder !== key);
     fallback = wider ? { label: wider.label, name: holderName(store, wider.holder) } : null;
   }
-  const plan = { mode, key, from, to, direction, mustCopy: mode === 'move' && from === ALL_SCOPE, taken, shadow, fallback, outplayed: null };
+  const plan = { mode, key, from, to, direction, mustCopy: mode === 'move' && from === ALL_SCOPE, taken: takenAt(store, to, key), shadow, fallback, outplayed: null };
   const after = applyScope(store, plan, truck, { clear: shadow.map((s) => s.scope) });
   const plays = autoPreset(after, truck);
   if (plays && plays.key !== after.assignments[to]) {
-    plan.outplayed = { name: holderName(store, plays.key), file: isCollectionKey(plays.key) };
+    plan.outplayed = { name: holderName(after, plays.key), file: isCollectionKey(plays.key) };
   }
   return plan;
 }
 
-// Carries out a plan (planScope): copy (a move down kept where it was, or anything from a
-// file, another chassis or all vehicles) puts a copy at `to`; a move frees `from`; clear
-// frees those narrower scopes. Presets that lose a scope stay.
+// A key cleared for a wider one to play here (planScope's shadow): a model loses its variants
+// of yours (they stay presets) and what its hooks remember; any other key its preset.
+function clearScope(store, scope) {
+  if (levelOf(scope) !== 'model') return unassign(store, scope);
+  const assignments = { ...store.assignments };
+  for (const [s] of memoriesOf(store, scope)) if (levelOf(s) === 'chassis') delete assignments[s];
+  if (isCollectionKey(assignments[scope])) delete assignments[scope];
+  let next = { ...store, assignments };
+  for (const key of ownVariants(next, scope)) next = dropAlternate(next, scope, key);
+  return next;
+}
+
+// A preset of yours put on a key: on a model a variant, its current one, which the vehicle in
+// the game plays when it is of that model (by its plate, or its hook when its plate keeps a
+// preset of its own); on any other key its preset, the one there waiting as a variant when
+// asked (variant; your vehicle's own is let go).
+function putOn(store, to, key, truck, variant) {
+  if (levelOf(to) === 'model') {
+    let next = pickAlternate(joinModel(store, to, key), to, key);
+    if (truck?.key === to) {
+      const plate = ownPlate(truck);
+      const kept = plate && next.assignments[plate];
+      const own = kept && !isCollectionKey(kept) && !ownVariants(next, to).includes(kept);
+      const memory = plate && !own ? plate : chassisKey(truck);
+      if (memory) next = { ...next, assignments: { ...next.assignments, [memory]: key } };
+    }
+    return next;
+  }
+  const held = store.assignments[to];
+  let next = withWaiting({ ...store, assignments: { ...store.assignments, [to]: key } }, to, waitingOn(store, to).filter((k) => k !== key));
+  if (variant && held && held !== key && levelOf(to) !== 'vehicle') next = addAlternate(next, to, held); // "Add as a variant"
+  return next;
+}
+
+// Carries out a plan (planScope, planMove, planAssign): copy (a move down kept where it was, or
+// anything from a file or all vehicles) puts a copy at `to`; a move takes it off `from` (off a
+// model with what its vehicles remember of it); clear frees those narrower scopes. Presets that
+// lose a scope stay.
 export function applyScope(store, plan, truck, { copy = false, clear = [], variant = false } = {}) {
   let next = store;
   let key = plan.key;
@@ -725,16 +971,9 @@ export function applyScope(store, plan, truck, { copy = false, clear = [], varia
     key = freePresetKey(store.presets);
     next = { ...next, presets: { ...next.presets, [key]: { ...structuredClone(layout), name: nameFor(store, plan.to, truck) } } };
   }
-  const assignments = { ...next.assignments };
-  const held = assignments[plan.to];
-  if (plan.mode === 'move' && key === plan.key && plan.from !== ALL_SCOPE) delete assignments[plan.from];
-  for (const scope of clear) if (scope !== ALL_SCOPE) delete assignments[scope];
-  assignments[plan.to] = key;
-  next = { ...next, assignments };
-  next = withWaiting(next, plan.to, waitingOn(next, plan.to).filter((k) => k !== key));
-  if (variant && held && held !== key) next = addAlternate(next, plan.to, held); // "Add as a variant"
-  for (const scope of [plan.from, ...clear]) if (scope) next = promoteWaiting(next, scope);
-  return next;
+  if (plan.mode === 'move' && key === plan.key && plan.from && plan.from !== ALL_SCOPE) next = dropAlternate(next, plan.from, key);
+  for (const scope of clear) if (scope !== ALL_SCOPE) next = clearScope(next, scope);
+  return putOn(next, plan.to, key, truck, variant);
 }
 
 // A key's path as the tree shows it, without "All vehicles": "ATS › Kenworth › Kenworth T680
@@ -791,17 +1030,20 @@ export function truckStatus(store, selection, truck) {
     const { at } = scopePreset(store, selection.scope, truck);
     const own = at === selection.scope && !isCollectionKey(playing.key);
     let note = `Editing changes the preset of ${label}.`;
-    if (!own) note = `It inherits this from ${scopeLabel(store, at, truck)}: editing gives ${label} a preset of its own first.`;
+    if (!own && at === selection.scope) note = `A shared file of ${label}: editing makes your own copy in its place first.`;
+    else if (!own) note = `It inherits this from ${scopeLabel(store, at, truck)}: editing gives ${label} a preset of its own first.`;
     return { ...base, plays: `${base.plays} (key picked in the map)`, appliesTo: selection.scope === ALL_SCOPE ? EVERY : label, note, buttons: [BACK_TO_AUTO] };
   }
 
   if (selection.mode !== 'auto') {
     const file = playing.kind === 'collection' ? store.collection[playing.key].file : null;
+    // A variant tried with the cab's buttons (app.js controlAction) stays the cab's on getting out.
+    const tried = selection.cycled ? 'Tried with the controls: this cab keeps it when you get out, unless Auto goes back first.' : '';
     return {
       ...base,
-      plays: `${base.plays} (picked in the list)`,
+      plays: `${base.plays} (${selection.cycled ? 'tried with the controls' : 'picked in the list'})`,
       appliesTo: scopeOfKey(store, playing.key, truck),
-      note: note(file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', truck && lent),
+      note: note(tried, file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', truck && lent),
       useIn: truck ? { options: [{ value: '', label: 'Use it in…' }, ...rungOptions(playing.key)] } : null,
       buttons: [BACK_TO_AUTO],
     };
@@ -810,22 +1052,23 @@ export function truckStatus(store, selection, truck) {
   const auto = autoPreset(store, truck);
   const from = currentScope(store, selection, truck);
   const name = modelName(store, truck.key, truck);
-  const FROM = {
-    sibling: `another chassis of ${name}`,
-    collectionChassis: `${chassisScope(name, truck)}, from the collection`,
-    collectionModel: `${truck.variant ? `all chassis of ${name}` : `all ${name}`}, from the collection`,
-    collectionSibling: `another chassis of ${name}, from the collection`,
-  };
-  const appliesTo = from ? scopeLadder(store, truck).find((r) => r.scope === from).label : FROM[auto?.how] ?? `${scopeLabel(store, auto.scope, truck)}, from the collection`;
+  const appliesTo = from
+    ? scopeLadder(store, truck).find((r) => r.scope === from).label
+    : `${MODEL_HOWS.has(auto?.how) ? name : scopeLabel(store, auto.scope, truck)}, from the collection`;
   const scope = from
     ? { value: from, options: rungOptions(playing.key) }
     : { value: '', options: [{ value: '', label: appliesTo }, ...rungOptions(playing.key)] };
-  const owns = ownsEdits(auto, truck);
   const file = isCollectionKey(auto.key) ? store.collection[auto.key].file : null;
-  const copy = truck.variant ? 'copy for this chassis' : `preset for ${name}`;
   let editNote = null;
-  if (file) editNote = `From the collection: ${file}. Editing makes your own ${copy} first.`;
-  else if (!owns) editNote = `Editing makes a ${copy} first.`;
+  if (file && MODEL_HOWS.has(auto.how)) editNote = `From the collection: ${file}. Editing makes it your own variant of ${name} first.`;
+  else if (file) editNote = `From the collection: ${file}. Editing makes a variant of ${name} first.`;
+  else if (!ownsEdits(auto)) editNote = `Editing makes a variant of ${name} first.`;
+  else if (from === truck.key) {
+    // Edits go to the variant, wherever else it plays.
+    const { hooks, plates } = rememberedAt(store, truck.key, auto.key);
+    const elsewhere = [...hooks.filter((h) => h !== truck.variant).map((h) => `hook ${h} m`), ...plates.filter((p) => p !== truck.plate)];
+    if (elsewhere.length) editNote = `Edits also change it on ${elsewhere.join(', ')}.`;
+  }
   return {
     ...base,
     appliesTo: from === ALL_SCOPE ? EVERY : appliesTo,
@@ -840,8 +1083,7 @@ const AUTO_NOTE = {
   collectionGame: () => ' (collection)',
   vehicle: () => ' (this vehicle)',
   chassis: () => '',
-  model: (truck) => (truck.variant ? ' (all chassis)' : ''),
-  sibling: () => ' (other chassis)',
+  model: () => '',
   collectionChassis: () => ' (collection)',
   collectionModel: () => ' (collection)',
   collectionSibling: () => ' (collection)',
@@ -880,53 +1122,53 @@ export function presetOptions(store, truck, selection = { mode: 'auto' }) {
   ];
 }
 
-const MAP_ORDER = ['game', 'brand', 'model', 'chassis', 'vehicle'];
+const MAP_ORDER = ['game', 'brand', 'model'];
 
-// The preset map, laid out like registry keys: all vehicles > game > brand > model > chassis >
-// your vehicle (by plate). Every model you have driven gets its key, with the chassis and
-// vehicles seen; so do scopes that hold a preset or a shared file, and the vehicle in the game.
+// The preset map, laid out like registry keys: all vehicles > game > brand > model. Every model
+// you have driven gets its key; so do keys that hold a preset or a shared file (a model also for
+// its hooks' files and what its hooks and vehicles remember), and the vehicle in the game.
 // A model whose game is not known yet (not driven since presets got scopes) sits under
 // "Game not known yet (drive a vehicle once)"; that folder is no scope (pseudo).
-// Node: { scope, label, pseudo, own, inherited, current, plays, moveTo, children }
+// Node: { scope, label, pseudo, level, own, alternates, inherited, current, plays, picked, children }
 //   own        { key, name, file, default, label, labelColor } the preset or file at this key
-//              (default: a file of presets/default/), or null
+//              (default: a file of presets/default/), or null; on a model the variant that
+//              plays in the vehicle in the game (other models: their current one), with where it
+//              is remembered ({ hooks, plates })
+//   alternates the key's other variants (alternatesOf), on a model also your vehicles' own
+//              presets (personalOf: with their plate)
 //   inherited  { key, name, from } what a key without its own falls back to, and the key it is from
 //   current    on the chain of the vehicle in the game; plays: the key whose preset plays in
 //              Auto; picked: the key picked in the map (selection mode 'scope')
-//   moveTo     for a preset of yours: [{ value, label }] wider keys up its chain, then the
-//              keys under it
 // Also gives the unassigned presets and the files that apply nowhere.
 export function presetTree(store, truck, selection = { mode: 'auto' }) {
   const files = sharedFiles(store);
-  const ownAt = (scope) => {
-    const key = store.assignments[scope];
-    const tag = (layout) => ({ label: layout?.label ?? null, labelColor: layout?.labelColor ?? 'blue' });
-    const isDefault = (k) => Boolean(isCollectionKey(k) && store.collection?.[k]?.default);
-    if (key && presetLayout(store, key)) return { key, name: holderName(store, key), file: isCollectionKey(key), default: isDefault(key), ...tag(presetLayout(store, key)) };
-    const file = files.find((e) => e.vehicle === scope);
-    return file ? { key: file.key, name: file.name, file: true, default: Boolean(file.default), ...tag(file.layout) } : null;
-  };
-  // Every key to show: the vehicles driven with their chassis and plates, scopes with
-  // presets or files, and the vehicle in the game.
-  const scopes = new Set([ALL_SCOPE, ...Object.keys(store.assignments), ...files.map((e) => e.vehicle)]);
-  for (const [model, v] of Object.entries(store.vehicles ?? {})) {
-    scopes.add(model);
-    for (const hook of v.chassis ?? []) scopes.add(`${model}@${hook}`);
-    for (const plate of Object.keys(v.plates ?? {})) scopes.add(`${model}#${plate}`);
-  }
-  const ladder = truck ? scopeLadder(store, truck) : [];
-  for (const r of ladder) scopes.add(r.scope);
-  const chain = new Set(truck ? ladder.map((r) => r.scope) : [ALL_SCOPE]);
   const auto = truck && selection.mode === 'auto' ? autoPreset(store, truck) : null;
-  // Off the chain too: another chassis of the model, whose preset or file plays in this one.
-  const playsAt = auto ? auto.scope : null;
+  const fromModel = auto && MODEL_HOWS.has(auto.how);
+  const variantsAt = (scope) => {
+    if (levelOf(scope) !== 'model') return alternatesOf(store, scope);
+    const list = [...alternatesOf(store, scope), ...personalOf(store, scope)];
+    // The model in the game shows what plays in it.
+    if (!fromModel || truck.key !== scope || !list.some((v) => v.key === auto.key)) return list;
+    return list.map((v) => ({ ...v, active: v.key === auto.key }));
+  };
+  // Every key to show: the models driven, keys with presets or files (a hook's or a vehicle's
+  // on its model), and the vehicle in the game.
+  const mapScope = (s) => (isMemory(s) ? modelOf(s) : s);
+  const scopes = new Set([ALL_SCOPE, ...Object.keys(store.assignments).map(mapScope), ...Object.keys(store.alternates ?? {}).map(mapScope), ...files.map((e) => mapScope(e.vehicle))]);
+  for (const model of Object.keys(store.vehicles ?? {})) scopes.add(model);
+  const ladder = truck ? scopeLadder(store, truck) : [];
+  for (const r of ladder) if (r.level !== 'vehicle') scopes.add(r.scope);
+  const chain = new Set(truck ? ladder.map((r) => r.scope) : [ALL_SCOPE]);
+  const playsAt = auto ? (fromModel ? truck.key : auto.scope) : null;
 
   const nodes = new Map();
   const node = (scope, label, parent) => {
     if (!nodes.has(scope)) {
       const pseudo = scope.startsWith('?');
+      const variants = pseudo ? [] : variantsAt(scope);
+      const shown = variants.find((v) => v.active);
       nodes.set(scope, {
-        scope, label, pseudo, own: pseudo ? null : ownAt(scope), alternates: pseudo ? [] : alternatesOf(store, scope).filter((v) => !v.active),
+        scope, label, pseudo, level: pseudo ? null : levelOf(scope), own: shown ?? null, alternates: variants.filter((v) => v !== shown),
         inherited: null, current: chain.has(scope), plays: scope === playsAt,
         picked: selection.mode === 'scope' && selection.scope === scope, children: [], parent,
       });
@@ -948,27 +1190,16 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
       const [game, brand] = scope.slice(6).split('/');
       node(scope, brandName(store, game, brand, truck), gameNode(game));
     } else if (level === 'model') modelNode(scope);
-    else if (level === 'chassis') node(scope, `hook ${scope.slice(scope.indexOf('@') + 1)} m`, modelNode(modelOf(scope)));
-    else if (level === 'vehicle') {
-      const chassis = plateChassis(store, scope, truck);
-      const parent = chassis ? node(chassis, `hook ${chassis.slice(chassis.indexOf('@') + 1)} m`, modelNode(modelOf(scope))) : modelNode(modelOf(scope));
-      node(scope, scope.slice(scope.indexOf('#') + 1), parent);
-    }
   }
   for (const n of nodes.values()) {
     if (n.parent) n.parent.children.push(n);
   }
-  const below = (n) => n.children.flatMap((c) => [...(c.pseudo ? [] : [c]), ...below(c)]);
   const finish = (n, inherited) => {
     n.inherited = n.own ? null : inherited;
     n.children.sort((a, b) => MAP_ORDER.indexOf(levelOf(a.scope)) - MAP_ORDER.indexOf(levelOf(b.scope))
       || Number(a.pseudo) - Number(b.pseudo) || a.label.localeCompare(b.label));
     const passOn = n.own ? { key: n.own.key, name: n.own.name, from: n.label } : inherited;
     for (const c of n.children) finish(c, passOn);
-    n.moveTo = n.own && !n.own.file ? [
-      ...chainOf(store, n.scope, truck).slice(1).map((s) => ({ value: s, label: `↑ ${scopeLabel(store, s, truck)}` })),
-      ...below(n).map((c) => ({ value: c.scope, label: `↓ ${scopeLabel(store, c.scope, truck)}` })),
-    ] : [];
     delete n.parent;
     return n;
   };
@@ -984,24 +1215,26 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   };
 }
 
-// Puts one of your presets (or a file) at a key of the map, as "Use it in" does on the card.
-// A plan for applyScope (mode 'use'), or null when it is there already.
+// Puts one of your presets (or a file) at a key of the map, as "Use it in" does on the card: on
+// a model a variant, its current one. A plan for applyScope (mode 'use'), or null when it is
+// there already.
 export function planAssign(store, key, to) {
   if (store.assignments[to] === key || to.startsWith('?')) return null;
-  const holder = store.assignments[to];
-  const taken = holder
-    ? { key: holder, name: holderName(store, holder), keeps: isCollectionKey(holder) || scopesOf(store, holder).length > 1 }
-    : null;
-  return { mode: 'use', key, from: null, to, direction: null, mustCopy: false, taken, shadow: [], fallback: null, outplayed: null };
+  return { mode: 'use', key, from: null, to, direction: null, mustCopy: false, taken: takenAt(store, to, key), shadow: [], fallback: null, outplayed: null };
 }
 
-// What a preset at a key is shared for, the key in the file's "vehicle": the key itself; a
-// vehicle's own (by plate) its chassis, or its model when that is not known, so the plate
-// stays private; all vehicles' "all"; one on no key (scope null): no vehicle.
-function shareScope(store, scope, truck) {
-  if (!scope || scope.startsWith('?')) return null;
-  if (scope === ALL_SCOPE) return ALL_SCOPE;
-  return levelOf(scope) === 'vehicle' ? plateChassis(store, scope, truck) ?? modelOf(scope) : scope;
+// What a preset at a key is shared for: { vehicle, hooks }. A model's variant goes for the hooks
+// remembering it (those of your vehicles remembering it too, so the plates stay private), the
+// first one in vehicle, else for the model; a brand's, a game's or all vehicles' for that key;
+// one on no key (scope null) for no vehicle.
+function shareOf(store, scope, key, truck) {
+  if (!scope || scope.startsWith('?')) return { vehicle: null, hooks: [] };
+  if (!isModelLevel(scope)) return { vehicle: scope, hooks: [] };
+  const model = modelOf(scope);
+  const { hooks, plates } = rememberedAt(store, model, key);
+  const plateHooks = plates.map((p) => plateChassis(store, `${model}#${p}`, truck)).filter(Boolean).map(hookOf);
+  const all = [...new Set([...hooks, ...plateHooks])].sort(byHook);
+  return { vehicle: all.length ? `${model}@${all[0]}` : model, hooks: all };
 }
 
 // Where a key is from, as a file says it: a brand's or a game's place, a model's name and
@@ -1026,28 +1259,24 @@ function placeOfScope(store, vehicle, truck) {
 
 // The presets ticked in the export window as files to share (collection.js). picks:
 // [{ scope, key }], a preset of yours or a shared file and the key it is on (null: on none),
-// each going for that key (shareScope; all vehicles' as "all"). { files: [{ fileName, data }], clashes, plates }:
-// clashes, the keys that more than one file goes for (only one of them would play there);
-// plates, how many vehicles' own presets go for their chassis.
+// each going for that key (shareOf). { files: [{ fileName, data }], plates }: plates, how many
+// vehicles' own presets go for their hook.
 export function exportFiles(store, picks, truck = null) {
   const files = [];
-  const targets = new Map();
   let plates = 0;
   for (const { scope, key } of picks) {
     const layout = presetLayout(store, key);
     if (!layout) continue;
-    const vehicle = shareScope(store, scope, truck);
-    if (scope && levelOf(scope) === 'vehicle') plates++;
-    if (vehicle) targets.set(vehicle, new Set([...(targets.get(vehicle) ?? []), scope]));
+    const { vehicle, hooks } = shareOf(store, scope, key, truck);
+    if (scope && isModelLevel(scope) && personalOf(store, modelOf(scope)).some((p) => p.key === key)) plates++;
     const place = vehicle && vehicle !== ALL_SCOPE ? placeOfScope(store, vehicle, truck) : {};
     const author = isCollectionKey(key) ? store.collection[key].author : null;
     files.push({
       fileName: presetFileName(layout.name),
-      data: presetFile({ name: layout.name, vehicle, author, ...place, layout }),
+      data: presetFile({ name: layout.name, vehicle, hooks, author, ...place, layout }),
     });
   }
-  const clashes = [...targets].filter(([, scopes]) => scopes.size > 1).map(([vehicle]) => scopeLabel(store, vehicle, truck));
-  return { files, clashes, plates };
+  return { files, plates };
 }
 
 export function selectionValue(selection) {

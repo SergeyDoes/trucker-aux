@@ -3,6 +3,7 @@
 import { LABEL_COLORS, LABEL_MAX, TYPES, TYPE_NAMES } from '../shared/layout.js';
 import { bandText } from '../shared/dsp.js';
 import { speakerIcon } from './marks.js';
+import { ACTIONS, ACTION_NAMES, bindingText } from '../shared/controls.js';
 
 const CHANNEL_OPTIONS = [
   { value: 'L', label: 'Left' },
@@ -14,6 +15,12 @@ const TYPE_OPTIONS = TYPES.map((value) => {
   return { value, label: band ? `${TYPE_NAMES[value]}, ${band}` : TYPE_NAMES[value] };
 });
 const TYPE_BADGE = { full: '', small: 'small', tweeter: 'tweeter', mid: 'mid', midbass: 'midbass', sub: 'sub' };
+// The voice that says which variant plays (settings.js VOICE_MODES).
+const VOICE_OPTIONS = [
+  { value: 'off', label: 'Off' },
+  { value: 'system', label: 'System, over everything' },
+  { value: 'aux', label: 'AUX, from the cab speakers' },
+];
 const MUTE_OPTIONS = [
   { value: 'never', label: 'Never' },
   { value: 'engine', label: 'Engine is off' },
@@ -195,6 +202,39 @@ export function createPanel(root, actions, boundsRoot) {
     type: 'checkbox', title: 'The game\'s "look toward the blinker": while a blinker is on, 20° toward the driver\'s side or 40° across (in a left-hand-drive cab 20° left, 40° right)',
   });
 
+  // The cab's keys and controller buttons (shared/controls.js): a button per action showing its
+  // binding, a click waits for a combination (app.js bindControl), × clears it. A row of its own,
+  // not a label: a click on the name does not start a capture.
+  const BIND_HINT = 'Click, then press a key, a controller button, or up to three together; let go to set it. Escape cancels';
+  const controlRows = ACTIONS.map((action) => {
+    const bind = el('button', { className: 'bind' });
+    const clear = el('button', { textContent: '×', title: 'Clear' });
+    bind.onclick = () => actions.bindControl(action);
+    clear.onclick = () => actions.clearControl(action);
+    const line = el('div', { className: 'row' }, [el('span', { textContent: ACTION_NAMES[action] }), el('div', { className: 'inline' }, [bind, clear])]);
+    return { action, bind, clear, line };
+  });
+  // The voice: off, over everything (no speakers, not muted, not at the music's volume), or from
+  // the cab's speakers as the music is (muted with it); at a volume of its own.
+  const voiceMode = el('select', {
+    title: 'An English Windows voice says which variant plays. System: on the output device over everything, never muted. AUX: from the cab\'s speakers like the music, muted with it and at its volume',
+  });
+  const voiceVolume = el('input', { type: 'range', min: 0, max: 200, step: 1, title: 'The voice\'s volume; over 100 % up to +12 dB' });
+  const voiceVolumeValue = el('span', { className: 'value' });
+  voiceMode.onchange = () => actions.setVoice(voiceMode.value);
+  voiceVolume.oninput = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100, false);
+  voiceVolume.onchange = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100);
+  const controlsForm = el('fieldset', {}, [
+    el('legend', { textContent: 'Controls' }),
+    ...controlRows.map((r) => r.line),
+    row('Voice', voiceMode),
+    row('Voice volume', el('div', { className: 'inline' }, [voiceVolume, voiceVolumeValue])),
+    el('p', {
+      className: 'hint',
+      textContent: 'They work while the game has the focus. Next and Previous try the variants of the vehicle\'s model; Auto goes back to the one that fitted when you got in. Getting out keeps the one tried for that cab. The game sees these keys and buttons too: pick ones it does not use.',
+    }),
+  ]);
+
   const preset = el('select');
   // The truck in the game: what plays, what it applies to, and what can be done
   // (presets.js truckStatus). Buttons carry an action name.
@@ -208,9 +248,9 @@ export function createPanel(root, actions, boundsRoot) {
   const cardNote = el('p', { className: 'hint card-note' });
   const cardUseInLabel = el('span', { className: 'cab-label', textContent: 'Use it in' });
   const cardButtons = el('div', { className: 'inline buttons' });
-  // The variants on the vehicle's chassis (two cabs on one hook): presets.js variantChoice.
+  // The model's variants, and your vehicle's own preset: presets.js variantChoice.
   const cardVariantLabel = el('span', { className: 'cab-label', textContent: 'Variant' });
-  const cardVariant = el('select', { title: 'Which of the presets on this chassis plays: two cabs can share a hook. Your own vehicle keeps its choice' });
+  const cardVariant = el('select', { title: 'Which of the model\'s variants plays in this vehicle: its hook remembers it (your own vehicle: its plate). A hook new to you plays the one picked last' });
   const truckCard = el('div', { className: 'cab-card' }, [
     el('span', { className: 'cab-label', textContent: 'Vehicle' }), cardTruck,
     el('span', { className: 'cab-label', textContent: 'Plays' }), cardPlays,
@@ -329,6 +369,7 @@ export function createPanel(root, actions, boundsRoot) {
       row('Pause behavior', pauseBehavior),
       row('Volume', el('div', { className: 'inline' }, [volume, volumeValue])),
     ]),
+    controlsForm,
     cameraForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Layout' }),
@@ -387,7 +428,7 @@ export function createPanel(root, actions, boundsRoot) {
     if (event.key === 'Enter') presetName.blur();
   };
   width.oninput = () => actions.setWidth(Number(width.value));
-  for (const slider of [volume, width, gain]) wheelSlider(slider);
+  for (const slider of [volume, voiceVolume, width, gain]) wheelSlider(slider);
   matchLoudness.onchange = () => actions.setMatchLoudness(matchLoudness.checked);
   add.onclick = () => actions.addSpeaker();
   addPair.onclick = () => actions.addPair();
@@ -450,6 +491,18 @@ export function createPanel(root, actions, boundsRoot) {
     turnLookReverse.disabled = !look.on;
     turnLookBlinkers.checked = look.blinkers;
     if (playerSlot.firstChild !== view.player) playerSlot.replaceChildren(...(view.player ? [view.player] : []));
+    for (const r of controlRows) {
+      const waiting = view.capturing === r.action;
+      const text = bindingText(view.controls[r.action], view.controlNames);
+      r.bind.textContent = waiting ? 'Press… (Esc cancels)' : text;
+      r.bind.title = `${text}\n${BIND_HINT}`; // a long controller name is cut on the button
+      r.bind.classList.toggle('waiting', waiting);
+      r.clear.disabled = !view.controls[r.action].length;
+    }
+    fillSelect(voiceMode, VOICE_OPTIONS, view.voice);
+    setValue(voiceVolume, Math.round(view.voiceVolume * 100));
+    voiceVolumeValue.textContent = `${Math.round(view.voiceVolume * 100)} %`;
+    voiceVolume.disabled = view.voice === 'off';
 
     fillSelect(preset, view.presets, view.preset);
     const { card } = view;

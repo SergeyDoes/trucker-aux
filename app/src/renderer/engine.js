@@ -10,6 +10,7 @@ const MAKEUP = 1.7;       // restores the level of speakers ~0.86 m away with RE
 const SILENCE_FADE = 0.1;  // time constant of muting when the truck is parked, s (-60 dB in ~0.7 s)
 const LIMIT_DB = -3;      // the limiter's threshold, dBFS
 const LIMIT_RATIO = 20;
+const VOICE_GAIN = 0.7;   // the voice (app.js say) at 100 %, a little under a full-scale track
 
 const monoBus = (ctx) => new GainNode(ctx, { channelCount: 1, channelCountMode: 'explicit' });
 
@@ -34,6 +35,7 @@ export function createEngine(ctx, output = ctx.destination, { limiter = true } =
   const gate = new GainNode(ctx, { gain: 1 }); // closed while the truck is parked
   const volume = new GainNode(ctx, { gain: 1 }); // the volume slider, over everything
   master.connect(gate).connect(volume);
+  let mix = output; // where the music and the voice over everything meet: the limiter, if any
   if (limiter) {
     // Peaks held under 0 dBFS: the volume over 100 % (up to +12 dB) and loudness matching (up
     // to +6 dB) can lift a quiet preset 18 dB. Below the threshold it passes the sound as it is: Chromium's compressor
@@ -41,9 +43,14 @@ export function createEngine(ctx, output = ctx.destination, { limiter = true } =
     const limit = new DynamicsCompressorNode(ctx, { threshold: LIMIT_DB, knee: 0, ratio: LIMIT_RATIO, attack: 0.003, release: 0.25 });
     const makeupDb = (1 - 1 / LIMIT_RATIO) * -LIMIT_DB * 0.6;
     volume.connect(limit).connect(new GainNode(ctx, { gain: 10 ** (-makeupDb / 20) })).connect(output);
+    mix = limit;
   } else {
     volume.connect(output);
   }
+  // The voice that says which variant plays (app.js say), at its own volume (setVoice).
+  const voice = new GainNode(ctx, { gain: VOICE_GAIN });
+  let voiceMode = 'system';
+  voice.connect(mix);
 
   const chains = new Map(); // speaker id -> { speaker, entry, nodes, level, panner }
   const muted = new Set();
@@ -166,6 +173,19 @@ export function createEngine(ctx, output = ctx.destination, { limiter = true } =
     volume.gain.setTargetAtTime(gain, ctx.currentTime, SMOOTH);
   }
 
+  // The voice (settings.js VOICE_MODES): 'system' over everything (no speakers, not muted, not
+  // at the music's volume; through the limiter), 'aux' from the cab's speakers as the music is,
+  // muted with it and at its volume too. gain: its own slider's (loudness.js perceptualGain).
+  function setVoice(mode, gain) {
+    const next = mode === 'aux' ? 'aux' : 'system';
+    if (next !== voiceMode) {
+      voice.disconnect();
+      voice.connect(next === 'aux' ? input : mix);
+      voiceMode = next;
+    }
+    voice.gain.setTargetAtTime(VOICE_GAIN * gain, ctx.currentTime, SMOOTH);
+  }
+
   setPose(null);
-  return { input, sync, setSolo, setMuted, setPose, setSilent, setTrim, setVolume };
+  return { input, voice, sync, setSolo, setMuted, setPose, setSilent, setTrim, setVolume, setVoice };
 }

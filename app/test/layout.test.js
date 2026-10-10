@@ -372,3 +372,9 @@ test('normalizeLayout keeps a label colour from the list, blue left out as the d
   assert.equal('labelColor' in normalizeLayout({ label: 'X', labelColor: 'pink' }), false);
   assert.equal('labelColor' in normalizeLayout({ labelColor: 'red' }), false); // no label, no colour
 });
+
+test('normalizeLayout keeps copyOf, the shared file a preset was copied from', () => {
+  assert.equal(normalizeLayout({ copyOf: 'file:default/a.json' }).copyOf, 'file:default/a.json');
+  assert.equal('copyOf' in normalizeLayout({ copyOf: 'p.3' }), false);
+  assert.equal('copyOf' in normalizeLayout({}), false);
+});
