@@ -7,6 +7,8 @@
   "brand": "intnational",
   "brandName": "International",
   "layout": {
+    "label": "day cab?",
+    "labelColor": "orange",
     "width": 1,
     "bounds": {
       "min": [

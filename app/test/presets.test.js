@@ -577,6 +577,13 @@ test('model names: models of a brand the game names alike get the year from thei
   assert.equal(scopeLabel(rememberVehicle(storeWith(), C24), C24.key), 'Freightliner Cascadia');
   const named = rememberVehicle(rememberVehicle(storeWith(), { ...C19, name: 'Cascadia 2019' }), { ...C24, name: 'Cascadia 2019' });
   assert.equal(scopeLabel(named, C19.key), 'Cascadia 2019');
+  // No year in the id: its last part, as the game would write it; a name ending with it keeps it.
+  const STRALIS = { key: 'vehicle.iveco.stralis', name: 'Iveco Stralis', game: 'ets2', brand: 'iveco', brandName: 'Iveco', variant: '1.6' };
+  const HIWAY = { ...STRALIS, key: 'vehicle.iveco.hiway' };
+  const ivecos = rememberVehicle(rememberVehicle(storeWith(), STRALIS), HIWAY);
+  assert.deepEqual([scopeLabel(ivecos, STRALIS.key), scopeLabel(ivecos, HIWAY.key)], ['Iveco Stralis', 'Iveco Stralis Hi-Way']);
+  const other = rememberVehicle(rememberVehicle(storeWith(), { ...STRALIS, key: 'vehicle.iveco.eway' }), STRALIS);
+  assert.equal(scopeLabel(other, 'vehicle.iveco.eway'), 'Iveco Stralis Eway');
 });
 
 test('model names: a shared file\'s vehicleName before your preset\'s name, never a key path', () => {
@@ -1078,4 +1085,23 @@ test('the card: a variant tried with the controls says the cab keeps it on getti
   const files = withCollection(store, SLEEPER_FILE);
   const adopted = adoptPicked(files, { mode: 'truck', key: 'file:sleeper.json', cycled: true });
   assert.deepEqual(adopted.selection, { mode: 'truck', key: 'p.4', cycled: true });
+});
+
+test('a variant picked in the tree: it plays, edits go to it; a file of the model becomes your copy in its place', () => {
+  const store = assign(withCollection(twoCabs(), SLEEPER_FILE), CHASSIS, 'p.3');
+  const PICKED = { mode: 'truck', key: 'p.3', variantOf: MODEL };
+  assert.equal(resolvePlaying(store, PICKED, SHORT).key, 'p.3');
+  assert.equal(truckStatus(store, PICKED, SHORT).plays, 'Sleeper — International 9900i (a variant picked in the map)');
+  assert.equal(truckStatus(store, PICKED, SHORT).note, 'Editing changes this variant, which plays on hook 3.2 m.');
+  const tree = presetTree(store, SHORT, PICKED);
+  assert.deepEqual(nodeAt(tree.root, MODEL).alternates.filter((v) => v.picked).map((v) => v.key), ['p.3']);
+  // A default of the model: editing makes your copy, which takes the file's place.
+  const FILE = { mode: 'truck', key: 'file:sleeper.json', variantOf: MODEL };
+  assert.equal(truckStatus(store, FILE, SHORT).note, 'From the collection: sleeper.json. Editing makes your own copy in its place first.');
+  const adopted = adoptPicked(store, FILE);
+  const copy = adopted.selection.key;
+  assert.deepEqual(adopted.selection, { mode: 'truck', key: copy, variantOf: MODEL });
+  assert.equal(adopted.store.presets[copy].copyOf, 'file:sleeper.json');
+  assert.ok(alternatesOf(adopted.store, MODEL).some((v) => v.key === copy));
+  assert.ok(!alternatesOf(adopted.store, MODEL).some((v) => v.key === 'file:sleeper.json'));
 });

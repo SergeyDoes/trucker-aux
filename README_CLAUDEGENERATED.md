@@ -84,9 +84,12 @@ Player ─► virtual cable                          Game audio ─────�
   - presets on no key wait under "Unused presets".
 - **Picking a variant:** the card's "Variant" picks one for the vehicle in the game (its hook,
   or your vehicle's plate, remembers it). The tree shows a model's variant that plays and "+N";
-  its menu's Variants list plays one (each says where it plays), makes a new one (a copy of what
-  plays), and takes one off (a shared file is hidden from the model). Two cabs on one hook (the
-  Kenworth W900's sleeper and studio on 3.6 m) are two variants.
+  unfolded, the variants are rows of their own (◆, with their badge and where they play, ▶ on
+  the one Auto plays). A click on a row plays it to edit (a default: your copy in its place at
+  the first edit); its menu plays it in the vehicle (or makes it the model's current one), makes
+  a new variant from it, takes it off (a shared file is hidden from the model) or exports it;
+  rows drag like keys. Two cabs on one hook (the Kenworth W900's sleeper and studio on 3.6 m)
+  are two variants.
 - **Controls:** a key, a controller button (a wheel's, a pad's) or a combination of up to three
   steps to the model's next or previous variant, to try it, and another goes back to what fitted
   the cab when you got in; getting out keeps the one tried for that cab. They work while the
@@ -104,7 +107,8 @@ Player ─► virtual cable                          Game audio ─────�
     a file keeps its name and label;
   - files dropped into `presets/` play without importing, after your own presets.
 - **Defaults:**
-  - the presets that come with the app sit in `presets/default/`, under everything else;
+  - the presets that come with the app sit inside it (`app.asar`; in the source
+    `app/presets/default/`), under everything else;
   - a newer build's defaults reach every key you have not set up yourself;
   - see [app/presets/README.md](app/presets/README.md).
 - **Real head position:** the driver sits left of the vehicle's centre line by what the
@@ -191,7 +195,7 @@ Build the plugins in Visual Studio 2022:
 
 - **The window:** from left to right:
   - the **key tree** with "Unused presets" below it;
-  - the **panel**: audio, controls, game camera (without the camera plugin), the preset and
+  - the **panel**: audio, camera (where the head comes from), variant control bindings, the preset and
     its card, speakers;
   - the **top and side views**;
   - the **3D overview**, with the **bounds** under it.
@@ -202,12 +206,31 @@ Build the plugins in Visual Studio 2022:
   - shows the vehicle, what plays and the keys of its vehicle ("Applies to");
   - picking a key there moves the preset up or down, and the app asks first when that
     key is taken.
-- **Controls:** click an action's button, press a key, a controller button or up to three
-  together, and let go; Escape cancels, × clears. Next and Previous play the model's variants as
-  a pick in the list does; Auto goes back to the one that fitted when you got in, and getting
-  out (another vehicle, or the game closed) keeps the one tried for that cab. Voice: Off; System,
-  over everything; AUX, from the cab speakers, muted with the music. The game sees these keys
-  and buttons too, so pick ones it does not use.
+- **Variant Control Bindings:** click Switch Next, Switch Prev. or Switch Auto, press a key, a
+  controller button or up to three together, and let go; Escape cancels, × clears. Next and
+  Prev. play the model's variants as a pick in the list does; Auto goes back to the one that
+  fitted when you got in, and getting out (another vehicle, or the game closed) keeps the one
+  tried for that cab. At first they are `.`, `,` and `/`, keys the games' layout leaves free. The
+  game sees these keys and buttons too, so pick ones it does not use.
+- **Camera › Mode:** *Raw Camera - Recommended*, the game's camera through
+  `trucker_aux_camera.dll` as it is (the telemetry when it does not read it); *Raw Telemetry -
+  VR Recommended*, the telemetry's head as it is, a headset's pose, nothing added; *Adjusted
+  Telemetry*, for when Raw Camera misbehaves: the telemetry with the look into turns and toward
+  the blinker set below, as in the game's Accessibility options. The status line says *camera:
+  raw telemetry* or *camera: adjusted telemetry* for those.
+- **Camera › Lock:** yaw, pitch and roll can be locked per mode: a locked axis of the head stays
+  straight in the cab and the sound does not follow it. At first the roll is locked for Raw
+  Camera and Adjusted Telemetry (the game's camera leans against the cab as it sways), nothing for
+  Raw Telemetry.
+  The free camera's turns are its own.
+- **Audio › Control voice:** says which variant plays when you switch: Off; System, over
+  everything; AUX, from the cab speakers, muted with the music. Voice volume is its own; Test
+  says what plays now.
+- **Devices:** a new setup records from a virtual cable, told by the source in brackets after a
+  device's name, which both sides of a cable share and Windows does not translate: VB-Audio
+  Virtual Cable (and Cable A/B, Hi-Fi), Virtual Audio Cable, Steam Streaming Speakers, in that
+  order; never a microphone. It plays to the default output, unless that is a virtual device.
+  Under Input the panel names the cable's other side, where the player is to send the music.
 - **Coordinates:**
   - X goes right from the vehicle's centre line;
   - Y goes up and Z goes back, from the driver's default head;
@@ -224,8 +247,11 @@ Build the plugins in Visual Studio 2022:
   - `data/layouts.json`: your presets and keys;
   - `data/settings.json`: devices and options;
   - `data/profile/`: Chromium's profile;
+  - `data/crash.log` and `data/crashes/`: a line and a dump for each crash, kept here, never sent;
   - `presets/`: preset files from others. The app reads them and never changes them;
-  - `presets/default/`: the presets that come with the app.
+  - the presets that come with the app are inside it: a newer version unpacked over the old
+    folder replaces them whole and keeps `data/` and `presets/`. A `presets/default/` left by a
+    version before 0.3.0 is not read.
 
 ## Development
 
@@ -273,8 +299,8 @@ docs/                       findings from the game, specs and plans
   emulated turn look then turns the sound on an outside camera too.
 - `trucker_aux_camera.dll` depends on the game version: after an update it may switch
   itself off until it is updated, and the emulation takes over.
-- The first run picks the input by VB-Cable's name. With another cable, pick its output
-  by hand.
+- The first run knows VB-Audio's cables, Virtual Audio Cable and Steam's streaming speakers by
+  their source; with another cable, pick its output by hand.
 
 ## License
 

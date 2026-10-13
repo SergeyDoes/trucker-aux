@@ -154,6 +154,9 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-row.file .reg-badge { font-style: italic; }
 /* The number of variants waiting on a key beside its badge (key-tree.js). */
 .reg-more { flex: none; margin-left: 4px; font-size: 10px; color: var(--dim); }
+/* A key's variant as a row of its own: its badge, then where it plays. */
+.reg-variant-icon { width: 16px; justify-content: center; font-size: 9px; color: var(--dim); }
+.reg-where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--dim); }
 /* A label over 16 characters runs like a ticker in a badge about 11 letters wide (badge.js); it
    stops under the pointer, and stands cut with reduced motion. */
 .reg-badge.marquee { display: inline-block; vertical-align: middle; width: 8ch; flex: 0 1000 auto; min-width: 5ch; text-overflow: clip; white-space: nowrap; } /* in a narrow tree it gives way before the key's name */

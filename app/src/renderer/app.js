@@ -20,7 +20,7 @@ import { isCollectionKey } from '../shared/collection.js';
 import { ask } from './dialog.js';
 import { createKeyTree } from './key-tree.js';
 import { branchIds, chooseExport, exportItems } from './export-dialog.js';
-import { channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
+import { cableOutputFor, channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
 import { normalizeSettings } from '../shared/settings.js';
 import { isBound } from '../shared/controls.js';
 import { isSilenced } from '../shared/dsp.js';
@@ -30,7 +30,7 @@ import {
   cameraPoint, cameraView, createCameraWatch, createFallbackWatch, withCameraView,
 } from '../shared/camera.js';
 import {
-  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg,
+  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, lockAxes, musicSilenced, pluginWarning, turnLook, turnsToDeg,
   withTurnLook,
 } from '../shared/pose.js';
 
@@ -53,7 +53,7 @@ const state = {
   view: { source: null }, // the game camera's view (shared/camera.js), when trucker_aux_camera.dll runs
   cameraFallback: false, // seen in the game without the camera: the Game camera settings are shown
   heard: null,      // the pose the engine and the views were given last
-  roll: 0,          // the head's roll against the cab, in turns: shown, not heard (levelHead)
+  roll: 0,          // the head's roll against the cab, in turns: shown, heard unless locked (lockAxes)
   picked: EMPTY,   // selected speakers { ids, primary } (state.selection is the preset choice)
   loudnessDb: null, // the playing layout's loudness-matching trim, once measured
   clipboard: [],   // copied speakers, kept across presets for this session
@@ -256,8 +256,10 @@ async function startAudio() {
     state.devices = [];
     warnings.push(`Cannot list audio devices: ${err.message}`);
   }
-  const input = pickDevice(state.devices, 'audioinput', state.settings.input, 'CABLE Output');
-  const output = pickDevice(state.devices, 'audiooutput', state.settings.output, null);
+  // A new setup records from a virtual cable (never a microphone) and plays to the default
+  // output unless that is a virtual device (shared/devices.js).
+  const input = pickDevice(state.devices, 'audioinput', state.settings.input);
+  const output = pickDevice(state.devices, 'audiooutput', state.settings.output);
   warnings.push(...[input.warning, output.warning].filter(Boolean));
   state.inputId = input.device?.deviceId ?? null;
   state.outputId = output.device?.deviceId ?? null;
@@ -267,7 +269,7 @@ async function startAudio() {
   let rate;
   if (source() === 'input') {
     if (!state.inputId) {
-      warnings.push('No input device found.');
+      if (!input.warning) warnings.push('No input device found.');
     } else {
       try {
         ({ stream, rate } = await openInput(state.inputId));
@@ -368,11 +370,10 @@ async function say(text) {
   }
 }
 
-// The bindings go to the poller (main/controls.js); the voice helper starts ahead when one is
-// bound, so the first phrase comes without its start-up.
+// The bindings go to the poller (main/controls.js). The voice helper starts at the first phrase,
+// or ahead when a binding or the voice is set (about to be used): not at every start.
 function applyControls() {
   window.aux.setControls(state.settings.controls);
-  if (state.settings.voice !== 'off' && isBound(state.settings.controls)) window.aux.warmVoice();
   window.aux.controlNames().then((names) => {
     state.controlNames = names;
     render();
@@ -500,6 +501,20 @@ const actions = {
     saveSettings();
     restartAudio();
   },
+  // Camera › Mode: 'game', 'vr' or 'telemetry' (settings.js HEAD_SOURCES); the next pose takes it.
+  setHeadFrom(value) {
+    state.settings = normalizeSettings({ ...state.settings, headFrom: value });
+    saveSettings();
+    render();
+  },
+  // Camera › Lock: an axis of the head locked, or not, for the mode chosen.
+  setAxisLock(axis, on) {
+    const way = state.settings.headFrom;
+    const locks = { ...state.settings.axisLocks, [way]: { ...state.settings.axisLocks[way], [axis]: on } };
+    state.settings = normalizeSettings({ ...state.settings, axisLocks: locks });
+    saveSettings();
+    render();
+  },
   // { on, percent, reverse, blinkers }: any of them; the next pose applies it.
   setTurnLook(patch) {
     state.settings = normalizeSettings({ ...state.settings, turnLook: { ...state.settings.turnLook, ...patch } });
@@ -540,6 +555,7 @@ const actions = {
       state.settings = normalizeSettings({ ...state.settings, controls: { ...state.settings.controls, [action]: ids } });
       saveSettings();
       applyControls();
+      if (state.settings.voice !== 'off') window.aux.warmVoice();
     }
     render();
   },
@@ -555,8 +571,12 @@ const actions = {
     state.settings = normalizeSettings({ ...state.settings, voice: mode });
     saveSettings();
     applyVoice();
-    if (mode !== 'off') applyControls();
+    if (mode !== 'off' && isBound(state.settings.controls)) window.aux.warmVoice();
     render();
+  },
+  // Audio › Control voice › Test: says what plays now, as the bindings would.
+  testVoice() {
+    say(spokenName(playing().key) || 'Trucker AUX');
   },
   setVoiceVolume(fraction, save = true) {
     state.settings = normalizeSettings({ ...state.settings, voiceVolume: fraction });
@@ -630,12 +650,20 @@ const actions = {
     state.store = inGame ? chooseVariant(state.store, state.truck, key) : pickAlternate(state.store, scope, key);
     afterScopeChange(before);
   },
-  newVariant(scope) {
+  // from: the preset copied (a variant's row: that one), else what plays now.
+  newVariant(scope, from = playing().key) {
     const before = speakerIds();
-    const current = playing().key;
     remember();
-    state.store = newAlternate(state.store, scope, state.truck, current);
+    state.store = newAlternate(state.store, scope, state.truck, from);
     afterScopeChange(before);
+  },
+  // A variant's row clicked in the preset map: it plays, to edit it (a file of the model becomes
+  // your copy in its place at the first edit: presets.js adoptPicked).
+  selectVariant(scope, key) {
+    state.selection = { mode: 'truck', key, variantOf: scope };
+    resetSession();
+    syncEngine();
+    render();
   },
   dropVariant(scope, key) {
     const before = speakerIds();
@@ -744,14 +772,15 @@ const actions = {
     if (from) actions.dropVariant(from, playing().key);
   },
   // The export window, ticked at first: from: a key of the tree (its presets and those under
-  // it, but vehicles' own), 'playing' (the preset that plays), or nothing (all your presets on
-  // keys but vehicles' own). Then Save As in main.
+  // it, but vehicles' own), 'playing' (the preset that plays), { key } (a variant's row: that
+  // preset), or nothing (all your presets on keys but vehicles' own). Then Save As in main.
   async exportPresets(from = null) {
     const map = presetTree(state.store, state.truck, state.selection);
     const items = exportItems(map);
     const find = (n, scope) => (n.scope === scope ? n : n.children.map((c) => find(c, scope)).find(Boolean));
     let checked;
-    if (from === 'playing') checked = [...items].filter(([, item]) => item.key === playing().key).map(([id]) => id);
+    const one = from === 'playing' ? playing().key : from?.key;
+    if (one) checked = [...items].filter(([, item]) => item.key === one).map(([id]) => id);
     else if (from) {
       const node = find(map.root, from);
       checked = node ? branchIds(node, (item) => !item.personal) : [];
@@ -759,7 +788,7 @@ const actions = {
     const picks = await chooseExport({ map, checked, check: (p) => exportFiles(state.store, p, state.truck) });
     if (!picks) return;
     const set = exportFiles(state.store, picks, state.truck);
-    const name = from && from !== 'playing' && !from.startsWith('?') ? keyPath(state.store, from, state.truck) : 'Trucker AUX presets';
+    const name = typeof from === 'string' && from !== 'playing' && !from.startsWith('?') ? keyPath(state.store, from, state.truck) : 'Trucker AUX presets';
     const result = await window.aux.exportPresets(set.files, name);
     if (result.canceled) return;
     state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
@@ -950,12 +979,16 @@ function render() {
     outputs: state.devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'communications'),
     inputId: state.inputId,
     outputId: state.outputId,
+    // The cable's other side, where the music is to be played (for a new setup).
+    cableOutput: cableOutputFor(state.devices, state.devices.find((d) => d.kind === 'audioinput' && d.deviceId === state.inputId))?.label ?? null,
     debug: state.debug,
     source: source(),
     muteWhen: state.settings.muteWhen,
     turnLook: state.settings.turnLook,
     cameraSource: state.view.source,
     cameraFallback: state.cameraFallback,
+    headFrom: state.settings.headFrom,
+    axisLocks: state.settings.axisLocks[state.settings.headFrom],
     pauseBehavior: state.settings.pauseBehavior,
     volume: state.settings.volume,
     controls: state.settings.controls,
@@ -1008,7 +1041,9 @@ function statusText() {
   if (pose.paused) return [name, `paused${muted}`];
   const head = (state.heard ?? pose).head;
   const lookNote = Math.round(state.turn * 360) ? ` (turn look ${angleText(turnsToDeg(state.turn), 2)})` : '';
-  const cameraNote = state.view.source ? ` · camera: ${state.view.source}` : '';
+  let cameraNote = state.view.source ? ` · camera: ${state.view.source}` : '';
+  if (state.settings.headFrom === 'telemetry') cameraNote = ' · camera: adjusted telemetry';
+  if (state.settings.headFrom === 'vr') cameraNote = ' · camera: raw telemetry';
   const angles = `yaw ${angleText(turnsToDeg(head.heading), 3)}${lookNote} · pitch ${angleText(turnsToDeg(head.pitch), 2)} · roll ${angleText(turnsToDeg(state.roll), 2)}`;
   return [name, `${angles}${cameraNote}${muted}`];
 }
@@ -1075,15 +1110,18 @@ window.aux.onPose((pose) => {
   // turned by the game's look into turns and toward the blinker, which the telemetry
   // leaves out. With trucker_aux_camera.dll the view comes from the game's camera, those
   // included, an outside camera leaves the head at rest and the free camera takes the head
-  // where it is; without it they are emulated from the Game camera settings, the blinker's
-  // step ramped in.
+  // where it is; without it they are emulated from the Camera settings, the blinker's step
+  // ramped in. In VR the telemetry's head is the headset's: nothing is added.
   const headX = headRestX(state.truck);
-  const view = cameraView(pose, pose?.camera, cameraWatch(pose?.camera, performance.now()));
+  // The telemetry by choice (Camera › Mode: Raw or Adjusted Telemetry): the camera is not read.
+  const way = state.settings.headFrom;
+  const camera = way === 'game' ? pose?.camera : null;
+  const view = cameraView(pose, camera, cameraWatch(camera, performance.now()));
   const fallback = fallbackWatch({ inWorld: state.inWorld, truck: pose?.truck, source: view.source }, performance.now());
   if (view.source !== state.view.source || fallback !== state.cameraFallback) {
     state.view = view;
     state.cameraFallback = fallback;
-    render(); // "+ Speaker" goes to the free camera; the Game camera fieldset shows without the camera
+    render(); // "+ Speaker" goes to the free camera; the turn look's settings show without the camera
   }
   state.view = view;
   let heard;
@@ -1091,13 +1129,15 @@ window.aux.onPose((pose) => {
     state.turn = 0;
     heard = withCameraView(pose, view);
   } else {
-    const look = turnLook(pose, state.settings.turnLook);
+    const look = way === 'vr' ? { steer: 0, blinker: 0 } : turnLook(pose, state.settings.turnLook);
     state.turn = look.steer + rampBlinker(look.blinker, performance.now());
     heard = withTurnLook(pose, state.turn);
   }
   heard = holdPause(heard); // paused: the head stays where it was in the game
   state.roll = heard?.head?.roll ?? 0;
-  if (view.source !== 'free') heard = levelHead(heard); // the ears level in the cab; the free camera's are its own
+  // The axes locked for this mode (the roll at first: the ears level in the cab); the free
+  // camera's turns are its own.
+  if (view.source !== 'free') heard = lockAxes(heard, state.settings.axisLocks[way]);
   state.heard = heard;
   audio?.engine.setPose(heard, headX);
   applySilence();
@@ -1121,7 +1161,9 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
   const active = [state.inputId, state.outputId];
   state.devices = await listDevices();
   const present = new Set(state.devices.map((d) => d.deviceId));
-  if (active.some((id) => id && !present.has(id))) restartAudio();
+  // A device in use gone, or a cable plugged in while there was no input: picked again.
+  const cableNow = !state.inputId && pickDevice(state.devices, 'audioinput', state.settings.input).device;
+  if (active.some((id) => id && !present.has(id)) || cableNow) restartAudio();
   else render();
 });
 

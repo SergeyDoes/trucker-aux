@@ -7,16 +7,17 @@
   "brand": "freightliner",
   "brandName": "Freightliner",
   "layout": {
-    "label": "2019",
+    "label": "day cab",
+    "labelColor": "green",
     "width": 1,
     "bounds": {
       "min": [
-        -0.96,
-        -1.15,
-        -1.3
+        -0.83,
+        -0.92,
+        -0.81
       ],
       "max": [
-        0.96,
+        0.83,
         0.95,
         0.6
       ]
@@ -24,94 +25,55 @@
     "speakers": [
       {
         "id": "s1",
-        "name": "Small full range L",
+        "name": "Midrange L",
         "position": [
-          -0.9,
-          -0.51,
-          -0.53
+          -0.79,
+          -0.44,
+          -0.13
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "small",
+        "type": "mid",
         "pair": "s2"
       },
       {
         "id": "s2",
-        "name": "Small full range R",
+        "name": "Midrange R",
         "position": [
-          0.9,
-          -0.51,
-          -0.53
+          0.79,
+          -0.44,
+          -0.13
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "small",
+        "type": "mid",
         "pair": "s1"
       },
       {
         "id": "s3",
-        "name": "Tweeter L",
+        "name": "Small full range L",
         "position": [
-          -0.91,
-          0,
-          -0.57
+          -0.72,
+          0.16,
+          -0.47
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "tweeter",
+        "type": "small",
         "pair": "s4"
       },
       {
         "id": "s4",
-        "name": "Tweeter R",
+        "name": "Small full range R",
         "position": [
-          0.91,
-          0,
-          -0.57
+          0.72,
+          0.16,
+          -0.47
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "tweeter",
+        "type": "small",
         "pair": "s3"
-      },
-      {
-        "id": "s5",
-        "name": "Full range L",
-        "position": [
-          -0.76,
-          -0.15,
-          0.44
-        ],
-        "channel": "L",
-        "gainDb": -21.5,
-        "type": "full",
-        "pair": "s6"
-      },
-      {
-        "id": "s6",
-        "name": "Full range R",
-        "position": [
-          0.76,
-          -0.15,
-          0.44
-        ],
-        "channel": "R",
-        "gainDb": -5,
-        "type": "full",
-        "pair": "s5"
-      },
-      {
-        "id": "s7",
-        "name": "Subwoofer",
-        "position": [
-          -0.42,
-          -0.35,
-          0.26
-        ],
-        "channel": "M",
-        "gainDb": 0,
-        "type": "sub",
-        "pair": null
       }
     ]
   }

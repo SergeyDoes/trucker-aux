@@ -13,9 +13,11 @@ test('normalizeBinding: valid ids, once each, up to three; Escape never', () => 
   assert.deepEqual(normalizeBinding([CTRL, F9, CTRL, 'key:x', `${PAD}:5`, `${PAD}:pov-up`]), [CTRL, F9, `${PAD}:5`]);
   assert.deepEqual(normalizeBinding([`${PAD}:33`, `${PAD}:0`, 'joy:45e:28e:1', ESCAPE, 42]), []);
   assert.deepEqual(normalizeBinding('F9'), []);
-  assert.deepEqual(normalizeControls({ next: [F9], auto: 'x', other: [W] }), { next: [F9], previous: [], auto: [] });
-  assert.equal(isBound(normalizeControls({})), false);
-  assert.equal(isBound(normalizeControls({ auto: [`${PAD}:8`] })), true);
+  // Not saved yet: the default keys (. , /); cleared (an empty list): unbound.
+  assert.deepEqual(normalizeControls({ next: [F9], auto: 'x', other: [W] }), { next: [F9], previous: ['key:188'], auto: ['key:191'] });
+  assert.deepEqual(normalizeControls({}), { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] });
+  assert.equal(isBound(normalizeControls({ next: [], previous: [], auto: [] })), false);
+  assert.equal(isBound(normalizeControls({ next: [], previous: [], auto: [`${PAD}:8`] })), true);
 });
 
 test('bindingWatch: fires when the last input goes down, the rest held; the longest wins', () => {

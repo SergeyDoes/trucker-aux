@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
+  DEFAULT_HEAD_X, angleText, createFrameWatch, createPauseHold, createRamp, headRestX, levelHead, lockAxes, musicSilenced, pluginWarning, turnLook, turnsToDeg, listenerVectors, withTurnLook,
 } from '../src/shared/pose.js';
 
 test('pluginWarning: an scs-telemetry revision the offsets were not made for', () => {
@@ -212,4 +212,13 @@ test('pitch 0.125 looks 45° up', () => {
 
 test('roll 0.25 tilts the top of the head left', () => {
   close(listenerVectors(0, 0, 0.25).up, [-1, 0, 0]);
+});
+
+test('lockAxes: a locked axis stays at 0 in the cab; the head\'s place stays', () => {
+  const pose = { sdkActive: true, head: { x: 0.1, y: 0.02, z: -0.03, heading: 0.05, pitch: -0.01, roll: 0.02 } };
+  assert.deepEqual(lockAxes(pose, { yaw: true, pitch: false, roll: true }).head, { x: 0.1, y: 0.02, z: -0.03, heading: 0, pitch: -0.01, roll: 0 });
+  assert.deepEqual(lockAxes(pose, { pitch: true }).head.pitch, 0);
+  assert.equal(lockAxes(pose, { yaw: false, pitch: false, roll: false }), pose); // nothing locked: the same pose
+  assert.equal(lockAxes(pose, null), pose);
+  assert.equal(lockAxes(null, { roll: true }), null);
 });

@@ -14,13 +14,15 @@ const el = (tag, props = {}, children = []) => {
   return node;
 };
 
-// Where a model's variant plays: the hooks and your vehicles remembering it, or its plate for
-// a vehicle's own preset.
-function whereText(v) {
+// Where a model's variant plays: the hooks and your vehicles remembering it ("hook 2.7 m,
+// WP-1"), or its plate for a vehicle's own preset ("only WP-1"); "" when none.
+function whereList(v) {
   if (v.plate) return `only ${v.plate}`;
-  const at = [...(v.hooks ?? []).map((h) => `hook ${h} m`), ...(v.plates ?? [])];
-  return at.length ? `plays on ${at.join(', ')}` : '';
+  return [...(v.hooks ?? []).map((h) => `hook ${h} m`), ...(v.plates ?? [])].join(', ');
 }
+
+// A key's or a variant's badge without a label of its own: what it is.
+const KIND_BADGE = { default: 'default', file: 'shared file', own: 'preset' };
 
 const FOLDER = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M1.5 3.5h5l1.5 1.5h6.5v8h-13z" fill="#e8b84a" stroke="#b8862a" stroke-width="1"/></svg>';
 const DRAG_TYPE = 'application/x-trucker-aux-preset';
@@ -45,7 +47,7 @@ export function createKeyTree(root, actions) {
     el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
-      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit; "+N": more variants (right-click › Variants). ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
+      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit; "+N": more variants, unfold the key to see them as rows ◆ (click one to play and edit it). ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
     }),
     el('div', { className: 'reg-keys' }, [tree]),
     splitter,
@@ -152,69 +154,116 @@ export function createKeyTree(root, actions) {
     return inside;
   }
 
-  function showMenu(event, node, map) {
-    event.preventDefault();
-    const item = (label, run, disabled = false, title = '') => el('button', {
-      textContent: label,
-      disabled,
-      title,
-      onclick: () => {
-        closeMenu();
-        run();
-      },
-    });
-    // A nested list beside its item, opened on hover or a click; to the left near the window's edge.
-    const submenu = (label, children) => {
-      const list = el('div', { className: 'reg-menu reg-submenu' }, children);
-      const wrap = el('div', { className: 'reg-sub-wrap' }, [el('button', { className: 'reg-sub', textContent: label }), list]);
-      const place = () => list.classList.toggle('left', wrap.getBoundingClientRect().right + (list.offsetWidth || 200) > window.innerWidth - 4);
-      wrap.onmouseenter = place;
-      wrap.firstChild.onclick = (e) => {
-        e.stopPropagation();
-        place();
-        wrap.classList.toggle('open');
-      };
-      return wrap;
-    };
-    const items = [];
-    if (!node.pseudo) {
-      if (!(node.own && node.own.key === map.currentKey)) items.push(item('Set the current preset here', () => actions.assignCurrent(node.scope)));
-      items.push(item('Copy the current preset here', () => actions.copyCurrent(node.scope)));
-      // The key's variants (a model's cabs): the one shown ticked, the others play when picked
-      // (on the model in the game: in that vehicle, remembered by its hook or plate); a new one
-      // is a copy of what plays now. Each says where it plays.
-      const variants = [...(node.own ? [{ ...node.own, active: true }] : []), ...node.alternates];
-      items.push(submenu('Variants', [
-        ...variants.map((v) => item(`${v.active ? '✓ ' : ''}${variantLabel(v)}`, () => actions.playVariant(node.scope, v.key), v.active, whereText(v))),
-        ...(variants.length ? [el('hr')] : []),
-        item('New variant (copy current)', () => actions.newVariant(node.scope)),
-      ]));
-      // A shared file is taken off a model only: it stays in its folder, hidden from the variants.
-      if (node.own && node.scope !== 'all' && (!node.own.file || node.level === 'model')) {
-        items.push(item(node.alternates.length ? 'Take this variant off' : 'Unassign', () => actions.dropVariant(node.scope, node.own.key)));
-      }
-      items.push(item('Export…', () => actions.exportPresets(node.scope)));
-      if (node.children.length) items.push(el('hr'));
-    }
-    if (node.children.length) {
-      items.push(item(expanded.has(node.scope) ? 'Collapse' : 'Expand', () => {
-        if (expanded.has(node.scope)) expanded.delete(node.scope);
-        else expanded.add(node.scope);
-        draw();
-      }));
-    }
-    if (!items.length) return;
-    menu.replaceChildren(el('div', { className: 'reg-menu-title', textContent: node.label }), ...items);
+  // A key's variants as rows of their own under it (a model's cabs, two or more): the one the
+  // key shows first, then the others.
+  const variantsOf = (node) => (node.pseudo || !node.own || !node.alternates.length ? [] : [{ ...node.own, shown: true }, ...node.alternates]);
+
+  const menuAt = (event, title, items) => {
+    menu.replaceChildren(el('div', { className: 'reg-menu-title', textContent: title }), ...items);
     menu.hidden = false;
     const { innerWidth, innerHeight } = window;
     const box = menu.getBoundingClientRect();
     menu.style.left = `${Math.min(event.clientX, innerWidth - box.width - 4)}px`;
     menu.style.top = `${Math.min(event.clientY, innerHeight - box.height - 4)}px`;
+  };
+  const menuItem = (label, run, disabled = false, title = '') => el('button', {
+    textContent: label,
+    disabled,
+    title,
+    onclick: () => {
+      closeMenu();
+      run();
+    },
+  });
+
+  function showMenu(event, node) {
+    event.preventDefault();
+    const variants = variantsOf(node);
+    const items = [];
+    if (!node.pseudo) {
+      if (!(node.own && node.own.key === last.map.currentKey)) items.push(menuItem('Set the current preset here', () => actions.assignCurrent(node.scope)));
+      items.push(menuItem('Copy the current preset here', () => actions.copyCurrent(node.scope)));
+      // A new variant is a copy of what plays now; the variants' own rows play or take one off.
+      items.push(menuItem('New variant (copy current)', () => actions.newVariant(node.scope)));
+      // A shared file is taken off a model only: it stays in its folder, hidden from the variants.
+      if (!variants.length && node.own && node.scope !== 'all' && (!node.own.file || node.level === 'model')) {
+        items.push(menuItem('Unassign', () => actions.dropVariant(node.scope, node.own.key)));
+      }
+      items.push(menuItem('Export…', () => actions.exportPresets(node.scope)));
+      if (node.children.length || variants.length) items.push(el('hr'));
+    }
+    if (node.children.length || variants.length) {
+      items.push(menuItem(expanded.has(node.scope) ? 'Collapse' : 'Expand', () => {
+        if (expanded.has(node.scope)) expanded.delete(node.scope);
+        else expanded.add(node.scope);
+        draw();
+      }));
+    }
+    if (items.length) menuAt(event, node.label, items);
+  }
+
+  // A variant's menu: play it (on the model in the game: in that vehicle, remembered by its hook
+  // or plate; on another model: its current one), a copy as a new variant, take it off, export it.
+  function showVariantMenu(event, node, v) {
+    event.preventDefault();
+    const inGame = node.current && node.level === 'model';
+    let play = 'Make it play here';
+    if (node.level === 'model') play = inGame ? 'Play it in this vehicle' : 'Make it the model\'s current';
+    const playing = inGame ? node.plays && v.shown : v.active;
+    menuAt(event, variantLabel(v), [
+      menuItem(play, () => actions.playVariant(node.scope, v.key), playing),
+      menuItem('New variant (copy of it)', () => actions.newVariant(node.scope, v.key)),
+      ...(node.scope !== 'all' && (!v.file || node.level === 'model') ? [menuItem('Take this variant off', () => actions.dropVariant(node.scope, v.key))] : []),
+      menuItem('Export…', () => actions.exportPresets({ key: v.key })),
+    ]);
+  }
+
+  // A row things are dropped on: the key's (a variant's row stands for its key).
+  function dropTarget(line, node) {
+    line.addEventListener('dragover', (event) => {
+      if (!dragging || dragging.from === node.scope || node.own?.key === dragging.key) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = event.ctrlKey || !dragging.from ? 'copy' : 'move';
+      line.classList.add('drop');
+    });
+    line.addEventListener('dragleave', () => line.classList.remove('drop'));
+    line.addEventListener('drop', (event) => {
+      event.preventDefault();
+      line.classList.remove('drop');
+      const payload = dragging ?? JSON.parse(event.dataTransfer.getData(DRAG_TYPE) || 'null');
+      dragging = null; // the source row may be gone (a folder opened while dragging redraws)
+      clearTimeout(openTimer);
+      if (payload) actions.dropInMap(payload, node.scope, event.ctrlKey);
+    });
+  }
+
+  // A variant's row: its badge, where it plays (hooks, plates), ▶ when Auto plays it. A click
+  // plays it to edit (a file: your copy in its place at the first edit), as a key's click does.
+  function variantRow(node, v) {
+    const kind = v.default ? 'default' : v.file ? 'file' : 'own';
+    const where = whereList(v);
+    const line = el('div', {
+      className: `reg-row reg-variant ${kind}${v.picked ? ' selected' : ''}`,
+      title: [v.name, where && (v.plate ? where : `plays on ${where}`)].filter(Boolean).join('\n'),
+    }, [
+      el('span', { className: 'reg-toggle' }),
+      el('span', { className: 'reg-icon reg-variant-icon', textContent: '◆' }),
+      labelBadge(v.label || KIND_BADGE[kind], `reg-badge${v.label ? ` tag-${v.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`),
+      el('span', { className: 'reg-where', textContent: where }),
+      el('span', { className: 'reg-mark', textContent: node.plays && v.shown ? '▶' : '' }),
+    ]);
+    line.onclick = () => actions.selectVariant(node.scope, v.key);
+    line.oncontextmenu = (event) => showVariantMenu(event, node, v);
+    dragSource(line, { from: v.file ? null : node.scope, key: v.key, file: v.file });
+    dropTarget(line, node);
+    return el('li', { role: 'treeitem' }, [line]);
   }
 
   function row(node, map) {
     const open = expanded.has(node.scope);
-    const toggle = el('span', { className: 'reg-toggle', textContent: node.children.length ? (open ? '▾' : '▸') : '' });
+    const variants = variantsOf(node);
+    const opens = node.children.length > 0 || variants.length > 0;
+    const toggle = el('span', { className: 'reg-toggle', textContent: opens ? (open ? '▾' : '▸') : '' });
     const flip = () => {
       if (open) expanded.delete(node.scope);
       else expanded.add(node.scope);
@@ -229,49 +278,33 @@ export function createKeyTree(root, actions) {
     // No preset names in the tree: a key's own preset shows its label, else "preset" (a shared
     // file: its label, else "shared file"; a default, one from presets/default/: "default");
     // a key that inherits shows nothing.
-    const KIND_BADGE = { default: 'default', file: 'shared file', own: 'preset' };
     const badge = node.own ? node.own.label || KIND_BADGE[kind] : '';
+    const where = node.own ? whereList(node.own) : '';
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.picked ? ' selected' : ''}${node.pseudo ? ' pseudo' : ''}`,
       title: node.own
-        ? [`${node.own.name}${node.own.default ? ' (comes with the app; editing gives the key a copy of yours)' : ''}`, whereText(node.own)].filter(Boolean).join('\n')
+        ? [`${node.own.name}${node.own.default ? ' (comes with the app; editing gives the key a copy of yours)' : ''}`, where && `plays on ${where}`].filter(Boolean).join('\n')
         : node.inherited ? `inherits ${node.inherited.name} from ${node.inherited.from}` : '',
     }, [
       toggle,
       el('span', { className: 'reg-icon', innerHTML: FOLDER }),
       el('span', { className: 'reg-name', textContent: node.label, title: node.label }),
       ...(badge ? [labelBadge(badge, `reg-badge${node.own.label ? ` tag-${node.own.labelColor}` : kind === 'default' ? ' tag-gray' : ''}`)] : []),
-      // The key's other variants (a model's cabs): how many, and which.
-      ...(node.alternates.length ? [el('span', {
+      // The key's other variants (a model's cabs): how many, while their rows are folded away.
+      ...(node.alternates.length && !open ? [el('span', {
         className: 'reg-more',
         textContent: `+${node.alternates.length}`,
-        title: `Variants: ${node.alternates.map(variantLabel).join(', ')} (right-click to play one; the card picks too)`,
+        title: `Variants: ${node.alternates.map(variantLabel).join(', ')} (unfold the key to see them)`,
       })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
     line.ondblclick = flip;
-    line.oncontextmenu = (event) => showMenu(event, node, map);
+    line.oncontextmenu = (event) => showMenu(event, node);
     if (node.own) dragSource(line, { from: node.own.file ? null : node.scope, key: node.own.key, file: node.own.file });
-    if (!node.pseudo) {
-      line.addEventListener('dragover', (event) => {
-        if (!dragging || dragging.from === node.scope || node.own?.key === dragging.key) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = event.ctrlKey || !dragging.from ? 'copy' : 'move';
-        line.classList.add('drop');
-      });
-      line.addEventListener('dragleave', () => line.classList.remove('drop'));
-      line.addEventListener('drop', (event) => {
-        event.preventDefault();
-        line.classList.remove('drop');
-        const payload = dragging ?? JSON.parse(event.dataTransfer.getData(DRAG_TYPE) || 'null');
-        dragging = null; // the source row may be gone (a folder opened while dragging redraws)
-        clearTimeout(openTimer);
-        if (payload) actions.dropInMap(payload, node.scope, event.ctrlKey);
-      });
-    }
+    if (!node.pseudo) dropTarget(line, node);
     // A closed folder opens when something is held over it, as in Explorer.
-    if (node.children.length && !open) {
+    if (opens && !open) {
       line.addEventListener('dragenter', () => {
         if (!dragging) return;
         clearTimeout(openTimer);
@@ -282,7 +315,7 @@ export function createKeyTree(root, actions) {
       });
     }
     const li = el('li', { role: 'treeitem' }, [line]);
-    if (open && node.children.length) li.append(el('ul', {}, node.children.map((c) => row(c, map))));
+    if (open && opens) li.append(el('ul', {}, [...variants.map((v) => variantRow(node, v)), ...node.children.map((c) => row(c, map))]));
     return li;
   }
 

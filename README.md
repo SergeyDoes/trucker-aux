@@ -41,7 +41,7 @@ Have fun!
   - A model can have several variants (its cabs): each chassis (told apart by the fifth-wheel position) and each of your owned vehicles (by plate) remembers which one it plays
   - Presets can be shared and imported
 
-- **Cab controls:** bind keyboard keys or controller buttons (combinations too) to try the variants while driving, or go back to Auto; the one you leave the cab with stays for that cab. A voice tells which one plays, over everything or from the cab speakers
+- **Cab controls:** bind keyboard keys or controller buttons (combinations too; `.` `,` `/` by default) to try the variants while driving, or go back to Auto; the one you leave the cab with stays for that cab. A voice tells which one plays, over everything or from the cab speakers
 - **Loudness matching:** An option to adjust the current preset volume to stay nearly the same when switching between presets with different speaker counts
 - **Like a car radio:** "Mute when" option mutes the music while the engine or the electrics are off;
 
@@ -134,7 +134,8 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - `data/settings.json`: devices and options;
   - `data/profile/`: Chromium's profile;
   - `presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
-  - `presets/default/`: the presets that come with the app, the bottom layer under yours and others' files. To update them for a build: Export the presets into `app/presets/default/` (and remove the old files); `npm run dist` ships it as it is.
+  - The presets that come with the app are inside it, the bottom layer under yours and others' files, so unpacking a new version over the old one updates them cleanly (a `presets/default/` left by an older version is not read). To update them for a build: Export the presets into `app/presets/default/` (and remove the old files); `npm run dist` packs it as it is.
+  - **Updating:** close the app and unpack the new version over the old folder: `data/` (your presets and settings) and your `presets/` files stay.
   - When run from source, these folders are in `app/`.
 
 <br>
@@ -143,7 +144,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 ## Workarounds and Limitations
 
 - The game telemetry doesn't report the truck upgrades, so Day Cabs and Sleepers are distinguished by the fifth-wheel position. Ambiguities may appear on certain chassis: such cabs are variants of the model, switched on the card or with the cab controls.
-- **Fallback method** (when *trucker_aux_camera.dll* doesn't read the game's camera, see below): The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
+- **Fallback method** (when *trucker_aux_camera.dll* doesn't read the game's camera, see below, or when *Camera › Mode* is *Adjusted Telemetry*): The Camera Accessibility settings offsets are not counted towards Telemetry-reported head position, so I recommend to manually copy these settings in Trucker AUX app. 
   - Currently *supported* settings are **Steering camera rotation**, and **Blinker camera rotation**. 
   - Other camera-related parameters, like **Camera Shake**, are probably behave the same, but they are *not simulated* in Trucker AUX yet.
   - The **current camera mode** is not reported by the game either, the head position is just defaulted when not in FPV. The above-mentioned behavior is processed directly from the trucks steer and turn signal states, and *it keep affect the head's position even in third person camera modes.*

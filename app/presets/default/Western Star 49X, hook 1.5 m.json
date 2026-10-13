@@ -7,12 +7,13 @@
   "brand": "westernstar",
   "brandName": "Western Star",
   "layout": {
+    "label": "day cab",
     "width": 1,
     "bounds": {
       "min": [
         -0.88,
         -1.15,
-        -1.3
+        -0.63
       ],
       "max": [
         0.88,
@@ -72,32 +73,6 @@
         "gainDb": 0,
         "type": "midbass",
         "pair": "s3"
-      },
-      {
-        "id": "s5",
-        "name": "Midrange L",
-        "position": [
-          -0.68,
-          -0.44,
-          0.06
-        ],
-        "channel": "L",
-        "gainDb": 0,
-        "type": "mid",
-        "pair": "s6"
-      },
-      {
-        "id": "s6",
-        "name": "Midrange R",
-        "position": [
-          0.68,
-          -0.44,
-          0.06
-        ],
-        "channel": "R",
-        "gainDb": 0,
-        "type": "mid",
-        "pair": "s5"
       }
     ]
   }

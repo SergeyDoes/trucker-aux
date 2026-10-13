@@ -52,6 +52,8 @@ export function createVoice({ onError = () => {} } = {}) {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
     helper.on('error', (err) => fail(err.message));
+    // Writing to a helper that has gone (EPIPE) must not end the app.
+    helper.stdin.on('error', (err) => fail(err.message));
     helper.on('exit', (code) => {
       if (helper) fail(`the speech helper stopped (${code}).`);
     });

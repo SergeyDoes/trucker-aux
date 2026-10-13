@@ -38,6 +38,17 @@ test('readCollection reads every preset file, subfolders too, and skips the rest
   assert.equal(fs.readFileSync(path.join(dir, 'broken.json'), 'utf8'), before);
 });
 
+test('readCollection: the defaults from the app\'s own folder, a default/ left in presets/ passed by', () => {
+  const dir = tempDir();
+  const defaults = tempDir();
+  put(dir, 'theirs.json', preset('Theirs', 'vehicle.a'));
+  put(dir, 'default/stale.json', preset('Stale', 'vehicle.a')); // from an older build unpacked over
+  put(defaults, 'Cab.json', preset('Cab', 'vehicle.b'));
+  const { collection } = readCollection(dir, defaults);
+  assert.deepEqual(Object.keys(collection).sort(), ['file:default/Cab.json', 'file:theirs.json']);
+  assert.deepEqual([collection['file:default/Cab.json'].default, collection['file:theirs.json'].default], [true, false]);
+});
+
 test('readCollection: no folder, no presets and no warnings', () => {
   assert.deepEqual(readCollection(path.join(tempDir(), 'missing')), { collection: {}, warnings: [] });
 });

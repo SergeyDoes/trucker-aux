@@ -1,7 +1,7 @@
 {
   "truckerAuxPreset": 1,
   "name": "ATS › Western Star › Western Star 57X › hook 1.5 m",
-  "vehicle": "vehicle.westernstar.57x@1.5",
+  "vehicle": "vehicle.westernstar.57x",
   "vehicleName": "Western Star 57X",
   "game": "ats",
   "brand": "westernstar",

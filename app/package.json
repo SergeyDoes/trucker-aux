@@ -30,6 +30,7 @@
     "files": [
       "src/**",
       "package.json",
+      "presets/default/**",
       "!**/node_modules/@koromix/koffi-{linux,darwin,freebsd,openbsd,android}-*{,/**}",
       {
         "from": "node_modules/three/examples/jsm/controls",
@@ -42,7 +43,10 @@
     "extraFiles": [
       {
         "from": "presets",
-        "to": "presets"
+        "to": "presets",
+        "filter": [
+          "README.md"
+        ]
       },
       {
         "from": "plugin",
@@ -57,7 +61,6 @@
       "target": [
         "zip"
       ],
-      "signAndEditExecutable": false,
       "artifactName": "${productName}-${version}-win-x64.${ext}"
     }
   }

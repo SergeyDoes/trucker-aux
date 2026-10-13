@@ -1,0 +1,54 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › International › International LT",
+  "vehicle": "vehicle.intnational.lt@2.9",
+  "vehicleName": "International LT",
+  "game": "ats",
+  "brand": "intnational",
+  "brandName": "International",
+  "layout": {
+    "label": "day cab?",
+    "labelColor": "orange",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Full range L",
+        "position": [
+          -0.8,
+          -0.45,
+          -0.27
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Full range R",
+        "position": [
+          0.8,
+          -0.45,
+          -0.27
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s1"
+      }
+    ]
+  }
+}

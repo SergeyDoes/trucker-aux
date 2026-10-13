@@ -401,10 +401,17 @@ export function dropImportedDefaults(store, collection) {
 
 // A shared file picked in the list is never changed: before the first edit it becomes an
 // unassigned copy ("New preset"), chosen instead (one tried with the cab's buttons stays tried).
-// Anything else is left as it is.
+// A file of a model picked in the tree as one of its variants (selection.variantOf) becomes
+// your copy in its place (copyOf, replaceFile). Anything else is left as it is.
 export function adoptPicked(store, selection) {
   const entry = selection.mode === 'truck' && isCollectionKey(selection.key) ? store.collection?.[selection.key] : null;
   if (!entry) return { store, selection };
+  const model = selection.variantOf && fileOfModel(store, selection.variantOf, entry.key) ? selection.variantOf : null;
+  if (model) {
+    const key = freePresetKey(store.presets);
+    const preset = { ...structuredClone(entry.layout), name: keyPath(store, model), copyOf: entry.key };
+    return { store: replaceFile({ ...store, presets: { ...store.presets, [key]: preset } }, model, entry, key), selection: { ...selection, key } };
+  }
   const created = createPreset(store, entry.layout);
   return { store: created.store, selection: { ...selection, key: created.key } };
 }
@@ -461,6 +468,9 @@ function rememberedAt(store, model, key) {
     plates: at.filter((s) => levelOf(s) === 'vehicle').map(plateOf).sort(),
   };
 }
+
+// Where a variant plays, as the card says it: "hook 2.7 m, hook 3.6 m, WP-1".
+const whereText = ({ hooks, plates }) => [...hooks.map((h) => `hook ${h} m`), ...plates].join(', ');
 
 const describe = (store, key) => {
   const layout = presetLayout(store, key);
@@ -682,8 +692,8 @@ const GAME_NAMES = { ats: 'ATS', ets2: 'ETS2' };
 // preset for the model (the last part when it is a key's path, as the app names copies: else
 // the path would grow with each copy), else its id made readable ("vehicle.peterbilt.389" ->
 // "peterbilt 389"). The game gives some models of a brand one name (Freightliner Cascadia 2019
-// and 2024 are both "Freightliner Cascadia"): such twins get the year from their id, else the
-// id's last part.
+// and 2024 are both "Freightliner Cascadia"; ETS2's Iveco Stralis and Stralis Hi-Way both "Iveco
+// Stralis"): such twins get a tag (twinTag), unless the name ends with it already.
 function modelName(store, model, truck) {
   const name = givenName(store, model, truck);
   const place = placeOf(store, model, truck);
@@ -693,8 +703,18 @@ function modelName(store, model, truck) {
     return (!game || !place.game || game === place.game) && givenName(store, other, truck) === name;
   });
   if (!twin) return name;
-  const tag = model.match(/(\d{4})$/)?.[1] ?? model.slice(model.lastIndexOf('.') + 1);
-  return name.endsWith(tag) ? name : `${name} ${tag}`;
+  const tag = twinTag(model);
+  return name.toLowerCase().endsWith(tag.toLowerCase()) ? name : `${name} ${tag}`;
+}
+
+// A twin's tag: the year in its id, else the id's last part as the game would write it
+// ("vehicle.iveco.hiway" -> "Hi-Way"), else with a capital.
+const TAG_NAMES = { hiway: 'Hi-Way' };
+function twinTag(model) {
+  const year = model.match(/(\d{4})$/)?.[1];
+  if (year) return year;
+  const tail = model.slice(model.lastIndexOf('.') + 1);
+  return TAG_NAMES[tail] ?? tail.charAt(0).toUpperCase() + tail.slice(1);
 }
 
 function givenName(store, model, truck) {
@@ -1039,11 +1059,19 @@ export function truckStatus(store, selection, truck) {
     const file = playing.kind === 'collection' ? store.collection[playing.key].file : null;
     // A variant tried with the cab's buttons (app.js controlAction) stays the cab's on getting out.
     const tried = selection.cycled ? 'Tried with the controls: this cab keeps it when you get out, unless Auto goes back first.' : '';
+    // A variant picked in the tree (selection.variantOf): edits go to it wherever it plays; a
+    // file of the model becomes your copy in its place.
+    const where = selection.variantOf ? whereText(rememberedAt(store, selection.variantOf, playing.key)) : '';
+    let edits = file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.';
+    if (selection.variantOf) edits = file ? `From the collection: ${file}. Editing makes your own copy in its place first.` : `Editing changes this variant${where ? `, which plays on ${where}` : ''}.`;
+    let picked = 'picked in the list';
+    if (selection.cycled) picked = 'tried with the controls';
+    else if (selection.variantOf) picked = 'a variant picked in the map';
     return {
       ...base,
-      plays: `${base.plays} (${selection.cycled ? 'tried with the controls' : 'picked in the list'})`,
+      plays: `${base.plays} (${picked})`,
       appliesTo: scopeOfKey(store, playing.key, truck),
-      note: note(tried, file ? `From the collection: ${file}. Editing makes your own copy first.` : 'Editing changes this preset.', truck && lent),
+      note: note(tried, edits, truck && lent),
       useIn: truck ? { options: [{ value: '', label: 'Use it in…' }, ...rungOptions(playing.key)] } : null,
       buttons: [BACK_TO_AUTO],
     };
@@ -1165,7 +1193,9 @@ export function presetTree(store, truck, selection = { mode: 'auto' }) {
   const node = (scope, label, parent) => {
     if (!nodes.has(scope)) {
       const pseudo = scope.startsWith('?');
-      const variants = pseudo ? [] : variantsAt(scope);
+      // A variant picked in the tree (selection.variantOf) is marked on its row.
+      const variants = pseudo ? [] : variantsAt(scope)
+        .map((v) => ({ ...v, picked: selection.mode === 'truck' && selection.variantOf === scope && selection.key === v.key }));
       const shown = variants.find((v) => v.active);
       nodes.set(scope, {
         scope, label, pseudo, level: pseudo ? null : levelOf(scope), own: shown ?? null, alternates: variants.filter((v) => v !== shown),

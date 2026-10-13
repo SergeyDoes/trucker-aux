@@ -1,12 +1,13 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ATS › Peterbilt › Peterbilt 389 › hook 2.6 m",
+  "name": "Peterbilt 389, hook 2.6 m",
   "vehicle": "vehicle.peterbilt.389@2.6",
   "vehicleName": "Peterbilt 389",
   "game": "ats",
   "brand": "peterbilt",
   "brandName": "Peterbilt",
   "layout": {
+    "label": "day cab 1",
     "width": 1,
     "bounds": {
       "min": [
@@ -52,8 +53,8 @@
         "name": "Tweeter L",
         "position": [
           -0.72,
-          0.21,
-          -0.36
+          0.4,
+          -0.21
         ],
         "channel": "L",
         "gainDb": 0,
@@ -65,8 +66,8 @@
         "name": "Tweeter R",
         "position": [
           0.72,
-          0.21,
-          -0.36
+          0.4,
+          -0.21
         ],
         "channel": "R",
         "gainDb": 0,
@@ -77,9 +78,9 @@
         "id": "s5",
         "name": "Subwoofer",
         "position": [
-          0.44,
-          -0.91,
-          -0.26
+          0.34,
+          -0.54,
+          -0.23
         ],
         "channel": "M",
         "gainDb": 6,

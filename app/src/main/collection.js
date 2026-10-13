@@ -28,13 +28,22 @@ function jsonFiles(dir, prefix = '') {
 
 // { collection: { [key]: entry }, warnings }. Files that are not presets are skipped and
 // named in a warning; they are not ours, so they are never moved or changed.
-export function readCollection(dir) {
+// With defaultsDir the presets that come with the app are read from there (inside the app, so a
+// newer build replaces them whole, unpacked over an older one or not) as "default/…", the keys
+// they always had; a default/ folder in dir, left by an older build, is passed by.
+export function readCollection(dir, defaultsDir = null) {
   const collection = {};
   const warnings = [];
-  for (const file of jsonFiles(dir)) {
+  const files = defaultsDir
+    ? [
+      ...jsonFiles(dir).filter((file) => !file.startsWith('default/')).map((file) => [path.join(dir, file), file]),
+      ...jsonFiles(defaultsDir).map((file) => [path.join(defaultsDir, file), `default/${file}`]),
+    ]
+    : jsonFiles(dir).map((file) => [path.join(dir, file), file]);
+  for (const [full, file] of files) {
     let raw;
     try {
-      raw = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8').replace(/^﻿/, ''));
+      raw = JSON.parse(fs.readFileSync(full, 'utf8').replace(/^﻿/, ''));
     } catch {
       warnings.push(`presets/${file} is not valid JSON.`);
       continue;

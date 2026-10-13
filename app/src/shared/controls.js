@@ -7,7 +7,7 @@
 // A controller is known by its USB ids, so a binding outlives a replug; two alike are one.
 
 export const ACTIONS = ['next', 'previous', 'auto'];
-export const ACTION_NAMES = { next: 'Next variant', previous: 'Previous variant', auto: 'Auto' };
+export const ACTION_NAMES = { next: 'Switch Next', previous: 'Switch Prev.', auto: 'Switch Auto' };
 export const MAX_COMBO = 3;
 export const ESCAPE = 'key:27'; // cancels a capture, so it is never bound
 
@@ -19,10 +19,16 @@ export function normalizeBinding(raw) {
   return Array.isArray(raw) ? [...new Set(raw.filter(isInputId))].slice(0, MAX_COMBO) : [];
 }
 
-// { next: [ids], previous: [ids], auto: [ids] }, empty ones unbound.
+// The bindings a new setup starts with: keys no action of the games' keyboard layout takes (none
+// of four ATS and ETS2 profiles binds them, 2026-10-11), side by side under the right hand:
+// "." next, "," previous, "/" Auto: the same keys whatever the keyboard layout.
+export const DEFAULT_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] };
+
+// { next: [ids], previous: [ids], auto: [ids] }: a binding not saved yet is the default one, one
+// cleared (an empty list) stays unbound.
 export function normalizeControls(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
-  return Object.fromEntries(ACTIONS.map((action) => [action, normalizeBinding(src[action])]));
+  return Object.fromEntries(ACTIONS.map((action) => [action, Array.isArray(src[action]) ? normalizeBinding(src[action]) : [...DEFAULT_CONTROLS[action]]]));
 }
 
 export const isBound = (controls) => ACTIONS.some((action) => controls[action]?.length);

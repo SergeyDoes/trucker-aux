@@ -1,0 +1,92 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Kenworth W900, hook 3.6 m copy",
+  "vehicle": "vehicle.kenworth.w900",
+  "vehicleName": "Kenworth W900",
+  "game": "ats",
+  "brand": "kenworth",
+  "brandName": "Kenworth",
+  "layout": {
+    "label": "sleeper 2",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.87,
+        -1.15,
+        -0.73
+      ],
+      "max": [
+        0.87,
+        0.95,
+        1.18
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s3",
+        "name": "Tweeter L",
+        "position": [
+          -0.55,
+          0.23,
+          -0.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R",
+        "position": [
+          0.55,
+          0.23,
+          -0.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      },
+      {
+        "id": "s5",
+        "name": "Subwoofer",
+        "position": [
+          0,
+          -0.69,
+          0.61
+        ],
+        "channel": "M",
+        "gainDb": 4.5,
+        "type": "sub",
+        "pair": null
+      },
+      {
+        "id": "s6",
+        "name": "Midbass L 2",
+        "position": [
+          -0.79,
+          -0.33,
+          0
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s7"
+      },
+      {
+        "id": "s7",
+        "name": "Midbass R 2",
+        "position": [
+          0.79,
+          -0.33,
+          0
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      }
+    ]
+  }
+}

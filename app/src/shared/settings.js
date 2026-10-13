@@ -19,6 +19,31 @@ function deviceRef(raw) {
 // head, so the app adds them.
 export const TURN_LOOK_REVERSE = ['off', 'on', 'inverted'];
 
+// Where the head comes from (Camera › Mode): 'game', Raw Camera, the game's camera through
+// trucker_aux_camera.dll when it reads it, else the telemetry; 'vr', Raw Telemetry, the
+// telemetry's head as it is (a VR headset's), nothing added; 'telemetry', Adjusted Telemetry,
+// the telemetry's head with the turn look emulated (the camera not read: no free camera either,
+// for when Raw Camera misbehaves).
+export const HEAD_SOURCES = ['game', 'vr', 'telemetry'];
+
+// The head's turns locked per way (Camera › Lock): a locked axis stays at 0 in the cab. At first
+// the roll for the game's camera and the telemetry (the camera leans against the cab while it
+// sways, pose.js levelHead); none in VR, where a head's tilt is real.
+export const AXES = ['yaw', 'pitch', 'roll'];
+const AXIS_LOCKS = {
+  game: { yaw: false, pitch: false, roll: true },
+  vr: { yaw: false, pitch: false, roll: false },
+  telemetry: { yaw: false, pitch: false, roll: true },
+};
+
+function axisLocks(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  return Object.fromEntries(HEAD_SOURCES.map((way) => [way, Object.fromEntries(AXES.map((axis) => {
+    const value = src[way]?.[axis];
+    return [axis, typeof value === 'boolean' ? value : AXIS_LOCKS[way][axis]];
+  }))]));
+}
+
 function reverseMode(value) {
   if (value === true) return 'on'; // the first version had a checkbox
   return TURN_LOOK_REVERSE.includes(value) ? value : 'off';
@@ -56,6 +81,9 @@ export function normalizeSettings(raw) {
     // Trim every preset to the loudness of the default layout (loudness.js).
     matchLoudness: typeof src.matchLoudness === 'boolean' ? src.matchLoudness : true,
     turnLook: turnLookSettings(src.turnLook),
+    // Where the head comes from (HEAD_SOURCES).
+    headFrom: HEAD_SOURCES.includes(src.headFrom) ? src.headFrom : 'game',
+    axisLocks: axisLocks(src.axisLocks),
     // The volume slider's place, 0..2 (up to 200 %, to the percent); loudness.js perceptualGain
     // makes it a gain.
     volume: finite(src.volume) ? Math.round(Math.min(2, Math.max(0, src.volume)) * 100) / 100 : 1,

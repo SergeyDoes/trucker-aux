@@ -71,13 +71,22 @@ export function withTurnLook(pose, turns) {
   return turns ? { ...pose, head: { ...pose.head, heading: pose.head.heading + turns } } : pose;
 }
 
+// The head's turns locked (settings.axisLocks: { yaw, pitch, roll }): a locked one stays at 0 in
+// the cab, so the sound does not follow it; the head's place stays. The same pose when nothing
+// changes.
+const AXIS_FIELDS = { yaw: 'heading', pitch: 'pitch', roll: 'roll' };
+export function lockAxes(pose, locks) {
+  if (!pose?.head || !locks) return pose;
+  const locked = Object.entries(AXIS_FIELDS).filter(([axis, field]) => locks[axis] && pose.head[field]);
+  if (!locked.length) return pose;
+  return { ...pose, head: { ...pose.head, ...Object.fromEntries(locked.map(([, field]) => [field, 0])) } };
+}
+
 // The listener's ears stay level in the cab: the game's camera (and head.offset) leans against
 // the cab while the cab sways, and tilted ears move the speakers above and below them sideways,
 // a centred one most audibly. A seated driver leans with the cab. Heading, pitch and the head's
-// place stay.
-export function levelHead(pose) {
-  return pose?.head?.roll ? { ...pose, head: { ...pose.head, roll: 0 } } : pose;
-}
+// place stay. (Camera › Lock › Roll, on at first for the game's camera.)
+export const levelHead = (pose) => lockAxes(pose, { roll: true });
 
 // While the game is paused the head stays where it was in the game: the last head heard
 // before the pause, whatever the camera or the telemetry say meanwhile (the pause menu may

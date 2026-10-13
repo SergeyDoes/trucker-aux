@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { normalizeStore } from '../src/shared/layout.js';
 import { readCollection } from '../src/main/collection.js';
+import { presetFileName } from '../src/shared/collection.js';
 import { exportFiles, foldChassis, keyPath, presetTree } from '../src/shared/presets.js';
 
 const [dataDir, outDir] = process.argv.slice(2);
@@ -40,7 +41,7 @@ fs.mkdirSync(outDir, { recursive: true });
 const taken = new Set();
 for (const { fileName, data } of files) {
   const base = fileName.replace(/\.json$/i, '');
-  let name = taken.has(fileName) && data.layout.label ? `${base}, ${data.layout.label}.json` : fileName;
+  let name = taken.has(fileName) && data.layout.label ? presetFileName(`${base}, ${data.layout.label}`) : fileName;
   for (let n = 2; taken.has(name); n++) name = `${base} (${n}).json`;
   taken.add(name);
   fs.writeFileSync(path.join(outDir, name), `${JSON.stringify(data, null, 2)}\n`, 'utf8');

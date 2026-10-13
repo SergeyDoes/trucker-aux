@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { normalizeSettings } from '../src/shared/settings.js';
 
 const TURN_LOOK_OFF = { on: false, percent: 100, reverse: 'off', blinkers: false };
-const NO_CONTROLS = { next: [], previous: [], auto: [] };
+const NO_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] }; // the default keys
 
 test('normalizeSettings: defaults', () => {
   assert.deepEqual(normalizeSettings(undefined), {
     version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true,
-    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1,
+    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
   });
 });
 
@@ -32,7 +32,7 @@ test('normalizeSettings keeps valid devices and drops junk', () => {
   });
   assert.deepEqual(settings, {
     version: 1, source: 'file', input: { id: 'cable', label: 'CABLE Output' }, output: null, muteWhen: 'engine', pauseBehavior: 'muted', matchLoudness: false,
-    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1,
+    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
   });
   assert.equal(normalizeSettings({ source: 'radio' }).source, 'input');
   assert.equal(normalizeSettings({ muteWhen: 'electric' }).muteWhen, 'electric');
@@ -60,10 +60,25 @@ test('normalizeSettings: the first version saved the angle at full lock in degre
 
 test('normalizeSettings: the controls and the voice', () => {
   const settings = normalizeSettings({ controls: { next: ['key:120', 'nope'], auto: ['joy:045e:028e:5'] }, voice: false });
-  assert.deepEqual(settings.controls, { next: ['key:120'], previous: [], auto: ['joy:045e:028e:5'] });
+  assert.deepEqual(settings.controls, { next: ['key:120'], previous: ['key:188'], auto: ['joy:045e:028e:5'] });
   assert.equal(settings.voice, 'off'); // the first version's checkbox
   assert.equal(normalizeSettings({ voice: 'aux' }).voice, 'aux');
   assert.equal(normalizeSettings({ voice: 'yes' }).voice, 'system');
   assert.equal(normalizeSettings({ voice: true }).voice, 'system');
   assert.deepEqual([0.333, 3, -1, 'x'].map((v) => normalizeSettings({ voiceVolume: v }).voiceVolume), [0.33, 2, 0, 1]);
+});
+
+test('normalizeSettings: the head from the game camera, VR or the telemetry', () => {
+  assert.equal(normalizeSettings({ headFrom: 'telemetry' }).headFrom, 'telemetry');
+  assert.equal(normalizeSettings({ headFrom: 'webcam' }).headFrom, 'game');
+});
+
+test('normalizeSettings: the camera modes and their locked axes', () => {
+  assert.equal(normalizeSettings({ headFrom: 'vr' }).headFrom, 'vr');
+  const locks = normalizeSettings({ axisLocks: { game: { roll: false, yaw: true }, vr: { pitch: 'x' }, other: { roll: true } } }).axisLocks;
+  assert.deepEqual(locks, {
+    game: { yaw: true, pitch: false, roll: false },
+    vr: { yaw: false, pitch: false, roll: false },
+    telemetry: { yaw: false, pitch: false, roll: true },
+  });
 });

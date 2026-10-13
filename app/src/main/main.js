@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, session, shell } from 'electron';
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, Menu, session, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +15,7 @@ import { dropImportedDefaults, foldChassis, seedAll } from '../shared/presets.js
 const here = path.dirname(fileURLToPath(import.meta.url));
 const POSE_PERIOD_MS = 10; // shared-memory polling, ~100 Hz
 const RETRY_MS = 1000;     // how often to look for the memory while the game is not running
+const WM_DEVICECHANGE = 0x0219;
 
 // Debug tools (the test file source, the default menu with DevTools and reload):
 // when run from source, or in a build started with --dev-tools (Electron rejects --debug as an old Node flag).
@@ -29,9 +30,29 @@ const dataDir = resolveDataDir({
 });
 app.setPath('userData', path.join(dataDir, 'profile'));
 
+// Crashes are kept for a look afterwards, never sent: Chromium's minidumps in data/crashes/, and
+// a line each in data/crash.log for a process gone (the window's renderer, the GPU, …) or an
+// error in this one. The app closing by itself with neither: a crash of this process (its dump).
+app.setPath('crashDumps', path.join(dataDir, 'crashes'));
+crashReporter.start({ uploadToServer: false });
+function crashLog(text) {
+  try {
+    fs.appendFileSync(path.join(dataDir, 'crash.log'), `${new Date().toISOString()} ${text}\n`);
+  } catch {
+    // nowhere to write it
+  }
+}
+process.on('uncaughtExceptionMonitor', (err) => crashLog(`main: ${err?.stack ?? err}`));
+process.on('unhandledRejection', (reason) => crashLog(`main, a promise: ${reason?.stack ?? reason}`));
+app.on('render-process-gone', (_event, _contents, details) => crashLog(`renderer gone: ${details.reason} (${details.exitCode})`));
+app.on('child-process-gone', (_event, details) => crashLog(`${details.type}${details.name ? ` (${details.name})` : ''} gone: ${details.reason} (${details.exitCode})`));
+
 // Shared presets, one file each (collection.js): read with the store, again when the
 // folder changes.
 const presetsDir = presetsDirFor(dataDir);
+// The presets that come with the app, inside it (app.asar in a build): a newer build replaces
+// them whole, so unpacking it over an older one leaves no stale default behind.
+const defaultsDir = path.join(app.getAppPath(), 'presets', 'default');
 
 // A new store (no layouts.json yet) starts with the default preset for all vehicles (seedAll);
 // one from 0.1.1 lets its copies of the defaults give way to them (dropImportedDefaults). Presets
@@ -39,7 +60,7 @@ const presetsDir = presetsDirFor(dataDir);
 // (foldChassis): saved with the next change.
 ipcMain.handle('store:load', () => {
   const data = loadData(dataDir);
-  const shared = readCollection(presetsDir);
+  const shared = readCollection(presetsDir, defaultsDir);
   if (data.fresh) data.store = seedAll(data.store, shared.collection);
   if (data.store.defaultsImported) {
     data.store = dropImportedDefaults(data.store, shared.collection);
@@ -176,9 +197,11 @@ function createWindow() {
   });
   win.loadFile(path.join(here, '../renderer/index.html'));
   mainWindow = win;
+  // A controller plugged in or out: the input poller looks for the controllers again.
+  if (process.platform === 'win32') win.hookWindowMessage(WM_DEVICECHANGE, () => controls.devicesChanged());
   startPoseFeed(win);
   const stopWatching = watchCollection(presetsDir, () => {
-    if (!win.isDestroyed()) win.webContents.send('collection', readCollection(presetsDir));
+    if (!win.isDestroyed()) win.webContents.send('collection', readCollection(presetsDir, defaultsDir));
   });
   win.on('closed', stopWatching);
 }

@@ -4,6 +4,7 @@ import { LABEL_COLORS, LABEL_MAX, TYPES, TYPE_NAMES } from '../shared/layout.js'
 import { bandText } from '../shared/dsp.js';
 import { speakerIcon } from './marks.js';
 import { ACTIONS, ACTION_NAMES, bindingText } from '../shared/controls.js';
+import { AXES } from '../shared/settings.js';
 
 const CHANNEL_OPTIONS = [
   { value: 'L', label: 'Left' },
@@ -33,6 +34,20 @@ const PAUSE_OPTIONS = [
   { value: 'muted', label: 'Always muted' },
   { value: 'vehicle', label: 'Active vehicle' },
 ];
+
+// Where the head comes from (settings.js HEAD_SOURCES), and what the Camera fieldset says.
+const HEAD_OPTIONS = [
+  { value: 'game', label: 'Raw Camera - Recommended' },
+  { value: 'vr', label: 'Raw Telemetry - VR Recommended' },
+  { value: 'telemetry', label: 'Adjusted Telemetry' },
+];
+const EMULATED = 'Set these as in the game\'s Accessibility options: the game turns its camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.';
+const CAMERA_HINTS = {
+  game: 'The sound follows the game\'s camera, its look into turns and toward the blinker included; outside cameras leave it at rest, the free camera takes it along.',
+  fallback: `trucker_aux_camera.dll does not read the game's camera (it is missing, or does not know this game version), so the telemetry gives the head. ${EMULATED}`,
+  telemetry: `The telemetry gives the head; the game's camera is not read (no free camera). ${EMULATED}`,
+  vr: 'The telemetry gives the headset\'s pose as it is; the game turns nothing on its own in VR, so nothing is added. The game\'s camera is not read (no free camera).',
+};
 
 // The game's options for looking into turns on the reverse gear (settings.js TURN_LOOK_REVERSE).
 const REVERSE_OPTIONS = [
@@ -176,6 +191,8 @@ export function createPanel(root, actions, boundsRoot) {
 
   const input = el('select');
   const output = el('select');
+  // Where the player is to send the music: the input cable's other side (devices.js cableOutputFor).
+  const cableHint = el('p', { className: 'hint' });
   const sourceInput = el('input', { type: 'radio', name: 'source', value: 'input' });
   const sourceFile = el('input', { type: 'radio', name: 'source', value: 'file' });
   const file = el('input', { type: 'file', accept: 'audio/*' });
@@ -214,24 +231,25 @@ export function createPanel(root, actions, boundsRoot) {
     const line = el('div', { className: 'row' }, [el('span', { textContent: ACTION_NAMES[action] }), el('div', { className: 'inline' }, [bind, clear])]);
     return { action, bind, clear, line };
   });
-  // The voice: off, over everything (no speakers, not muted, not at the music's volume), or from
-  // the cab's speakers as the music is (muted with it); at a volume of its own.
+  // The control voice (in Audio): off, over everything (no speakers, not muted, not at the
+  // music's volume), or from the cab's speakers as the music is (muted with it); at a volume of
+  // its own; Test says what plays now.
   const voiceMode = el('select', {
-    title: 'An English Windows voice says which variant plays. System: on the output device over everything, never muted. AUX: from the cab\'s speakers like the music, muted with it and at its volume',
+    title: 'The voice that says which variant plays when you switch them with the bindings (an English Windows voice). System: on the output device over everything, never muted. AUX: from the cab\'s speakers like the music, muted with it and at its volume',
   });
-  const voiceVolume = el('input', { type: 'range', min: 0, max: 200, step: 1, title: 'The voice\'s volume; over 100 % up to +12 dB' });
+  const voiceVolume = el('input', { type: 'range', min: 0, max: 200, step: 1, title: 'The control voice\'s volume; over 100 % up to +12 dB' });
   const voiceVolumeValue = el('span', { className: 'value' });
+  const voiceTest = el('button', { textContent: 'Test', title: 'Say what plays now, as the bindings would' });
   voiceMode.onchange = () => actions.setVoice(voiceMode.value);
   voiceVolume.oninput = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100, false);
   voiceVolume.onchange = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100);
+  voiceTest.onclick = () => actions.testVoice();
   const controlsForm = el('fieldset', {}, [
-    el('legend', { textContent: 'Controls' }),
+    el('legend', { textContent: 'Variant Control Bindings' }),
     ...controlRows.map((r) => r.line),
-    row('Voice', voiceMode),
-    row('Voice volume', el('div', { className: 'inline' }, [voiceVolume, voiceVolumeValue])),
     el('p', {
       className: 'hint',
-      textContent: 'They work while the game has the focus. Next and Previous try the variants of the vehicle\'s model; Auto goes back to the one that fitted when you got in. Getting out keeps the one tried for that cab. The game sees these keys and buttons too: pick ones it does not use.',
+      textContent: 'They work while the game has the focus. Next and Prev. try the variants of the vehicle\'s model; Auto goes back to the one that fitted when you got in. Getting out keeps the one tried for that cab. The game sees these keys and buttons too: pick ones it does not use. Audio › Control voice says which one plays.',
     }),
   ]);
 
@@ -333,21 +351,38 @@ export function createPanel(root, actions, boundsRoot) {
     return { ...wall, input, label: el('label', {}, [wall.label, input]) };
   });
   const headNote = el('p', { className: 'hint' });
-  // Shown only once the app has seen the game without trucker_aux_camera.dll's camera
-  // (view.cameraFallback, shared/camera.js createFallbackWatch): with it the sound takes the
-  // game's own camera and these are not used.
-  const cameraForm = el('fieldset', {}, [
-    el('legend', { textContent: 'Game camera' }),
+  // Where the head comes from: the game's camera (trucker_aux_camera.dll), or the telemetry, raw
+  // (VR) or adjusted. The look into turns and toward the blinker are emulated only for Adjusted
+  // Telemetry, or once the app has seen the game without the camera (view.cameraFallback,
+  // shared/camera.js createFallbackWatch); never for Raw Telemetry. The axes locked are the mode's own.
+  const headFrom = el('select', {
+    title: 'Raw Camera: the game\'s camera through trucker_aux_camera.dll as it is (the telemetry when it does not read it). Raw Telemetry: the telemetry\'s head as it is, a VR headset\'s pose. Adjusted Telemetry: the telemetry with the game\'s look into turns and toward the blinker added, for when Raw Camera misbehaves',
+  });
+  headFrom.onchange = () => actions.setHeadFrom(headFrom.value);
+  const locks = Object.fromEntries(AXES.map((axis) => {
+    const box = el('input', { type: 'checkbox' });
+    box.onchange = () => actions.setAxisLock(axis, box.checked);
+    return [axis, box];
+  }));
+  const lockRow = row('Lock', el('div', {
+    className: 'inline',
+    title: 'A locked axis of the head stays straight in the cab: the sound does not follow it (the free camera\'s turns are its own)',
+  }, AXES.map((axis) => el('label', { className: 'inline' }, [locks[axis], axis[0].toUpperCase() + axis.slice(1)]))));
+  const emulation = el('div', {}, [
     row('Into turns', el('div', { className: 'inline' }, [
       turnLookOn,
       el('label', { className: 'inline' }, [turnLookPercent, '%']),
     ])),
     row('In reverse', turnLookReverse),
     row('Blinkers', el('div', { className: 'inline' }, [turnLookBlinkers, 'Look toward them'])),
-    el('p', {
-      className: 'hint',
-      textContent: 'trucker_aux_camera.dll does not read the game\'s camera (it is missing, or does not know this game version). Set these as in the game\'s Accessibility options: the game turns its camera without telling the telemetry, so the sound is turned here. 100 % is 35° at full lock; a blinker turns it 20° to the driver\'s side or 40° across.',
-    }),
+  ]);
+  const cameraHint = el('p', { className: 'hint' });
+  const cameraForm = el('fieldset', {}, [
+    el('legend', { textContent: 'Camera' }),
+    row('Mode', headFrom),
+    lockRow,
+    emulation,
+    cameraHint,
   ]);
   const boundsForm = el('fieldset', {}, [
     el('legend', { textContent: 'Bounds, cm' }),
@@ -362,15 +397,18 @@ export function createPanel(root, actions, boundsRoot) {
     el('fieldset', {}, [
       el('legend', { textContent: 'Audio' }),
       row('Input', input),
+      cableHint,
       row('Output', output),
       sourceRow,
       fileRow,
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
       row('Volume', el('div', { className: 'inline' }, [volume, volumeValue])),
+      row('Control voice', voiceMode),
+      row('Voice volume', el('div', { className: 'inline' }, [voiceVolume, voiceVolumeValue, voiceTest])),
     ]),
-    controlsForm,
     cameraForm,
+    controlsForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Layout' }),
       row('Preset', preset),
@@ -474,6 +512,8 @@ export function createPanel(root, actions, boundsRoot) {
     warnings.replaceChildren(...view.warnings.map((text) => el('li', { textContent: text })));
     fillSelect(input, view.inputs.map((d) => ({ value: d.deviceId, label: d.label || 'Unnamed input' })), view.inputId);
     fillSelect(output, view.outputs.map((d) => ({ value: d.deviceId, label: d.label || 'Unnamed output' })), view.outputId);
+    cableHint.textContent = view.cableOutput ? `Play the music into "${view.cableOutput}" (Windows: Volume mixer, the player's output).` : '';
+    cableHint.hidden = !view.cableOutput || view.source !== 'input';
     sourceInput.checked = view.source === 'input';
     sourceFile.checked = view.source === 'file';
     sourceRow.hidden = !view.debug;
@@ -483,7 +523,12 @@ export function createPanel(root, actions, boundsRoot) {
     setValue(volume, Math.round(view.volume * 100));
     volumeValue.textContent = `${Math.round(view.volume * 100)} %`;
     const look = view.turnLook;
-    cameraForm.hidden = !view.cameraFallback;
+    fillSelect(headFrom, HEAD_OPTIONS, view.headFrom);
+    for (const axis of AXES) locks[axis].checked = view.axisLocks[axis];
+    const emulated = view.headFrom === 'telemetry' || (view.headFrom === 'game' && view.cameraFallback);
+    emulation.hidden = !emulated;
+    if (view.headFrom === 'game') cameraHint.textContent = emulated ? CAMERA_HINTS.fallback : CAMERA_HINTS.game;
+    else cameraHint.textContent = CAMERA_HINTS[view.headFrom];
     turnLookOn.checked = look.on;
     setValue(turnLookPercent, look.percent);
     turnLookPercent.disabled = !look.on;
@@ -503,6 +548,7 @@ export function createPanel(root, actions, boundsRoot) {
     setValue(voiceVolume, Math.round(view.voiceVolume * 100));
     voiceVolumeValue.textContent = `${Math.round(view.voiceVolume * 100)} %`;
     voiceVolume.disabled = view.voice === 'off';
+    voiceTest.disabled = view.voice === 'off';
 
     fillSelect(preset, view.presets, view.preset);
     const { card } = view;
