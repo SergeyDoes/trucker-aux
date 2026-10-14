@@ -1,23 +1,28 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ETS2 › Volvo › Volvo FH5 › hook 1.9 m",
-  "vehicle": "vehicle.volvo.fh_2021@1.9",
+  "name": "ETS2 › Volvo › Volvo FH5",
+  "vehicle": "vehicle.volvo.fh_2021@1.6",
+  "hooks": [
+    "1.6",
+    "1.9"
+  ],
   "vehicleName": "Volvo FH5",
   "game": "ets2",
   "brand": "volvo",
   "brandName": "Volvo",
   "layout": {
+    "label": "sleeper",
     "width": 1,
     "bounds": {
       "min": [
-        -0.83,
+        -1.11,
         -0.92,
-        -0.81
+        -1.05
       ],
       "max": [
-        0.83,
+        1.11,
         0.95,
-        0.6
+        0.98
       ]
     },
     "speakers": [

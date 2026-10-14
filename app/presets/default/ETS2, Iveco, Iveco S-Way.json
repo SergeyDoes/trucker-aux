@@ -1,0 +1,104 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ETS2 › Iveco › Iveco S-Way",
+  "vehicle": "vehicle.iveco.sway@1.5",
+  "vehicleName": "Iveco S-Way",
+  "game": "ets2",
+  "brand": "iveco",
+  "brandName": "Iveco",
+  "layout": {
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.21,
+        -0.92,
+        -1.04
+      ],
+      "max": [
+        1.21,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -1.11,
+          -0.74,
+          -0.8
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          1.11,
+          -0.74,
+          -0.8
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.98,
+          -0.35,
+          -0.88
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.98,
+          -0.35,
+          -0.88
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.77,
+          0.19,
+          -0.77
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R",
+        "position": [
+          0.77,
+          0.19,
+          -0.77
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s3"
+      }
+    ]
+  }
+}
