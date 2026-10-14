@@ -1,8 +1,12 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ETS2 › Scania › Scania S › hook 1.4 m",
-  "vehicle": "vehicle.scania.s_2016@1.4",
-  "vehicleName": "Scania S",
+  "name": "ETS2 › Scania › Scania Streamline",
+  "vehicle": "vehicle.scania.streamline@1.0",
+  "hooks": [
+    "1.0",
+    "1.1"
+  ],
+  "vehicleName": "Scania Streamline",
   "game": "ets2",
   "brand": "scania",
   "brandName": "Scania",
@@ -10,14 +14,14 @@
     "width": 1,
     "bounds": {
       "min": [
-        -1.13,
+        -1.02,
         -0.92,
-        -0.99
+        -0.81
       ],
       "max": [
-        1.13,
-        0.73,
-        0.47
+        1.02,
+        0.95,
+        0.6
       ]
     },
     "speakers": [
@@ -25,9 +29,9 @@
         "id": "s5",
         "name": "Midbass L",
         "position": [
-          -1.03,
-          -0.63,
-          -0.46
+          -0.94,
+          -0.36,
+          0.03
         ],
         "channel": "L",
         "gainDb": 0,
@@ -38,9 +42,9 @@
         "id": "s6",
         "name": "Midbass R",
         "position": [
-          1.03,
-          -0.63,
-          -0.46
+          0.94,
+          -0.36,
+          0.03
         ],
         "channel": "R",
         "gainDb": 0,
@@ -51,9 +55,9 @@
         "id": "s1",
         "name": "Tweeter L",
         "position": [
-          -0.99,
-          -0.32,
-          -0.87
+          -0.98,
+          -0.03,
+          -0.6
         ],
         "channel": "L",
         "gainDb": 0,
@@ -64,9 +68,9 @@
         "id": "s2",
         "name": "Tweeter R",
         "position": [
-          0.99,
-          -0.32,
-          -0.87
+          0.98,
+          -0.03,
+          -0.6
         ],
         "channel": "R",
         "gainDb": 0,

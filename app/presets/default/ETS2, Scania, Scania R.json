@@ -1,7 +1,11 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ETS2 › Scania › Scania R › hook 1.4 m",
+  "name": "ETS2 › Scania › Scania R",
   "vehicle": "vehicle.scania.r_2016@1.4",
+  "hooks": [
+    "1.4",
+    "2.0"
+  ],
   "vehicleName": "Scania R",
   "game": "ets2",
   "brand": "scania",
@@ -10,12 +14,12 @@
     "width": 1,
     "bounds": {
       "min": [
-        -0.83,
+        -0.93,
         -0.92,
         -0.81
       ],
       "max": [
-        0.83,
+        0.93,
         0.95,
         0.6
       ]

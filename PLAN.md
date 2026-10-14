@@ -375,6 +375,11 @@ Done: 203 unit tests pass.
 - Roll: `levelHead` is no longer called on every pose; only Camera › Lock zeroes an axis (`lockAxes`), roll locked at first for Active Camera and Telemetry SDK.
 - `app/presets/default/` is the user's data from `npm start` (`app/data`) exported: 49 files (42 before), the files taken off models left out. `export-store.mjs` tells files of one name apart by the label made safe for a file name (a label "sleeper?" broke the write).
 
+### E2.64 — 0.3.1: the defaults from the presets played in 0.3.0 ✓
+- `app/presets/default/` is the user's 0.3.0 data (the build's `data/`) exported with `scripts/export-store.mjs`: 51 files. 42 as they were; the user's DAF XF (4 speakers on hook 1.5, 8 on 1.6, "superspace"), Scania R, S and Streamline (each for both hooks played), Mercedes-Benz Actros (hooks 1.6 and 2.3) and Iveco Stralis Hi-Way (hook 1.6) in place of the hook files there were; Freightliner Cascadia 2019's two variants trade names (the one the model plays is the plain name). An unused preset (on no key) is not a default.
+- A store that names a default file gone (`file:default/…` of the old name) loses nothing: Auto passes a missing preset by and plays the new file for that hook or model.
+- Version 0.3.1.
+
 ### E2.63 — more of the menu bar ✓
 Done: 214 unit tests pass; checked in a sandbox, the dialogs and the shell answered through the inspector: Install game plugins into a fake ATS (added; the same again: "already"; another build of scs-telemetry.dll: renamed `.backup-<time>`, ours put in; a folder with no game: a warning), Open crash log and Open data folder (the paths), Undo / Redo off at first, on after + Speaker, carried out from the menu, View › Reset panel layout (a folded panel and a wider tree put back).
 - File › Open data folder. Edit › Undo, Redo: the window's own (`registerAccelerator: false`: the keys stay the window's, a text field undoes its text), enabled as the history allows (`menu:history` from `render`).
