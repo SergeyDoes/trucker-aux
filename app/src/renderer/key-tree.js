@@ -78,10 +78,11 @@ export function createKeyTree(root, actions) {
     edge.addEventListener('pointermove', move);
     edge.addEventListener('pointerup', stop);
   });
-  edge.ondblclick = () => {
+  const resetWidth = () => {
     document.documentElement.style.removeProperty('--tree-width');
     localStorage.removeItem(WIDTH_KEY);
   };
+  edge.ondblclick = resetWidth;
 
   // The splitter sets the height of the unused presets (remembered for this session).
   splitter.addEventListener('pointerdown', (event) => {
@@ -388,6 +389,11 @@ export function createKeyTree(root, actions) {
   let renaming = false;
   let lastCurrent = null;
   return {
+    // View › Reset panel layout: the tree's width and the unused presets' height as at first.
+    resetLayout() {
+      resetWidth();
+      unused.style.height = '';
+    },
     // map: presetTree(...) plus currentKey (the preset that plays); history: { undo, redo }
     // counts and auto (whether Auto is chosen).
     update(map, history) {

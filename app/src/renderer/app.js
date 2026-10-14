@@ -151,20 +151,30 @@ function applySilence() {
 }
 
 let saveTimer = null;
+let savePending = false;
+let frozen = false;     // File › Import under way: nothing is saved over what it brings (the window reloads)
 let saveWarning = null; // a save that failed: the next one that works takes only it away
-function scheduleSave() {
+// Saves the presets now, if a save is waiting.
+async function saveNow() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const { collection, ...own } = state.store;
-    const warning = await window.aux.saveLayouts(own);
-    if (warning === saveWarning) return;
-    state.storeWarnings = [...state.storeWarnings.filter((w) => w !== saveWarning), ...(warning ? [warning] : [])];
-    saveWarning = warning;
-    render();
-  }, SAVE_DELAY_MS);
+  saveTimer = null;
+  if (!savePending || frozen) return;
+  savePending = false;
+  const { collection, ...own } = state.store;
+  const warning = await window.aux.saveLayouts(own);
+  if (warning === saveWarning) return;
+  state.storeWarnings = [...state.storeWarnings.filter((w) => w !== saveWarning), ...(warning ? [warning] : [])];
+  saveWarning = warning;
+  render();
+}
+function scheduleSave() {
+  savePending = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, SAVE_DELAY_MS);
 }
 
 async function saveSettings() {
+  if (frozen) return;
   const warning = await window.aux.saveSettings(state.settings);
   if (warning) {
     state.storeWarnings = [warning];
@@ -794,6 +804,19 @@ const actions = {
     state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
     render();
   },
+  // File › Export › All presets: the export window's choice with all of yours ticked (a file for
+  // each key a preset is on, a vehicle's own for its hook), not the shared files, without the
+  // window. Then Save As in main.
+  async exportAllPresets() {
+    const map = presetTree(state.store, state.truck, state.selection);
+    const picks = [...exportItems(map).values()].filter((item) => !item.file);
+    if (!picks.length) return;
+    const set = exportFiles(state.store, picks, state.truck);
+    const result = await window.aux.exportPresets(set.files, 'Trucker AUX presets');
+    if (result.canceled) return;
+    state.storeWarnings = result.warning ? [result.warning] : [`Exported ${result.written} preset(s) to ${result.path}.`];
+    render();
+  },
   // Import: preset files (main asks which) become your presets, a file for a model a variant of
   // it (importPresets). The hooks (or models, brands, games) that play a preset of yours are
   // listed: on the ticked ones the imported one plays, on the others yours keeps playing; both
@@ -963,7 +986,13 @@ import('./overview3d.js')
     document.getElementById('overview').textContent = `3D view unavailable: ${err.message}`;
   });
 
+let menuHistory = null; // what Edit › Undo / Redo were last told
 function render() {
+  const can = `${history.undo.length > 0} ${history.redo.length > 0}`;
+  if (can !== menuHistory) {
+    menuHistory = can;
+    window.aux.menuHistory(history.undo.length > 0, history.redo.length > 0);
+  }
   keyTree.update(
     { ...presetTree(state.store, state.truck, state.selection), currentKey: playing().key },
     { undo: history.undo.length, redo: history.redo.length, auto: state.selection.mode === 'auto' },
@@ -1147,6 +1176,40 @@ window.aux.onPose((pose) => {
   if (now - lastStatus >= STATUS_PERIOD_MS) {
     lastStatus = now;
     panel.setStatus(statusText());
+  }
+});
+
+// The menu bar (main.js appMenu). An import of data saves what is waiting, then saves nothing
+// until the window reloads with what it brought; an export of data saves first too.
+window.aux.onMenu(async (action) => {
+  const [name, kind] = action.split(':');
+  if (name === 'import-data') {
+    await saveNow();
+    frozen = true;
+    const result = await window.aux.importData(kind);
+    if (result.ok) {
+      location.reload();
+      return;
+    }
+    frozen = false;
+    if (result.warning) {
+      state.storeWarnings = [result.warning];
+      render();
+    }
+  } else if (name === 'export-data') {
+    await saveNow();
+    const result = await window.aux.exportData();
+    if (result.canceled) return;
+    state.storeWarnings = [result.warning ?? `Exported all data${result.presets ? ` and ${result.presets} preset file(s)` : ''} to ${result.path}.`];
+    render();
+  } else if (name === 'export-all-presets') actions.exportAllPresets();
+  else if (name === 'export-presets') actions.exportPresets();
+  else if (name === 'import-presets') actions.importPresets();
+  else if (name === 'undo') actions.undo();
+  else if (name === 'redo') actions.redo();
+  else if (name === 'reset-layout') {
+    panel.resetLayout();
+    keyTree.resetLayout();
   }
 });
 

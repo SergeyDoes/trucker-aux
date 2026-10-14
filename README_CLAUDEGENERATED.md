@@ -138,8 +138,10 @@ Player ─► virtual cable                          Game audio ─────�
   - the telemetry's shared memory is only opened for reading, never created;
   - `trucker_aux_camera.dll` only reads the game's memory, and every read is guarded:
     a game update that moves things switches it off instead of crashing the game;
-  - the app does not read or change the game's files;
-  - no sign-ins, no network.
+  - the app does not read or change the game's files, but Help › Install game plugins copies
+    the two plugins into the game folder you pick (looking only for the game's exe there);
+  - no sign-ins, no network, but Help › Check for updates when pressed (one request to
+    GitHub's releases).
 - **Revision check:** the app warns when `scs-telemetry.dll` is a revision it does not
   know (another mod may install its own), as the values it reads could then be wrong.
 
@@ -164,8 +166,10 @@ Player ─► virtual cable                          Game audio ─────�
 
 1. Download the latest release zip and extract it.
 2. Copy `plugin\scs-telemetry.dll` and `plugin\trucker_aux_camera.dll` to
-   `<game>\bin\win_x64\plugins\` (create `plugins` if needed). On start the game asks
-   about "advanced SDK features": accept.
+   `<game>\bin\win_x64\plugins\` (create `plugins` if needed), or run the app and use
+   Help › Install game plugins: pick the game's folder, and a plugin there of another build
+   is renamed `<file>.backup-<time>` first. On start the game asks about "advanced SDK
+   features": accept.
 3. Set up the audio:
    - route your player to the cable's input (in Windows' volume mixer, per app);
    - use one sample rate everywhere: both sides of the cable and the headphones. Any
@@ -252,6 +256,19 @@ Build the plugins in Visual Studio 2022:
   - the presets that come with the app are inside it: a newer version unpacked over the old
     folder replaces them whole and keeps `data/` and `presets/`. A `presets/default/` left by a
     version before 0.3.0 is not read.
+- **Menus:** File › Open data folder; Edit › Undo and Redo (the window's Ctrl+Z and Ctrl+Y,
+  so a text field still undoes its own text); View › Reset panel layout (the panels unfolded,
+  the tree's width as at first); Help › Open crash log (`data/crash.log`, and `data/crashes/`
+  when it holds a dump).
+- **File › Import / Export:**
+  - Export › All data writes `data/` (presets and settings) and your `presets/` files into a
+    new folder laid out like the app's;
+  - Import › Data from older version, From data (only presets) and From data (only settings)
+    bring them from such a folder or another version's. The current files are copied into
+    `data/backup-<time>/` first, the defaults of an older version are never brought, and the
+    window reloads with what came;
+  - Export › All presets saves every preset of yours as files without the export window;
+    Export › Presets opens it, Import › Preset files is the Presets panel's import.
 
 ## Development
 

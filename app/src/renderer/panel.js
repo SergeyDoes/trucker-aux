@@ -432,7 +432,8 @@ export function createPanel(root, actions, boundsRoot) {
     speakerForm,
   );
   boundsRoot.replaceChildren(boundsForm);
-  for (const fieldset of [...root.querySelectorAll(':scope > fieldset'), boundsForm]) foldable(fieldset);
+  const fieldsets = [...root.querySelectorAll(':scope > fieldset'), boundsForm];
+  fieldsets.forEach(foldable);
 
   input.onchange = () => actions.selectInput(input.value);
   output.onchange = () => actions.selectOutput(output.value);
@@ -644,6 +645,15 @@ export function createPanel(root, actions, boundsRoot) {
 
   return {
     update,
+    // View › Reset panel layout: every fieldset unfolded.
+    resetLayout() {
+      try {
+        localStorage.removeItem(FOLDED_KEY);
+      } catch {
+        // nothing kept
+      }
+      for (const fieldset of fieldsets) fieldset.classList.remove('folded');
+    },
     setStatus([name, detail]) {
       statusName.textContent = name;
       statusName.title = name;

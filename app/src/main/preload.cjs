@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('aux', {
   exportPresets: (files, name) => ipcRenderer.invoke('collection:export', files, name),
   // Asks for preset files (Open) and reads them: { entries, warnings } or { canceled }.
   importPresets: () => ipcRenderer.invoke('collection:import'),
+  // File › Import / Export of a data folder (main/data-transfer.js): kind 'all', 'presets' or
+  // 'settings'; { ok } (then reload), { warning } or { canceled }.
+  importData: (kind) => ipcRenderer.invoke('data:import', kind),
+  exportData: () => ipcRenderer.invoke('data:export'),
+  // The menu bar's File items, carried out here (app.js).
+  onMenu: (listener) => ipcRenderer.on('menu', (_event, action) => listener(action)),
+  // Whether there is something to undo and to redo, for Edit's items.
+  menuHistory: (undo, redo) => ipcRenderer.send('menu:history', { undo, redo }),
   // The cab's keys and controller buttons (main/controls.js): the bindings, a combination
   // pressed (ids, or null), the controllers' names, the actions as they fire, warnings.
   setControls: (bindings) => ipcRenderer.invoke('controls:set', bindings),

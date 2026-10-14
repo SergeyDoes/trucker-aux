@@ -12,7 +12,7 @@ export function presetsDirFor(dataDir) {
 
 
 // Paths of the .json files under dir, relative, with "/", sorted.
-function jsonFiles(dir, prefix = '') {
+export function jsonFiles(dir, prefix = '') {
   let entries;
   try {
     entries = fs.readdirSync(path.join(dir, prefix), { withFileTypes: true });

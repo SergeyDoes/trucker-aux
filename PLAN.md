@@ -375,6 +375,24 @@ Done: 203 unit tests pass.
 - Roll: `levelHead` is no longer called on every pose; only Camera › Lock zeroes an axis (`lockAxes`), roll locked at first for Active Camera and Telemetry SDK.
 - `app/presets/default/` is the user's data from `npm start` (`app/data`) exported: 49 files (42 before), the files taken off models left out. `export-store.mjs` tells files of one name apart by the label made safe for a file name (a label "sleeper?" broke the write).
 
+### E2.63 — more of the menu bar ✓
+Done: 214 unit tests pass; checked in a sandbox, the dialogs and the shell answered through the inspector: Install game plugins into a fake ATS (added; the same again: "already"; another build of scs-telemetry.dll: renamed `.backup-<time>`, ours put in; a folder with no game: a warning), Open crash log and Open data folder (the paths), Undo / Redo off at first, on after + Speaker, carried out from the menu, View › Reset panel layout (a folded panel and a wider tree put back).
+- File › Open data folder. Edit › Undo, Redo: the window's own (`registerAccelerator: false`: the keys stay the window's, a text field undoes its text), enabled as the history allows (`menu:history` from `render`).
+- View › Reset panel layout: no fieldset folded, the tree's width and the unused presets' height as at first (`panel.resetLayout`, `keyTree.resetLayout`). The debug tools add reload and DevTools to it, and keep Electron's Window menu.
+- Help › Install game plugins… (`main/game-plugins.js`): the game's folder picked (or one inside it; found by `bin/win_x64/amtrucks.exe` or `eurotrucks2.exe`, nothing else of the game read; Steam's default library offered first when it exists), what each plugin would be (added, already there, replaces another build) said and asked; another build is renamed `<file>.backup-<time>` (not a .dll, so not loaded; renaming works while the game holds it) and put back if the copy fails.
+- Help › Open crash log: `data/crash.log` in its editor, `data/crashes/` when it holds a .dmp, else "No crashes recorded".
+- Found on the build: Chromium's crash handler did not start on the first run of a new unpack (no `data/` yet, so no `data/crashes/` could be made under it): no dumps then. The folder is now made before `crashReporter.start`; on that first run the handler runs.
+
+### E2.62 — File › Import and Export of data ✓
+Done: 211 unit tests pass; checked in a sandbox, the dialogs answered through the inspector: the menu; Export › All data and All presets; Import of the settings only and of all from an older folder (the window reloaded with them: Camera › Mode as imported); this app's own data and an empty folder refused, with no backup made.
+- A File menu: Import › Data from older version…, From data (only presets)…, From data (only settings)…, Preset files…; Export › All data…, All presets…, Presets…; Exit. The debug tools keep Electron's Edit, View and Window.
+- `main/data-transfer.js`: `findData` (an app folder or its data folder), `importData` (a copy of the current files in `data/backup-<local time>/` first; `layouts.json` and/or `settings.json` replaced; your preset files copied, never `default/`, the very same file skipped, another of that name as "name (2)"), `exportData` (`data/` and `presets/` laid out as an app folder, so an import reads it back).
+- The window carries the items out (`onMenu`): before an import it saves what waits, then saves nothing until it reloads with what came; the next load says what was imported from where and where the backup is. All presets: the export window's items of yours, all ticked, without the window.
+
+### E2.61 — Help › Check for updates ✓
+Done: 206 unit tests pass; checked in a sandbox (the menu, and GitHub's answer from the main process: v0.2.4).
+- A menu bar with Help: Check for updates… (`main/updates.js`: GitHub's latest release, `net.fetch`, only when pressed; newer by `shared/version.js isNewer`: a dialog offers its page, to unpack the zip over the folder), Releases page, About Trucker AUX (the version). The debug tools keep Electron's File, Edit, View and Window beside it; the release build had no menu at all before.
+
 ### E2.60 — twins named as the game would ✓
 - ETS2 names the Iveco Stralis and the Stralis Hi-Way both "Iveco Stralis": the twin with no year in its id got the id's tail as it is ("Iveco Stralis hiway"). Now `twinTag`: the year, else the tail as the game would write it (`hiway` → Hi-Way), else with a capital; a name ending with its tag in any case keeps it ("Iveco Stralis" for `vehicle.iveco.stralis`).
 

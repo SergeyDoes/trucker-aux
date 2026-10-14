@@ -7,6 +7,9 @@ import { loadData, saveLayouts, saveSettings, writeJsonAtomic } from './store.js
 import { openCamera, openTelemetry } from './telemetry.js';
 import { createControls } from './controls.js';
 import { createVoice } from './voice.js';
+import { RELEASES_URL, checkForUpdates } from './updates.js';
+import { IMPORT_KINDS, exportData, findData, importData, importable, timeStamp } from './data-transfer.js';
+import { findGame, installPlugins, pluginPlan } from './game-plugins.js';
 import { presetsDirFor, readCollection, watchCollection, writePresetSet } from './collection.js';
 import { parsePresetFile, presetFileName } from '../shared/collection.js';
 import { normalizeControls } from '../shared/controls.js';
@@ -33,7 +36,15 @@ app.setPath('userData', path.join(dataDir, 'profile'));
 // Crashes are kept for a look afterwards, never sent: Chromium's minidumps in data/crashes/, and
 // a line each in data/crash.log for a process gone (the window's renderer, the GPU, …) or an
 // error in this one. The app closing by itself with neither: a crash of this process (its dump).
-app.setPath('crashDumps', path.join(dataDir, 'crashes'));
+// The folder is made first: Chromium's crash handler does not start where its parent is missing
+// (the first run of a new unpack, before data/ exists).
+const crashDumps = path.join(dataDir, 'crashes');
+try {
+  fs.mkdirSync(crashDumps, { recursive: true });
+} catch {
+  // no dumps then; the app runs
+}
+app.setPath('crashDumps', crashDumps);
 crashReporter.start({ uploadToServer: false });
 function crashLog(text) {
   try {
@@ -68,7 +79,73 @@ ipcMain.handle('store:load', () => {
     if (warning) data.warnings.push(warning);
   }
   data.store = foldChassis(data.store);
+  if (importNotice) data.warnings.push(importNotice);
+  importNotice = null;
   return { ...data, collection: shared, debug };
+});
+
+// File › Import › data of another folder (data-transfer.js): asked which folder, then whether to
+// replace (the current files are backed up first). The window reloads after { ok }, and the next
+// load says what came from where.
+let importNotice = null;
+const IMPORT_WHAT = { all: 'presets and settings', presets: 'presets', settings: 'settings' };
+ipcMain.handle('data:import', async (event, kind) => {
+  if (!IMPORT_KINDS.includes(kind)) return { canceled: true };
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const what = IMPORT_WHAT[kind];
+  const { canceled, filePaths } = await dialog.showOpenDialog(win, {
+    title: `Import ${what} from another Trucker AUX folder`,
+    defaultPath: path.dirname(path.dirname(dataDir)),
+    buttonLabel: 'Import',
+    properties: ['openDirectory'],
+  });
+  if (canceled || !filePaths.length) return { canceled: true };
+  const source = findData(filePaths[0]);
+  if (!source) return { warning: `No Trucker AUX data in ${filePaths[0]}: pick the folder of another version, or its data folder.` };
+  if (path.resolve(source.dataDir) === path.resolve(dataDir)) return { warning: 'That is this app\'s own data.' };
+  const files = importable(source, kind);
+  if (!files.length) return { warning: `No ${kind === 'settings' ? 'settings.json' : 'layouts.json'} in ${source.dataDir}.` };
+  const presetFiles = kind !== 'settings' && fs.existsSync(source.presetsDir) ? ', and your preset files from its presets folder' : '';
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'question',
+    title: 'Import data',
+    message: `Replace your ${what} with those in "${path.dirname(source.dataDir)}"?`,
+    detail: `Brought: ${files.join(', ')}${presetFiles}. The current files are kept in a backup folder in data first.`,
+    buttons: ['Import', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return { canceled: true };
+  try {
+    const done = importData(source, kind, dataDir, presetsDir);
+    const copied = done.presets ? ` with ${done.presets} preset file(s)` : '';
+    importNotice = `Imported ${what}${copied} from ${path.dirname(source.dataDir)}. The previous ones are in ${done.backup}.`;
+    return { ok: true };
+  } catch (err) {
+    return { warning: `Import failed: ${err.message}` };
+  }
+});
+
+// File › Export › All data: your data folder's files and preset files into a new folder, laid out
+// as an app folder (an import reads it back).
+let dataExportDir = null;
+ipcMain.handle('data:export', async (event) => {
+  const day = timeStamp(new Date()).slice(0, 10);
+  const { canceled, filePath } = await dialog.showSaveDialog(BrowserWindow.fromWebContents(event.sender), {
+    title: 'Export all data into a folder',
+    defaultPath: path.join(dataExportDir ?? app.getPath('documents'), `Trucker AUX data ${day}`),
+    buttonLabel: 'Export',
+    properties: ['createDirectory', 'showOverwriteConfirmation'],
+  });
+  if (canceled || !filePath) return { canceled: true };
+  dataExportDir = path.dirname(filePath);
+  try {
+    const presets = exportData(dataDir, presetsDir, filePath);
+    shell.openPath(filePath);
+    return { path: filePath, presets };
+  } catch (err) {
+    return { warning: `Export failed: ${err.message}` };
+  }
 });
 ipcMain.handle('store:save-layouts', (_event, store) => saveLayouts(dataDir, store));
 ipcMain.handle('store:save-settings', (_event, settings) => saveSettings(dataDir, settings));
@@ -206,12 +283,156 @@ function createWindow() {
   win.on('closed', stopWatching);
 }
 
+// Help › Install game plugins (game-plugins.js): the app's plugin/ folder (beside data/, from
+// source app/plugin/) into the game folder picked, after a look at what is there and a yes.
+const pluginDir = path.join(path.dirname(dataDir), 'plugin');
+const STEAM_GAMES = 'C:\\Program Files (x86)\\Steam\\steamapps\\common';
+const PLAN_TEXT = { new: 'added', same: 'already there', other: 'replaces another build (kept beside it as .backup-<time>)' };
+let gamesDir = null;
+async function installGamePlugins() {
+  const tell = (type, message, detail = '') => dialog.showMessageBox(mainWindow, { type, title: 'Install game plugins', message, detail });
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'The folder of American Truck Simulator or Euro Truck Simulator 2',
+    defaultPath: gamesDir ?? (fs.existsSync(STEAM_GAMES) ? STEAM_GAMES : undefined),
+    buttonLabel: 'Install here',
+    properties: ['openDirectory'],
+  });
+  if (canceled || !filePaths.length) return;
+  const game = findGame(filePaths[0]);
+  if (!game) {
+    tell('warning', 'No ATS or ETS2 there.', `Pick the game's folder, the one with bin\\win_x64\\amtrucks.exe or eurotrucks2.exe (${filePaths[0]}).`);
+    return;
+  }
+  gamesDir = path.dirname(game.root);
+  const plan = pluginPlan(pluginDir, game.pluginsDir);
+  const missing = plan.filter((p) => p.state === 'missing').map((p) => p.file);
+  if (missing.length) {
+    tell('warning', 'The app has no plugins to install.', `${missing.join(', ')} not in ${pluginDir}: unpack the release again.`);
+    return;
+  }
+  if (plan.every((p) => p.state === 'same')) {
+    tell('info', `${game.name} has these plugins already.`, game.pluginsDir);
+    return;
+  }
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Install game plugins',
+    message: `Install the plugins into ${game.name}?`,
+    detail: `${game.pluginsDir}\n${plan.map((p) => `${p.file}: ${PLAN_TEXT[p.state]}`).join('\n')}`,
+    buttons: ['Install', 'Cancel'],
+    defaultId: 0,
+    cancelId: 1,
+  });
+  if (response !== 0) return;
+  try {
+    installPlugins(pluginDir, game.pluginsDir);
+    tell('info', `Installed into ${game.name}.`, 'The game loads them when it starts (restart it if it runs) and asks about "advanced SDK features": accept.');
+  } catch (err) {
+    tell('error', 'The plugins were not installed.', err.message);
+  }
+}
+
+// Help › Open crash log: data/crash.log in its editor, and data/crashes/ when it holds a dump.
+function openCrashLog() {
+  const log = path.join(dataDir, 'crash.log');
+  const dumps = path.join(dataDir, 'crashes');
+  let hasDump = false;
+  try {
+    hasDump = fs.readdirSync(dumps, { recursive: true }).some((file) => /\.dmp$/i.test(file));
+  } catch {
+    // no dumps folder
+  }
+  if (fs.existsSync(log)) shell.openPath(log);
+  if (hasDump) shell.openPath(dumps);
+  if (!hasDump && !fs.existsSync(log)) {
+    dialog.showMessageBox(mainWindow, { type: 'info', title: 'Crash log', message: 'No crashes recorded.', detail: dataDir });
+  }
+}
+
+// Edit › Undo / Redo follow the window's history (app.js render): there is something to undo or not.
+ipcMain.on('menu:history', (_event, can) => {
+  for (const id of ['undo', 'redo']) {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(id);
+    if (item) item.enabled = Boolean(can?.[id]);
+  }
+});
+
+// The menu bar: File (Import and Export of data and presets, the data folder), Edit (Undo, Redo),
+// View (Reset panel layout), Help (the update check, asked only when pressed, the releases page,
+// the game plugins, the crash log, the version). The debug tools add Electron's reload and
+// DevTools to View, and its Window menu.
+function appMenu() {
+  const help = {
+    label: 'Help',
+    submenu: [
+      { label: 'Check for updates…', click: () => checkForUpdates(mainWindow) },
+      { label: 'Releases page', click: () => shell.openExternal(RELEASES_URL) },
+      { type: 'separator' },
+      { label: 'Install game plugins…', click: () => installGamePlugins() },
+      { label: 'Open crash log', click: openCrashLog },
+      { type: 'separator' },
+      {
+        label: 'About Trucker AUX',
+        click: () => dialog.showMessageBox(mainWindow, {
+          type: 'info', title: 'About Trucker AUX', message: `Trucker AUX ${app.getVersion()}`, detail: RELEASES_URL.replace(/\/releases$/, ''),
+        }),
+      },
+    ],
+  };
+  // Most items are the window's to carry out (app.js onMenu): it saves first, and reloads after
+  // an import.
+  const toWindowMenu = (action) => () => toWindow('menu', action);
+  const fileMenu = {
+    label: 'File',
+    submenu: [
+      {
+        label: 'Import',
+        submenu: [
+          { label: 'Data from older version…', click: toWindowMenu('import-data:all') },
+          { label: 'From data (only presets)…', click: toWindowMenu('import-data:presets') },
+          { label: 'From data (only settings)…', click: toWindowMenu('import-data:settings') },
+          { type: 'separator' },
+          { label: 'Preset files…', click: toWindowMenu('import-presets') },
+        ],
+      },
+      {
+        label: 'Export',
+        submenu: [
+          { label: 'All data…', click: toWindowMenu('export-data') },
+          { label: 'All presets…', click: toWindowMenu('export-all-presets') },
+          { label: 'Presets…', click: toWindowMenu('export-presets') },
+        ],
+      },
+      { label: 'Open data folder', click: () => shell.openPath(dataDir) },
+      { type: 'separator' },
+      { role: 'quit' },
+    ],
+  };
+  // The keys stay the window's (registerAccelerator: false): Ctrl+Z in a text field undoes its text.
+  const editMenu = {
+    label: 'Edit',
+    submenu: [
+      { id: 'undo', label: 'Undo', accelerator: 'CmdOrCtrl+Z', registerAccelerator: false, enabled: false, click: toWindowMenu('undo') },
+      { id: 'redo', label: 'Redo', accelerator: 'CmdOrCtrl+Y', registerAccelerator: false, enabled: false, click: toWindowMenu('redo') },
+    ],
+  };
+  const viewMenu = {
+    label: 'View',
+    submenu: [
+      { label: 'Reset panel layout', click: toWindowMenu('reset-layout') },
+      ...(debug ? [{ type: 'separator' }, { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] : []),
+    ],
+  };
+  const tools = debug ? [{ role: 'windowMenu' }] : [];
+  return Menu.buildFromTemplate([fileMenu, editMenu, viewMenu, ...tools, help]);
+}
+
 app.whenReady().then(() => {
   // The window needs an input device and output selection.
   const allowed = new Set(['media', 'speaker-selection']);
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowed.has(permission)));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowed.has(permission));
-  if (!debug) Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(appMenu());
   createWindow();
 });
 app.on('window-all-closed', () => app.quit());

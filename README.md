@@ -47,8 +47,8 @@ Have fun!
 
 - **No crap:**
   - the shared memory is only opened for reading, never created;
-  - the app does not read or change the game's files;
-  - no sign-ins, no network.
+  - the app does not read or change the game's files (except *Install game plugins* helper option that copies the two plugins into the game folder you pick);
+  - no sign-ins, no network (but *Help › Check for updates*, when you press it).
   - app's data stored within it's folder
 
 <br>
@@ -92,6 +92,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - Download the [latest version](../../releases/latest) and *Extract* the archive
   - Place the **scs-telemetry.dll** and **trucker_aux_camera.dll** at *[Game Folder]/bin/win_x64/plugins/*
     - Create the *plugins* folder if needed
+    - **Starting from v0.3.0 you can use the apps helper function**: *Help › Install game plugins*
    - Run the *Trucker AUX* application
      - Set your *Virtual Output Device* into **Input** field
      - Set your *Headset (or Default) Device* into **Output** field
@@ -135,7 +136,9 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
   - `data/profile/`: Chromium's profile;
   - `presets/`: the shared preset collection, read only: drop preset files (or folders of them) here to use them. Export (in the Presets panel) ticks presets in a tree and saves them, by default here;
   - The presets that come with the app are inside it, the bottom layer under yours and others' files, so unpacking a new version over the old one updates them cleanly (a `presets/default/` left by an older version is not read). To update them for a build: Export the presets into `app/presets/default/` (and remove the old files); `npm run dist` packs it as it is.
-  - **Updating:** close the app and unpack the new version over the old folder: `data/` (your presets and settings) and your `presets/` files stay.
+  - **Updating:** *Help › Check for updates* tells whether a newer version is out and opens its page. Close the app and unpack the new version over the old folder: `data/` (your presets and settings) and your `presets/` files stay. Or unpack it into a new folder and take them along with *File › Import › Data from older version*.
+  - **Menus:** *File › Open data folder*; *Edit › Undo / Redo* (as Ctrl+Z / Ctrl+Y); *View › Reset panel layout* unfolds the panels and puts the tree's width back; *Help › Open crash log* opens `data/crash.log` (and `data/crashes/` when it holds a dump) to send along with a report.
+  - **File › Import / Export:** *Export › All data* copies `data/` and your `presets/` files into a folder laid out as the app's; *Import › Data from older version* (or *From data (only presets)*, *From data (only settings)*) takes them from such a folder or another version's, your current ones kept in `data/backup-<time>/` first. *Export › All presets* saves all your presets as files at once; *Export › Presets* opens the export window; *Import › Preset files* is the import from the Presets panel.
   - When run from source, these folders are in `app/`.
 
 <br>
