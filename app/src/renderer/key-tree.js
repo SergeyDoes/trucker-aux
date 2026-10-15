@@ -35,6 +35,7 @@ export function createKeyTree(root, actions) {
   const share = el('button', { className: 'reg-file', textContent: 'Export…', title: 'Pick presets to save as files to share', onclick: () => actions.exportPresets() });
   const take = el('button', { className: 'reg-file', textContent: 'Import…', title: 'Make preset files your presets, on the keys they are for', onclick: () => actions.importPresets() });
   const tree = el('ul', { className: 'reg-tree', role: 'tree' });
+  const keysBox = el('div', { className: 'reg-keys' }, [tree]);
   // Below the keys: presets on no key, to keep, rename and put on keys again.
   const unusedList = el('div', { className: 'reg-unused-list' });
   const unused = el('section', { className: 'reg-unused' }, [
@@ -49,7 +50,7 @@ export function createKeyTree(root, actions) {
       className: 'hint',
       textContent: 'Click a key to play and edit it; right-click for more. A model lists its presets as rows ◆ under it (click one to play and edit it): "preset" yours, "default" comes with the app, or their labels; "+N" while folded. Another key is bold with such a mark when set there; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to add it to its variants (Ctrl: a copy); Ctrl+C, Ctrl+V and Ctrl+D copy, paste and duplicate the preset picked here.',
     }),
-    el('div', { className: 'reg-keys' }, [tree]),
+    keysBox,
     splitter,
     unused,
   );
@@ -152,6 +153,33 @@ export function createKeyTree(root, actions) {
     if (node.scope === 'all' || node.scope.startsWith('game:') || (node.current && node.children.some((c) => c.current))) expanded.add(node.scope);
     node.children.forEach(seed);
   }
+  // A model is open when first shown (its variants are its rows); folded by hand, it stays so
+  // until it is the vehicle's again.
+  const seenModels = new Set();
+  function openModels(node) {
+    if (node.level === 'model' && !seenModels.has(node.scope)) {
+      seenModels.add(node.scope);
+      expanded.add(node.scope);
+    }
+    node.children.forEach(openModels);
+  }
+  // The row of what is picked or plays, scrolled into view when out of it: a row picked, else
+  // the vehicle's model's row of what plays (one of its variants), else the key that plays (▶),
+  // else the vehicle's key.
+  function showCurrent(current, playingKey) {
+    const rows = [...tree.querySelectorAll('.reg-row')];
+    const row = rows.find((r) => r.classList.contains('selected'))
+      ?? rows.find((r) => r.dataset.scope === current && r.dataset.variant === playingKey)
+      ?? rows.findLast((r) => r.querySelector(':scope > .reg-mark')?.textContent === '▶')
+      ?? rows.find((r) => r.dataset.scope === current && !r.dataset.variant);
+    row?.scrollIntoView({ block: 'nearest' });
+  }
+  // What plays is kept in view (showCurrent) while the panel changes its size after a draw (at
+  // the start the unused presets come in under the keys), until the tree is scrolled or clicked.
+  let follow = null;
+  new ResizeObserver(() => follow && showCurrent(...follow)).observe(keysBox);
+  keysBox.addEventListener('wheel', () => { follow = null; }, { passive: true });
+  keysBox.addEventListener('pointerdown', () => { follow = null; });
   function openTo(node, scope) {
     if (node.scope === scope) return true;
     const inside = node.children.some((c) => openTo(c, scope));
@@ -269,6 +297,7 @@ export function createKeyTree(root, actions) {
       el('span', { className: 'reg-where', textContent: where }),
       el('span', { className: 'reg-mark', textContent: node.plays && v.shown ? '▶' : '' }),
     ]);
+    Object.assign(line.dataset, { scope: node.scope, variant: v.key });
     line.onclick = () => actions.selectVariant(node.scope, v.key);
     line.oncontextmenu = (event) => showVariantMenu(event, node, v);
     dragSource(line, { from: v.file ? null : node.scope, key: v.key, file: v.file });
@@ -315,6 +344,7 @@ export function createKeyTree(root, actions) {
       })] : []),
       el('span', { className: 'reg-mark', textContent: node.plays ? '▶' : node.current ? '●' : '' }),
     ]);
+    line.dataset.scope = node.scope;
     line.onclick = () => (node.pseudo ? flip() : actions.selectScope(node.scope));
     line.ondblclick = flip;
     line.oncontextmenu = (event) => showMenu(event, node);
@@ -404,6 +434,7 @@ export function createKeyTree(root, actions) {
   let lastPicked = null;
   let renaming = false;
   let lastCurrent = null;
+  let lastPlaying = null;
   return {
     // Whether the tree (or its menu) was clicked last: the keyboard's copy and paste are its own.
     isActive: () => active,
@@ -424,19 +455,36 @@ export function createKeyTree(root, actions) {
         seed(map.root);
         seeded = true;
       }
-      const picked = (function find(n) { return n.picked ? n.scope : n.children.map(find).find(Boolean); })(map.root) ?? null;
-      if (picked && picked !== lastPicked) openTo(map.root, picked);
-      lastPicked = picked;
-      // The vehicle in the game: its key is opened to whenever another one comes.
+      openModels(map.root);
+      // A key picked, or a variant picked on its rows.
+      const picked = (function find(n) {
+        return n.picked || n.own?.picked || n.alternates.some((v) => v.picked) ? n.scope : n.children.map(find).find(Boolean);
+      })(map.root) ?? null;
+      // The vehicle in the game: its key is opened, with the keys above it, whenever another
+      // vehicle comes, a key or variant is picked, or another preset plays (Auto, the cab's
+      // buttons); then the row of what plays is scrolled into view.
       const current = (function deepest(n) { return n.current ? n.children.map(deepest).find(Boolean) ?? n.scope : null; })(map.root);
-      if (current && current !== lastCurrent) openTo(map.root, current);
+      const moved = current !== lastCurrent || picked !== lastPicked || map.currentKey !== lastPlaying;
+      if (moved) {
+        for (const scope of [picked, current].filter(Boolean)) {
+          openTo(map.root, scope);
+          expanded.add(scope);
+        }
+      }
+      lastPicked = picked;
       lastCurrent = current;
+      lastPlaying = map.currentKey;
       auto.classList.toggle('on', history.auto);
       auto.title = history.auto ? 'Following the vehicle in the game' : 'Back to Auto: follow the vehicle in the game again';
       undo.disabled = !history.undo;
       redo.disabled = !history.redo;
       last = { map };
       draw();
+      // At the next frame: at the start the panel is not laid out yet.
+      if (moved) {
+        follow = [current, map.currentKey];
+        requestAnimationFrame(() => follow && showCurrent(...follow));
+      }
     },
   };
 }

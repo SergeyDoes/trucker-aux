@@ -128,6 +128,7 @@ Player ─► Virtual Audio Input.                   Game Audio ─────�
 - **Shortcuts,** outside text fields:
   - Arrows for moving selected speakers, Shift+arrows by 10 cm, no Y movement yet;
   - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate;
+  - After a click in the presets tree, Ctrl+C, Ctrl+V and Ctrl+D copy, paste and duplicate presets there;
   - Undo/Redo supported;
   - F2 to rename an unused preset.
 - **Data** is kept within the app folder, `%APPDATA%` is not being bloated:

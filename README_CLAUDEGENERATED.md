@@ -83,7 +83,12 @@ Player ─► virtual cable                          Game audio ─────�
     of what it would inherit;
   - models of a brand the game names alike (Freightliner Cascadia 2019 and 2024) get the
     year from their id;
-  - presets on no key wait under "Unused presets".
+  - presets on no key wait under "Unused presets";
+  - models are open at first (folded by hand they stay so); the vehicle in the game opens the
+    keys down to its own and the row of what plays is scrolled into view, again whenever the
+    vehicle, the pick or what plays changes;
+  - a key or a preset picked to edit holds until Auto is pressed or you get out of the vehicle:
+    the next one plays in Auto.
 - **Picking a variant:** the card's "Variant" picks one for the vehicle in the game (its hook,
   or your vehicle's plate, remembers it). The tree shows a model's variant that plays and "+N";
   unfolded, the variants are rows of their own, a model's even when it has one (◆, with their badge and where they play, ▶ on

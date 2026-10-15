@@ -375,6 +375,12 @@ Done: 203 unit tests pass.
 - Roll: `levelHead` is no longer called on every pose; only Camera › Lock zeroes an axis (`lockAxes`), roll locked at first for Active Camera and Telemetry SDK.
 - `app/presets/default/` is the user's data from `npm start` (`app/data`) exported: 49 files (42 before), the files taken off models left out. `export-store.mjs` tells files of one name apart by the label made safe for a file name (a label "sleeper?" broke the write).
 
+### E2.67 — the tree follows the vehicle; getting out goes back to Auto ✓
+Done: 218 unit tests pass; checked in a sandbox with a fake truck swapped through the main process's pose (from the start in a New Actros: its row of what plays in view; All vehicles picked, then a VNL 2018: Auto again, the tree on the VNL 2018 and its variant playing; picked again, then out of any vehicle: Auto).
+- Getting out of a vehicle (another one, or the game gone) goes back to Auto whatever was picked; the variant tried with the cab's buttons is still remembered for the cab (app.js onPose).
+- Models are open when first shown (`seenModels`); folded by hand they stay folded until the vehicle's model again.
+- When the vehicle, the pick or what plays changes, the keys open down to the vehicle's model (and the pick) and the row of what plays is scrolled into view when out of it (`showCurrent`: the picked row, else the model's variant row of what plays, else ▶, else ●), at the next frame, and again while the panel changes its size (a ResizeObserver: at the start the unused presets come in under the keys) until the tree is scrolled or clicked.
+
 ### E2.66 — a model lists its only variant; the defaults from the 0.3.2 data, their names kept ✓
 Done: 218 unit tests pass; checked in a sandbox (unfolded, every model with a preset shows it as a row: "default", "day cab"…; all vehicles shows none); the 64 defaults read without warnings.
 - The tree: a model's variants are rows under it even when it has one, so a model always lists what it has (`key-tree.js variantsOf`); another key's only beside others. Unassign stays while the key has no other variant.

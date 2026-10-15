@@ -1141,11 +1141,11 @@ window.aux.onPose((pose) => {
     const left = state.truck;
     state.truck = truck;
     if (otherTruck) resetSession();
-    // Getting out of a cab (another vehicle, or the game gone) after trying variants with the
-    // cab's buttons: the one tried stays the cab's, remembered as a pick on the card is (by the
-    // hook, or your vehicle's plate); the next vehicle plays in Auto.
-    if (otherTruck && state.selection.cycled) {
-      if (left) {
+    // Getting out of a cab (another vehicle, or the game gone): the next vehicle plays in Auto,
+    // whatever was picked. After trying variants with the cab's buttons, the one tried stays the
+    // cab's, remembered as a pick on the card is (by the hook, or your vehicle's plate).
+    if (otherTruck && (left || state.selection.cycled)) {
+      if (left && state.selection.cycled) {
         remember();
         state.store = chooseVariant(state.store, left, state.selection.key);
         scheduleSave();
