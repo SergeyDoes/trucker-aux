@@ -2,6 +2,11 @@
   "truckerAuxPreset": 1,
   "name": "ETS2 › Mercedes-Benz › Mercedes-Benz New Actros › hook 1.5 m",
   "vehicle": "vehicle.mercedes.actros2014@1.5",
+  "hooks": [
+    "1.5",
+    "2.4",
+    "2.7"
+  ],
   "vehicleName": "Mercedes-Benz New Actros",
   "game": "ets2",
   "brand": "mercedes",

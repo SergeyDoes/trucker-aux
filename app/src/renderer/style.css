@@ -135,6 +135,7 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .reg-menu .reg-sub::after { content: '▸'; float: right; margin-left: 16px; color: var(--dim); }
 .reg-sub-wrap:hover > .reg-sub { background: #2f6fde33; }
 .reg-menu button:disabled { color: inherit; opacity: 0.75; }
+.reg-menu .reg-shortcut { float: right; margin-left: 24px; color: var(--dim); }
 .reg-tree, .reg-tree ul { list-style: none; margin: 0; padding: 0; }
 .reg-tree ul { padding-left: 14px; }
 .reg-row { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 6px; white-space: nowrap; cursor: default; min-width: 0; }
@@ -157,6 +158,7 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 /* A key's variant as a row of its own: its badge, then where it plays. */
 .reg-variant-icon { width: 16px; justify-content: center; font-size: 9px; color: var(--dim); }
 .reg-where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; color: var(--dim); }
+.reg-variant .reg-where { flex-shrink: 100000; } /* where a variant plays gives way before its badge */
 /* A label over 16 characters runs like a ticker in a badge about 11 letters wide (badge.js); it
    stops under the pointer, and stands cut with reduced motion. */
 .reg-badge.marquee { display: inline-block; vertical-align: middle; width: 8ch; flex: 0 1000 auto; min-width: 5ch; text-overflow: clip; white-space: nowrap; } /* in a narrow tree it gives way before the key's name */

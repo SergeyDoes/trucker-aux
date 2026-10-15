@@ -72,11 +72,13 @@ Player ─► virtual cable                          Game audio ─────�
   can also have a preset of its own, "this vehicle only".
 - **The key tree:**
   - keys are grouped by game, brand and model;
-  - each key shows whether it has its own preset, a shared file or a default, or what
-    it inherits;
+  - a model lists its presets as rows under it, each marked "preset" (yours), "default" or
+    "shared file", or by its label; another key shows such a mark when set there, else it
+    inherits;
   - click a key to play and edit it; editing a key that inherits gives it a copy of its
     own;
-  - drag presets from key to key; right-click for more;
+  - drag a preset onto a key to add it to that key's variants (moved from its key; Ctrl: a
+    copy); what plays there stays. Right-click for more;
   - a model driven for the first time gets its first variant at once, labelled "new": a copy
     of what it would inherit;
   - models of a brand the game names alike (Freightliner Cascadia 2019 and 2024) get the
@@ -84,11 +86,12 @@ Player ─► virtual cable                          Game audio ─────�
   - presets on no key wait under "Unused presets".
 - **Picking a variant:** the card's "Variant" picks one for the vehicle in the game (its hook,
   or your vehicle's plate, remembers it). The tree shows a model's variant that plays and "+N";
-  unfolded, the variants are rows of their own (◆, with their badge and where they play, ▶ on
+  unfolded, the variants are rows of their own, a model's even when it has one (◆, with their badge and where they play, ▶ on
   the one Auto plays). A click on a row plays it to edit (a default: your copy in its place at
-  the first edit); its menu plays it in the vehicle (or makes it the model's current one), makes
-  a new variant from it, takes it off (a shared file is hidden from the model) or exports it;
-  rows drag like keys. Two cabs on one hook (the Kenworth W900's sleeper and studio on 3.6 m)
+  the first edit); its menu plays it in the vehicle (or makes it the key's current one),
+  duplicates, copies or pastes, deletes it (a shared file is hidden from the model; a preset of
+  yours goes when no other key uses it) or exports it. Copies join the key's variants, named by
+  the key, with the label they had; what plays there stays. Rows drag like keys. Two cabs on one hook (the Kenworth W900's sleeper and studio on 3.6 m)
   are two variants.
 - **Controls:** a key, a controller button (a wheel's, a pad's) or a combination of up to three
   steps to the model's next or previous variant, to try it, and another goes back to what fitted
@@ -244,6 +247,8 @@ Build the plugins in Visual Studio 2022:
   - arrows nudge the selected speakers, Shift+arrows by 10 cm;
   - Delete removes them, Esc clears the selection;
   - Ctrl+A, Ctrl+C, Ctrl+V and Ctrl+D select all, copy, paste and duplicate;
+  - after a click in the tree, Ctrl+C, Ctrl+V and Ctrl+D copy the preset picked there, paste a
+    copy onto the key picked, and duplicate it;
   - Ctrl+Z undoes; Ctrl+Y or Ctrl+Shift+Z redoes;
   - F2 renames an unused preset.
 - **Data** is kept next to the app, not in `%APPDATA%`. From source these folders are
@@ -282,8 +287,10 @@ npm run dist         # Windows build: out/Trucker AUX-<version>-win-x64.zip
 - `npm run dist` needs both built plugins in `app/plugin/`, which are git-ignored.
 - A build hides the debug tools: the test-file source and DevTools. Start it with
   `--dev-tools` to have them.
-- Updating the defaults: Export into `app/presets/default/`, remove the old files there,
-  then build.
+- Updating the defaults: `node scripts/export-store.mjs <data folder> <out folder>` exports the
+  tree of the presets played there; put its files in place of `app/presets/default/`, then
+  build. A default keeps its file name (as it is, or as your copy of it), and other presets get
+  names no default had, so a hook remembering a default finds the same cab after an update.
 - `tools/fake_shm.py` fakes the telemetry for work without the game: a game, a truck, a
   fifth-wheel position, a plate, a blinker and, with `--camera cab|outside|free`, the
   camera plugin's block. Run it only while the game is closed.

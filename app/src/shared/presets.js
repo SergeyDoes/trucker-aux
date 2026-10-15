@@ -574,17 +574,55 @@ export function foldChassis(store) {
   return next;
 }
 
-// A new variant on a key: a copy of `from` (what plays now, the menu's "copy current"), else of
-// what the key plays (or inherits), named by the key and labelled "new"; it plays, the one that
-// played waits. On the model of the vehicle in the game it plays there (chooseVariant).
+// A copy of a layout as a variant of a key: named by the key; standing for no file (copyOf, the
+// mark of a file's copy in its place, stays behind).
+function variantCopy(store, scope, layout, truck) {
+  const { copyOf: _, ...rest } = structuredClone(layout);
+  return { ...rest, name: keyPath(store, scope, truck) };
+}
+
+// A new variant on a key: a copy of `from` (what plays now, the menu's "Add current as
+// variant"), else of what the key plays (or inherits), labelled "new". It joins the key's
+// variants (addVariant): what plays there stays.
 export function newAlternate(store, scope, truck = null, from = null) {
   const layout = presetLayout(store, from ?? scopePreset(store, scope, truck).key);
   const key = freePresetKey(store.presets);
-  const preset = { ...structuredClone(layout), name: keyPath(store, scope, truck), label: NEW_LABEL, labelColor: 'green' };
-  const held = store.assignments[scope];
-  const waiting = held && !isCollectionKey(held) ? [held, ...waitingOn(store, scope)] : waitingOn(store, scope);
-  const next = withWaiting({ ...store, presets: { ...store.presets, [key]: preset }, assignments: { ...store.assignments, [scope]: key } }, scope, waiting);
-  return truck?.key === scope ? chooseVariant(next, truck, key) : next;
+  const preset = { ...variantCopy(store, scope, layout, truck), label: NEW_LABEL, labelColor: 'green' };
+  return addVariant({ ...store, presets: { ...store.presets, [key]: preset } }, scope, key);
+}
+
+// The tree's Duplicate, Paste and drags (app.js). One of your presets added to a key's variants:
+// it waits there, or plays when the key has no variant at all (a list of one). What plays on a
+// key with variants stays.
+export function addVariant(store, scope, key) {
+  if (!store.presets[key]) return store;
+  if (!store.assignments[scope] && !alternatesOf(store, scope).length) return { ...store, assignments: { ...store.assignments, [scope]: key } };
+  return addAlternate(store, scope, key);
+}
+
+// A copy of a preset or a file (`from`) among a key's variants (addVariant), with the label it
+// had. { store, key }; key null when `from` is gone.
+export function copyVariant(store, scope, from, truck = null) {
+  const layout = presetLayout(store, from);
+  if (!layout) return { store, key: null };
+  const key = freePresetKey(store.presets);
+  return { store: addVariant({ ...store, presets: { ...store.presets, [key]: variantCopy(store, scope, layout, truck) } }, scope, key), key };
+}
+
+// A variant of yours dragged from one key onto another: off the first (dropAlternate: its hooks
+// and vehicles forget it there), into the second's variants (addVariant).
+export function moveVariant(store, from, to, key) {
+  if (!store.presets[key] || from === to) return store;
+  return addVariant(dropAlternate(store, from, key), to, key);
+}
+
+// A variant deleted from a key: taken off it (dropAlternate; a file of a model is only hidden
+// from it), and a preset of yours no other key uses then goes too. All vehicles' stays.
+export function deleteVariant(store, scope, key) {
+  const next = dropAlternate(store, scope, key);
+  if (!next.presets[key] || key === allPresetKey(next)) return next;
+  const used = Object.values(next.assignments).includes(key) || Object.values(next.alternates ?? {}).some((keys) => keys.includes(key));
+  return used ? next : deletePreset(next, key);
 }
 
 // A variant as the card and the tree's menu name it: its label, else its name; a file says so,

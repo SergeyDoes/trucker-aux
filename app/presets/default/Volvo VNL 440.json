@@ -1,7 +1,7 @@
 {
   "truckerAuxPreset": 1,
   "name": "Volvo VNL 440",
-  "vehicle": "vehicle.volvo.vnl2025",
+  "vehicle": "vehicle.volvo.vnl2025@2.5",
   "vehicleName": "Volvo VNL",
   "game": "ats",
   "brand": "volvo",

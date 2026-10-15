@@ -1,7 +1,7 @@
 {
   "truckerAuxPreset": 1,
   "name": "ATS › Volvo › Volvo VNL 2018",
-  "vehicle": "vehicle.volvo.vnl2018@2.8",
+  "vehicle": "vehicle.volvo.vnl2018",
   "vehicleName": "Volvo VNL 2018",
   "game": "ats",
   "brand": "volvo",

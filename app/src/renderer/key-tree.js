@@ -1,10 +1,10 @@
 // The preset map (presets.js presetTree) as a standing panel on the left, like the registry
 // editor's key tree. A key with a preset of its own is bold with a "preset" mark (it
 // overrides what it would inherit, as a prefab override in Unity); a shared file's says
-// "shared file"; the others inherit. A model shows the variant that plays in the vehicle in the
-// game (else its current one) and "+N" for the others. Click a key to play and edit what it
-// has; right-click for its menu; drag a key's preset onto another key to move it (Ctrl: set it
-// there as well).
+// "shared file"; the others inherit. A model lists its variants as rows, each with its mark (the
+// model's row has none), and "+N" while folded. Click a key to play and edit what it
+// has; right-click for its menu; drag a preset onto a key to add it to that key's variants (moved
+// from its key; Ctrl: a copy). Ctrl+C / V / D copy, paste and duplicate the preset picked here.
 import { labelBadge } from './badge.js';
 import { variantLabel } from '../shared/presets.js';
 
@@ -39,7 +39,7 @@ export function createKeyTree(root, actions) {
   const unusedList = el('div', { className: 'reg-unused-list' });
   const unused = el('section', { className: 'reg-unused' }, [
     el('h3', { textContent: 'Unused presets' }),
-    el('p', { className: 'hint', textContent: 'Drag a key\'s preset here to take it off the key (Ctrl: a copy). Double-click or F2 to rename; drag onto a key to use it.' }),
+    el('p', { className: 'hint', textContent: 'Drag a key\'s preset here to take it off the key (Ctrl: a copy). Double-click or F2 to rename; drag onto a key to add it to its variants.' }),
     unusedList,
   ]);
   const splitter = el('div', { className: 'reg-split', title: 'Drag to resize' });
@@ -47,7 +47,7 @@ export function createKeyTree(root, actions) {
     el('header', {}, [el('h2', { textContent: 'Presets' }), auto, take, share, undo, redo]),
     el('p', {
       className: 'hint',
-      textContent: 'Click a key to play and edit it; right-click for more. Bold "preset": set on that key; "default": comes with the app; the rest inherit; "+N": more variants, unfold the key to see them as rows ◆ (click one to play and edit it). ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to move it (Ctrl: also there).',
+      textContent: 'Click a key to play and edit it; right-click for more. A model lists its presets as rows ◆ under it (click one to play and edit it): "preset" yours, "default" comes with the app, or their labels; "+N" while folded. Another key is bold with such a mark when set there; the rest inherit. ● the vehicle in the game, ▶ what plays in Auto. Drag a preset onto a key to add it to its variants (Ctrl: a copy); Ctrl+C, Ctrl+V and Ctrl+D copy, paste and duplicate the preset picked here.',
     }),
     el('div', { className: 'reg-keys' }, [tree]),
     splitter,
@@ -118,6 +118,10 @@ export function createKeyTree(root, actions) {
   const menu = el('div', { className: 'reg-menu', hidden: true });
   document.body.append(menu);
   const closeMenu = () => { menu.hidden = true; };
+  // Ctrl+C, V and D are for the preset picked here while the tree (or its menu) was clicked last
+  // (app.js SHORTCUTS); elsewhere they are the speakers'.
+  let active = false;
+  document.addEventListener('pointerdown', (event) => { active = root.contains(event.target) || menu.contains(event.target); }, true);
   document.addEventListener('mousedown', (event) => { if (!menu.contains(event.target)) closeMenu(); });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeMenu(); });
   window.addEventListener('blur', closeMenu);
@@ -157,7 +161,9 @@ export function createKeyTree(root, actions) {
 
   // A key's variants as rows of their own under it (a model's cabs, two or more): the one the
   // key shows first, then the others.
-  const variantsOf = (node) => (node.pseudo || !node.own || !node.alternates.length ? [] : [{ ...node.own, shown: true }, ...node.alternates]);
+  // A key's variants as rows under it, the one shown on the key first: a model's even when it is
+  // the only one, so a model always lists what it has; another key's only beside others.
+  const variantsOf = (node) => (node.pseudo || !node.own || (!node.alternates.length && node.level !== 'model') ? [] : [{ ...node.own, shown: true }, ...node.alternates]);
 
   const menuAt = (event, title, items) => {
     menu.replaceChildren(el('div', { className: 'reg-menu-title', textContent: title }), ...items);
@@ -167,15 +173,22 @@ export function createKeyTree(root, actions) {
     menu.style.left = `${Math.min(event.clientX, innerWidth - box.width - 4)}px`;
     menu.style.top = `${Math.min(event.clientY, innerHeight - box.height - 4)}px`;
   };
-  const menuItem = (label, run, disabled = false, title = '') => el('button', {
-    textContent: label,
+  // keys: the shortcut shown beside the item.
+  const menuItem = (label, run, disabled = false, title = '', keys = '') => el('button', {
     disabled,
     title,
     onclick: () => {
       closeMenu();
       run();
     },
-  });
+  }, [label, ...(keys ? [el('span', { className: 'reg-shortcut', textContent: keys })] : [])]);
+  // A preset's Duplicate, Copy and Paste (for a key: onto it) and Delete; copies join the key's
+  // variants, what plays there stays.
+  const presetItems = (scope, key, deletable) => [
+    ...(key ? [menuItem('Duplicate', () => actions.copyToKey(scope, key), false, '', 'Ctrl+D'), menuItem('Copy', () => actions.copyPreset(key), false, '', 'Ctrl+C')] : []),
+    menuItem('Paste', () => actions.pastePreset(scope), !actions.canPaste(), '', 'Ctrl+V'),
+    ...(key && deletable ? [menuItem('Delete', () => actions.deleteVariant(scope, key))] : []),
+  ];
 
   function showMenu(event, node) {
     event.preventDefault();
@@ -184,12 +197,13 @@ export function createKeyTree(root, actions) {
     if (!node.pseudo) {
       if (!(node.own && node.own.key === last.map.currentKey)) items.push(menuItem('Set the current preset here', () => actions.assignCurrent(node.scope)));
       items.push(menuItem('Copy the current preset here', () => actions.copyCurrent(node.scope)));
-      // A new variant is a copy of what plays now; the variants' own rows play or take one off.
-      items.push(menuItem('New variant (copy current)', () => actions.newVariant(node.scope)));
+      // A copy of what plays now, labelled "new", among the key's variants.
+      items.push(menuItem('Add current as variant', () => actions.newVariant(node.scope)));
+      items.push(el('hr'));
       // A shared file is taken off a model only: it stays in its folder, hidden from the variants.
-      if (!variants.length && node.own && node.scope !== 'all' && (!node.own.file || node.level === 'model')) {
-        items.push(menuItem('Unassign', () => actions.dropVariant(node.scope, node.own.key)));
-      }
+      const removable = node.own && node.scope !== 'all' && (!node.own.file || node.level === 'model');
+      items.push(...presetItems(node.scope, node.own?.key, removable));
+      if (!node.alternates.length && removable) items.push(menuItem('Unassign', () => actions.dropVariant(node.scope, node.own.key)));
       items.push(menuItem('Export…', () => actions.exportPresets(node.scope)));
       if (node.children.length || variants.length) items.push(el('hr'));
     }
@@ -204,27 +218,29 @@ export function createKeyTree(root, actions) {
   }
 
   // A variant's menu: play it (on the model in the game: in that vehicle, remembered by its hook
-  // or plate; on another model: its current one), a copy as a new variant, take it off, export it.
+  // or plate; elsewhere: the key's current), Duplicate, Copy, Paste, Delete, Export.
   function showVariantMenu(event, node, v) {
     event.preventDefault();
     const inGame = node.current && node.level === 'model';
-    let play = 'Make it play here';
-    if (node.level === 'model') play = inGame ? 'Play it in this vehicle' : 'Make it the model\'s current';
     const playing = inGame ? node.plays && v.shown : v.active;
     menuAt(event, variantLabel(v), [
-      menuItem(play, () => actions.playVariant(node.scope, v.key), playing),
-      menuItem('New variant (copy of it)', () => actions.newVariant(node.scope, v.key)),
-      ...(node.scope !== 'all' && (!v.file || node.level === 'model') ? [menuItem('Take this variant off', () => actions.dropVariant(node.scope, v.key))] : []),
+      menuItem(inGame ? 'Play in this vehicle' : 'Make current', () => actions.playVariant(node.scope, v.key), playing),
+      el('hr'),
+      ...presetItems(node.scope, v.key, node.scope !== 'all' && (!v.file || node.level === 'model')),
       menuItem('Export…', () => actions.exportPresets({ key: v.key })),
     ]);
   }
 
-  // A row things are dropped on: the key's (a variant's row stands for its key).
+  // A row things are dropped on: the key's (a variant's row stands for its key). A drop adds to
+  // the key's variants: a copy with Ctrl, from all vehicles or of a file (app.js dropInMap).
   function dropTarget(line, node) {
     line.addEventListener('dragover', (event) => {
-      if (!dragging || dragging.from === node.scope || node.own?.key === dragging.key) return;
+      if (!dragging) return;
+      const copy = event.ctrlKey || dragging.file || dragging.from === 'all';
+      const there = dragging.from === node.scope || node.own?.key === dragging.key || (node.alternates ?? []).some((v) => v.key === dragging.key);
+      if (there && !copy) return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = event.ctrlKey || !dragging.from ? 'copy' : 'move';
+      event.dataTransfer.dropEffect = copy ? 'copy' : 'move';
       line.classList.add('drop');
     });
     line.addEventListener('dragleave', () => line.classList.remove('drop'));
@@ -278,8 +294,8 @@ export function createKeyTree(root, actions) {
     if (node.own) kind = node.own.default ? 'default' : node.own.file ? 'file' : 'own';
     // No preset names in the tree: a key's own preset shows its label, else "preset" (a shared
     // file: its label, else "shared file"; a default, one from presets/default/: "default");
-    // a key that inherits shows nothing.
-    const badge = node.own ? node.own.label || KIND_BADGE[kind] : '';
+    // a key that inherits shows nothing. A model shows them on its variants' rows only.
+    const badge = node.own && node.level !== 'model' ? node.own.label || KIND_BADGE[kind] : '';
     const where = node.own ? whereList(node.own) : '';
     const line = el('div', {
       className: `reg-row ${kind}${node.current ? ' current' : ''}${node.picked ? ' selected' : ''}${node.pseudo ? ' pseudo' : ''}`,
@@ -389,6 +405,13 @@ export function createKeyTree(root, actions) {
   let renaming = false;
   let lastCurrent = null;
   return {
+    // Whether the tree (or its menu) was clicked last: the keyboard's copy and paste are its own.
+    isActive: () => active,
+    // A key opened, and the keys above it, to show variants just added (drawn at the next update).
+    reveal(scope) {
+      if (last) openTo(last.map.root, scope);
+      expanded.add(scope);
+    },
     // View › Reset panel layout: the tree's width and the unused presets' height as at first.
     resetLayout() {
       resetWidth();

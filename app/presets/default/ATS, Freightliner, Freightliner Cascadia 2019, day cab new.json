@@ -1,0 +1,80 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Freightliner › Freightliner Cascadia 2019",
+  "vehicle": "vehicle.freightliner.cascadia2019@1.5",
+  "vehicleName": "Freightliner Cascadia 2019",
+  "game": "ats",
+  "brand": "freightliner",
+  "brandName": "Freightliner",
+  "layout": {
+    "label": "day cab new",
+    "labelColor": "green",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.95,
+        -0.92,
+        -1.16
+      ],
+      "max": [
+        0.95,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -0.82,
+          -0.55,
+          -0.58
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          0.82,
+          -0.55,
+          -0.58
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s7",
+        "name": "Tweeter L",
+        "position": [
+          -0.81,
+          -0.18,
+          -1.07
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s8"
+      },
+      {
+        "id": "s8",
+        "name": "Tweeter R",
+        "position": [
+          0.81,
+          -0.18,
+          -1.07
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s7"
+      }
+    ]
+  }
+}

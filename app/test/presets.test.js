@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addAlternate, adoptVehicle, adoptPicked, cycleVariant, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
+  addAlternate, addVariant, copyVariant, deleteVariant, moveVariant, adoptVehicle, adoptPicked, cycleVariant, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
   foldChassis, levelOf, parseSelection, personalOf, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
@@ -683,9 +683,9 @@ test('adoptVehicle: a new model gets its first variant; a new hook remembers wha
   assert.deepEqual(Object.keys(second.presets), Object.keys(adopted.presets));
   assert.equal(second.assignments[variantKey(SHORT)], 'p.3');
   assert.equal(adoptVehicle(second, SHORT), second); // remembered now
-  // A variant made later on another hook does not move it.
+  // A variant made later joins the model's list: neither hook moves.
   const two = newAlternate(second, TRUCK.key, SLEEPER);
-  assert.equal(two.assignments[variantKey(SLEEPER)], 'p.4');
+  assert.deepEqual([two.assignments[variantKey(SLEEPER)], two.alternates[TRUCK.key]], ['p.3', ['p.4']]);
   assert.equal(autoPreset(two, SHORT).key, 'p.3');
   // A file for the model: a new hook remembers it; a file for that very hook plays without a memory.
   const fromFile = adoptVehicle(withCollection(storeWith(), MODEL_FILE), SHORT);
@@ -859,24 +859,80 @@ test('variants: taking one off the model; the next one plays, its hooks forget i
   assert.equal(dropAlternate(off, MODEL, 'p.3').assignments[MODEL], undefined); // the last one: the model is free
 });
 
-test('variants: a new one is a copy of the model\'s, named by it, labelled new; it plays in the vehicle', () => {
+test('variants: a new one is a copy of the model\'s, named by it, labelled new; it joins the list, what plays stays', () => {
   const store = assign(storeWith({ [MODEL]: { name: 'Studio', label: 'studio', width: 0.7 } }), CHASSIS, 'p.2');
   const next = newAlternate(store, MODEL, SLEEPER);
-  const key = next.assignments[MODEL];
-  assert.notEqual(key, 'p.2');
+  const key = next.alternates[MODEL][0];
+  assert.equal(key, 'p.3');
   assert.equal(next.presets[key].name, 'ATS › International › International 9900i');
   assert.deepEqual([next.presets[key].label, next.presets[key].labelColor, next.presets[key].width], ['new', 'green', 0.7]);
-  assert.deepEqual(next.alternates, { [MODEL]: ['p.2'] });
-  assert.equal(next.assignments[CHASSIS], key); // the vehicle in the game plays it
-  assert.equal(newAlternate(store, MODEL, SHORT).assignments[CHASSIS], 'p.2'); // another hook keeps its own
-  // A model with nothing of its own: a copy of what it inherits, and nothing waits.
+  assert.deepEqual([next.assignments[MODEL], next.assignments[CHASSIS]], ['p.2', 'p.2']); // the model and the vehicle play what they did
+  // A model with nothing of its own: a copy of what it inherits, and as its only variant it plays.
   const fresh = newAlternate(storeWith(), MODEL, SLEEPER);
   assert.equal(at(fresh, MODEL).label, 'new');
   assert.equal(fresh.alternates, undefined);
-  // A copy of another preset (the menu's "copy current": what plays now).
+  // A copy of another preset (the menu's "Add current as variant": what plays now).
   const fromAll = newAlternate(store, MODEL, SLEEPER, 'p.1');
-  assert.deepEqual([at(fromAll, MODEL).width, at(fromAll, MODEL).speakers.length], [1, 2]);
-  assert.deepEqual(fromAll.alternates, { [MODEL]: ['p.2'] });
+  assert.deepEqual([fromAll.presets['p.3'].width, fromAll.presets['p.3'].speakers.length], [1, 2]);
+  assert.deepEqual([fromAll.assignments[MODEL], fromAll.alternates], ['p.2', { [MODEL]: ['p.3'] }]);
+});
+
+// p.2 plays on the model, p.3 waits there, p.4 is on no key.
+const cabsAndLoose = () => addAlternate(storeWith({ [MODEL]: { name: 'Studio', label: 'studio' } }, [{ name: 'Sleeper' }, { name: 'Loose' }]), MODEL, 'p.3');
+
+test('tree: a preset added to a key waits among its variants; a key with none plays it', () => {
+  const store = cabsAndLoose();
+  const added = addVariant(store, MODEL, 'p.4');
+  assert.deepEqual([added.assignments[MODEL], added.alternates[MODEL]], ['p.2', ['p.3', 'p.4']]);
+  assert.equal(addVariant(added, MODEL, 'p.4'), added); // there already
+  assert.equal(addVariant(store, MODEL, 'p.2'), store); // it plays there
+  const alone = addVariant(store, OTHER.key, 'p.4');
+  assert.deepEqual([alone.assignments[OTHER.key], alone.alternates[OTHER.key]], ['p.4', undefined]);
+  // A model whose files are its variants: yours waits beside them, the file keeps playing.
+  const files = addVariant(withCollection(store, shared('579.json', OTHER.key)), OTHER.key, 'p.4');
+  assert.deepEqual([files.assignments[OTHER.key], files.alternates[OTHER.key]], [undefined, ['p.4']]);
+  assert.equal(autoPreset(files, OTHER).key, 'file:579.json');
+});
+
+test('tree: Duplicate, Paste and a Ctrl-drag add a copy named by the key, with the label it had', () => {
+  const store = cabsAndLoose();
+  const { store: next, key } = copyVariant(store, MODEL, 'p.2', SLEEPER);
+  assert.equal(key, 'p.5');
+  assert.deepEqual([next.presets[key].name, next.presets[key].label], ['ATS › International › International 9900i', 'studio']);
+  assert.notEqual(next.presets[key].speakers, store.presets['p.2'].speakers);
+  assert.deepEqual([next.assignments[MODEL], next.alternates[MODEL]], ['p.2', ['p.3', 'p.5']]);
+  // From a file: yours, standing for no file (copyOf left behind).
+  const fromFile = copyVariant(withCollection(store, MODEL_FILE), OTHER.key, 'file:model.json', OTHER);
+  assert.deepEqual([fromFile.store.presets[fromFile.key].width, fromFile.store.assignments[OTHER.key]], [0.8, fromFile.key]);
+  const adopted = { ...store, presets: { ...store.presets, 'p.3': { ...store.presets['p.3'], copyOf: 'file:model.json' } } };
+  const again = copyVariant(adopted, MODEL, 'p.3');
+  assert.equal(again.store.presets[again.key].copyOf, undefined);
+  assert.deepEqual(copyVariant(store, MODEL, 'gone'), { store, key: null });
+});
+
+test('tree: a drag moves a variant to another key\'s list; its hooks forget it where it was', () => {
+  const store = assign(cabsAndLoose(), CHASSIS, 'p.2');
+  const moved = moveVariant(store, MODEL, OTHER.key, 'p.3');
+  assert.deepEqual([moved.assignments[MODEL], moved.alternates?.[MODEL], moved.assignments[OTHER.key]], ['p.2', undefined, 'p.3']);
+  const current = moveVariant(store, MODEL, OTHER.key, 'p.2');
+  assert.deepEqual([current.assignments[MODEL], current.assignments[CHASSIS], current.assignments[OTHER.key]], ['p.3', undefined, 'p.2']);
+  assert.equal(moveVariant(store, MODEL, MODEL, 'p.3'), store);
+});
+
+test('tree: Delete takes a variant off its key and deletes it when nothing else uses it', () => {
+  const store = cabsAndLoose();
+  const gone = deleteVariant(store, MODEL, 'p.3');
+  assert.deepEqual([gone.presets['p.3'], gone.alternates], [undefined, undefined]);
+  const current = deleteVariant(store, MODEL, 'p.2');
+  assert.deepEqual([current.presets['p.2'], current.assignments[MODEL]], [undefined, 'p.3']);
+  // Used on another key too: it stays there.
+  const shared2 = assign(store, OTHER.key, 'p.3');
+  const kept = deleteVariant(shared2, MODEL, 'p.3');
+  assert.deepEqual([kept.presets['p.3'].name, kept.assignments[OTHER.key], kept.alternates], ['Sleeper', 'p.3', undefined]);
+  // A file of the model is hidden from it; all vehicles' preset is never deleted.
+  const files = withCollection(store, MODEL_FILE);
+  assert.deepEqual(deleteVariant(files, MODEL, 'file:model.json').hiddenFiles, { [MODEL]: ['file:model.json'] });
+  assert.equal(deleteVariant(store, 'all', 'p.1').presets['p.1'].name, store.presets['p.1'].name);
 });
 
 test('variants: the files for a model and its hooks are variants too; picking one makes it current', () => {

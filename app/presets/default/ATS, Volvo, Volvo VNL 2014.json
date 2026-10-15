@@ -1,0 +1,132 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Volvo › Volvo VNL 2014",
+  "vehicle": "vehicle.volvo.vnl@2.6",
+  "vehicleName": "Volvo VNL 2014",
+  "game": "ats",
+  "brand": "volvo",
+  "brandName": "Volvo",
+  "layout": {
+    "label": "sleeper 740",
+    "labelColor": "green",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.1,
+        -1.09,
+        -1.15
+      ],
+      "max": [
+        1.1,
+        0.95,
+        1.85
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Full range L",
+        "position": [
+          -0.74,
+          -0.13,
+          1.61
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Full range R",
+        "position": [
+          0.74,
+          -0.13,
+          1.61
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "full",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Tweeter L",
+        "position": [
+          -0.83,
+          -0.26,
+          -0.93
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Tweeter R",
+        "position": [
+          0.83,
+          -0.26,
+          -0.93
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Midbass L",
+        "position": [
+          -1.03,
+          -0.82,
+          -0.75
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Midbass R",
+        "position": [
+          1.03,
+          -0.82,
+          -0.75
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s3"
+      },
+      {
+        "id": "s7",
+        "name": "Subwoofer L",
+        "position": [
+          -0.5,
+          -0.94,
+          0.77
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "sub",
+        "pair": "s8"
+      },
+      {
+        "id": "s8",
+        "name": "Subwoofer R",
+        "position": [
+          0.5,
+          -0.94,
+          0.77
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "sub",
+        "pair": "s7"
+      }
+    ]
+  }
+}

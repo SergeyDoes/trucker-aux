@@ -1,23 +1,24 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ETS2 › Mercedes-Benz › Mercedes-Benz New Actros › hook 2.4 m",
-  "vehicle": "vehicle.mercedes.actros2014@2.4",
-  "vehicleName": "Mercedes-Benz New Actros",
+  "name": "ETS2 › Volvo › Volvo FH6",
+  "vehicle": "vehicle.volvo.fh_2024@1.6",
+  "vehicleName": "Volvo FH6",
   "game": "ets2",
-  "brand": "mercedes",
-  "brandName": "Mercedes-Benz",
+  "brand": "volvo",
+  "brandName": "Volvo",
   "layout": {
+    "label": "sleeper",
     "width": 1,
     "bounds": {
       "min": [
-        -1.12,
+        -1.11,
         -0.92,
-        -0.81
+        -1.05
       ],
       "max": [
-        1.12,
+        1.11,
         0.95,
-        0.6
+        0.98
       ]
     },
     "speakers": [
@@ -25,9 +26,9 @@
         "id": "s1",
         "name": "Midbass L",
         "position": [
-          -1.06,
-          -0.63,
-          -0.59
+          -1.01,
+          -0.91,
+          -0.6
         ],
         "channel": "L",
         "gainDb": 0,
@@ -38,9 +39,9 @@
         "id": "s2",
         "name": "Midbass R",
         "position": [
-          1.06,
-          -0.63,
-          -0.59
+          1.01,
+          -0.91,
+          -0.6
         ],
         "channel": "R",
         "gainDb": 0,
@@ -49,37 +50,37 @@
       },
       {
         "id": "s3",
-        "name": "Small full range L",
+        "name": "Full range L",
         "position": [
-          -0.91,
-          0.48,
-          -0.14
+          -0.69,
+          -0.02,
+          0.69
         ],
         "channel": "L",
         "gainDb": 0,
-        "type": "small",
+        "type": "full",
         "pair": "s4"
       },
       {
         "id": "s4",
-        "name": "Small full range R",
+        "name": "Full range R",
         "position": [
-          0.91,
-          0.48,
-          -0.14
+          0.69,
+          -0.02,
+          0.69
         ],
         "channel": "R",
         "gainDb": 0,
-        "type": "small",
+        "type": "full",
         "pair": "s3"
       },
       {
         "id": "s5",
         "name": "Tweeter L",
         "position": [
-          -1.11,
-          -0.09,
-          -0.79
+          -1.01,
+          -0.24,
+          -0.92
         ],
         "channel": "L",
         "gainDb": 0,
@@ -90,9 +91,9 @@
         "id": "s6",
         "name": "Tweeter R",
         "position": [
-          1.11,
-          -0.09,
-          -0.79
+          1.01,
+          -0.24,
+          -0.92
         ],
         "channel": "R",
         "gainDb": 0,

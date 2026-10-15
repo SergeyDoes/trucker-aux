@@ -11,9 +11,9 @@ import {
   EMPTY, boxSelect, clickSelect, pruneSelection, selectAll,
 } from '../shared/selection.js';
 import {
-  adoptPicked, adoptVehicle, allPresetKey, alternatesOf, applyScope, chooseVariant, createPreset, currentScope, cycleVariant, deletePreset, dropAlternate, editLayout, exportFiles,
+  addVariant, adoptPicked, adoptVehicle, allPresetKey, copyVariant, deleteVariant, moveVariant, alternatesOf, applyScope, chooseVariant, createPreset, currentScope, cycleVariant, deletePreset, dropAlternate, editLayout, exportFiles,
   importClashes, importPresets,
-  keyPath, newAlternate, parseSelection, pickAlternate, planAssign, planMove, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder,
+  keyPath, newAlternate, parseSelection, pickAlternate, planAssign, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder,
   scopesOf, selectionValue, truckStatus, variantChoice, variantKey,
 } from '../shared/presets.js';
 import { isCollectionKey } from '../shared/collection.js';
@@ -57,6 +57,7 @@ const state = {
   picked: EMPTY,   // selected speakers { ids, primary } (state.selection is the preset choice)
   loudnessDb: null, // the playing layout's loudness-matching trim, once measured
   clipboard: [],   // copied speakers, kept across presets for this session
+  presetClip: null, // the preset copied in the tree (Ctrl+C there, or its menu's Copy), for Paste
   // Session-only, by speaker id. Ids repeat across presets, so these are cleared when
   // the truck or the chosen preset changes.
   solo: null,
@@ -353,6 +354,17 @@ function controlAction(action) {
 }
 
 // What plays, as the voice says it: its label, else its place among the model's variants.
+// A preset of yours or a file, there still.
+const presetExists = (key) => Boolean(key && (state.store.presets[key] ?? state.store.collection?.[key]));
+
+// The key picked in the tree (a key's row, or a variant's row: its key) for Paste and Duplicate;
+// null in Auto or for a preset picked elsewhere.
+function pickedScope() {
+  const { selection } = state;
+  if (selection.mode === 'scope') return selection.scope;
+  return selection.mode === 'truck' ? selection.variantOf ?? null : null;
+}
+
 function spokenName(key) {
   const label = playing().layout.label;
   if (label) return label;
@@ -409,17 +421,7 @@ async function putAtScope(to) {
   return carryOut(plan, labelOf, resolvePlaying(state.store, state.selection, truck).layout.name, true);
 }
 
-// The preset map's Move: a preset of yours (key, the one shown on `from`) from its key to another.
-async function moveInMap(from, to, key) {
-  const plan = planMove(state.store, from, to, state.truck, key);
-  if (!plan) {
-    render();
-    return false;
-  }
-  return carryOut(plan, (scope) => scopeLabel(state.store, scope, state.truck), state.store.presets[plan.key].name, false);
-}
-
-// Asks what a plan (planScope, planMove) needs and carries it out. True when something
+// Asks what a plan (planScope, planAssign) needs and carries it out. True when something
 // changed. inVehicle: the plan is about the vehicle in the game (the card), not the map.
 async function carryOut(plan, labelOf, name, inVehicle) {
   const { to } = plan;
@@ -651,8 +653,8 @@ const actions = {
     afterScopeChange(before);
   },
   // The tree's menu: one of a key's variants plays there (on the model of the vehicle in the
-  // game, in that vehicle, as the card picks); a new one, a copy of what plays, which plays; one
-  // taken off (off a model, its hooks and vehicles forget it; the preset stays).
+  // game, in that vehicle, as the card picks). New ones, copies, join a key's variants and what
+  // plays there stays (presets.js addVariant); the key opens to show them.
   playVariant(scope, key) {
     const before = speakerIds();
     remember();
@@ -660,12 +662,44 @@ const actions = {
     state.store = inGame ? chooseVariant(state.store, state.truck, key) : pickAlternate(state.store, scope, key);
     afterScopeChange(before);
   },
-  // from: the preset copied (a variant's row: that one), else what plays now.
+  // Add current as variant: a copy of what plays now, labelled "new".
   newVariant(scope, from = playing().key) {
     const before = speakerIds();
     remember();
     state.store = newAlternate(state.store, scope, state.truck, from);
+    keyTree.reveal(scope);
     afterScopeChange(before);
+  },
+  // Duplicate, Paste: a copy of a preset or a file (with its label) among a key's variants.
+  copyToKey(scope, key) {
+    if (!scope || !key) return;
+    const before = speakerIds();
+    const copied = copyVariant(state.store, scope, key, state.truck);
+    if (!copied.key) return;
+    remember();
+    state.store = copied.store;
+    keyTree.reveal(scope);
+    afterScopeChange(before);
+  },
+  // Delete in the tree: off the key, and gone when no other key uses it (a file of a model: hidden
+  // from it).
+  deleteVariant(scope, key) {
+    const before = speakerIds();
+    remember();
+    state.store = deleteVariant(state.store, scope, key);
+    if (state.selection.mode === 'truck' && state.selection.key === key && !presetExists(key)) state.selection = { mode: 'auto' };
+    afterScopeChange(before);
+  },
+  // The tree's Copy and Paste; the keyboard's work on what is picked there (pickedScope).
+  copyPreset(key = playing().key) {
+    state.presetClip = key;
+  },
+  canPaste: () => presetExists(state.presetClip),
+  pastePreset(scope = pickedScope()) {
+    if (actions.canPaste()) actions.copyToKey(scope, state.presetClip);
+  },
+  duplicatePicked() {
+    actions.copyToKey(pickedScope(), playing().key);
   },
   // A variant's row clicked in the preset map: it plays, to edit it (a file of the model becomes
   // your copy in its place at the first edit: presets.js adoptPicked).
@@ -707,23 +741,16 @@ const actions = {
   redo() {
     stepHistory(history.redo, history.undo);
   },
-  // Move in the map: the preset shown on `from` (key) to another key, with the card's dialogs.
-  async moveInMap(from, to, key) {
-    await moveInMap(from, to, key);
-  },
-  // Set preset in the map: one of your presets (or a file) on that key, asking first when it
-  // takes the key from another.
-  async assignInMap(scope, key) {
-    const plan = planAssign(state.store, key, scope);
-    if (!plan) return render();
-    const name = state.store.presets[key]?.name ?? state.store.collection?.[key]?.name ?? key;
-    return carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), name, false);
-  },
-  // Dragging in the map: a preset of yours from its key onto another moves it there; with Ctrl,
-  // or for a preset or file on no key, it is set there as well.
-  async dropInMap({ from, key }, to, alsoHere) {
-    if (from && !alsoHere) await moveInMap(from, to, key);
-    else await actions.assignInMap(to, key);
+  // Dragging in the map adds to the key's variants, what plays there stays: a preset of yours
+  // moves from its key (one on no key leaves the unused ones); with Ctrl, from all vehicles
+  // (something must play there) or a file, a copy goes.
+  dropInMap({ from, key, file }, to, copy) {
+    if (copy || file || from === 'all') return actions.copyToKey(to, key);
+    const before = speakerIds();
+    remember();
+    state.store = from ? moveVariant(state.store, from, to, key) : addVariant(state.store, to, key);
+    keyTree.reveal(to);
+    afterScopeChange(before);
   },
   // A key's preset dropped among the unused presets: it leaves that key (the preset stays).
   // With Ctrl, from all vehicles (something must play) or for a shared file: a copy instead.
@@ -1231,14 +1258,15 @@ navigator.mediaDevices.addEventListener('devicechange', async () => {
 });
 
 // Keyboard, outside text fields: arrows nudge the selection (Shift: 10 cm), Delete removes
-// it, Esc clears it; Ctrl+A / C / V / D select all, copy, paste, duplicate.
+// it, Esc clears it; Ctrl+A / C / V / D select all, copy, paste, duplicate the speakers, or,
+// while the tree was clicked last, copy, paste and duplicate the preset picked there.
 const SHORTCUTS = {
   z: (shift) => (shift ? actions.redo() : actions.undo()),
   y: () => actions.redo(),
   a: () => actions.selectAll(),
-  c: () => actions.copySelected(),
-  v: () => actions.paste(),
-  d: () => actions.duplicateSelected(),
+  c: () => (keyTree.isActive() ? actions.copyPreset() : actions.copySelected()),
+  v: () => (keyTree.isActive() ? actions.pastePreset() : actions.paste()),
+  d: () => (keyTree.isActive() ? actions.duplicatePicked() : actions.duplicateSelected()),
 };
 // While a binding is pressed (Controls) the keys are for it alone.
 for (const type of ['keydown', 'keyup']) {

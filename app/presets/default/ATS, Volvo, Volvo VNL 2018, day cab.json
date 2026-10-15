@@ -1,0 +1,105 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Volvo › Volvo VNL 2018",
+  "vehicle": "vehicle.volvo.vnl2018@1.7",
+  "vehicleName": "Volvo VNL 2018",
+  "game": "ats",
+  "brand": "volvo",
+  "brandName": "Volvo",
+  "layout": {
+    "label": "day cab",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -1.04,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.44
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s5",
+        "name": "Midbass L",
+        "position": [
+          -0.8,
+          -0.96,
+          -0.66
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s6"
+      },
+      {
+        "id": "s6",
+        "name": "Midbass R",
+        "position": [
+          0.8,
+          -0.96,
+          -0.66
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s5"
+      },
+      {
+        "id": "s1",
+        "name": "Midrange L",
+        "position": [
+          -0.76,
+          0.33,
+          0.11
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midrange R",
+        "position": [
+          0.76,
+          0.33,
+          0.11
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "mid",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Tweeter L",
+        "position": [
+          -0.87,
+          -0.3,
+          -1
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Tweeter R",
+        "position": [
+          0.87,
+          -0.3,
+          -1
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s3"
+      }
+    ]
+  }
+}

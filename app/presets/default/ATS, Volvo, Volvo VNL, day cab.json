@@ -1,0 +1,79 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Volvo › Volvo VNL",
+  "vehicle": "vehicle.volvo.vnl2025@1.4",
+  "vehicleName": "Volvo VNL",
+  "game": "ats",
+  "brand": "volvo",
+  "brandName": "Volvo",
+  "layout": {
+    "label": "day cab",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.84,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.84,
+        0.95,
+        0.35
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.72,
+          -0.28,
+          -0.26
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.72,
+          -0.28,
+          -0.26
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.53,
+          -0.1,
+          -0.69
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R",
+        "position": [
+          0.53,
+          -0.1,
+          -0.69
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s3"
+      }
+    ]
+  }
+}
