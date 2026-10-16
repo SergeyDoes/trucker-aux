@@ -1,10 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  boundsCenter, createView, drawOrder, fitScale, frameDistance, gridValues, nudge, projectAxes, screenAxes,
+  boundsCenter, createView, drawOrder, fitScale, frameDistance, gridValues, nudge, panCenter, projectAxes, screenAxes,
 } from '../src/shared/view.js';
 
 const opts = { width: 400, height: 300, scale: 100, center: [0, 0, 0] };
+
+test('panCenter: what was under the pointer stays under it; the axis the view does not show stays', () => {
+  const view = createView('side', { width: 200, height: 100, scale: 50, center: [0.1, 0.2, 0.3] });
+  const p = [0.4, -0.5, 0.6];
+  const [x, y] = view.toScreen(p);
+  const moved = createView('side', { width: 200, height: 100, scale: 50, center: panCenter(view, [x, y], [x + 20, y - 10]) });
+  const [x2, y2] = moved.toScreen(p);
+  assert.ok(Math.abs(x2 - (x + 20)) < 1e-9 && Math.abs(y2 - (y - 10)) < 1e-9);
+  assert.equal(moved.center[0], 0.1); // X is not in the side view
+});
 
 test('top view: X to the right, forward up', () => {
   const v = createView('top', opts);

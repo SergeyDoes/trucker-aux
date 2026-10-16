@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CAPTURE_KEYS, ESCAPE, bindingText, bindingWatch, captureWatch, isBound, keyName, normalizeBinding, normalizeControls,
+  CAPTURE_KEYS, ESCAPE, REPEAT_DELAY_MS, REPEAT_MS, bindingText, bindingWatch, captureWatch, isBound, keyName, normalizeBinding, normalizeControls,
 } from '../src/shared/controls.js';
 
 const CTRL = 'key:17';
@@ -13,11 +13,12 @@ test('normalizeBinding: valid ids, once each, up to three; Escape never', () => 
   assert.deepEqual(normalizeBinding([CTRL, F9, CTRL, 'key:x', `${PAD}:5`, `${PAD}:pov-up`]), [CTRL, F9, `${PAD}:5`]);
   assert.deepEqual(normalizeBinding([`${PAD}:33`, `${PAD}:0`, 'joy:45e:28e:1', ESCAPE, 42]), []);
   assert.deepEqual(normalizeBinding('F9'), []);
-  // Not saved yet: the default keys (. , /); cleared (an empty list): unbound.
-  assert.deepEqual(normalizeControls({ next: [F9], auto: 'x', other: [W] }), { next: [F9], previous: ['key:188'], auto: ['key:191'] });
-  assert.deepEqual(normalizeControls({}), { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] });
+  // Not saved yet: the default keys (. , /; the volume's none); cleared (an empty list): unbound.
+  assert.deepEqual(normalizeControls({ next: [F9], auto: 'x', other: [W] }), { next: [F9], previous: ['key:188'], auto: ['key:191'], volumeUp: [], volumeDown: [], mute: [] });
+  assert.deepEqual(normalizeControls({}), { next: ['key:190'], previous: ['key:188'], auto: ['key:191'], volumeUp: [], volumeDown: [], mute: [] });
   assert.equal(isBound(normalizeControls({ next: [], previous: [], auto: [] })), false);
   assert.equal(isBound(normalizeControls({ next: [], previous: [], auto: [`${PAD}:8`] })), true);
+  assert.equal(isBound(normalizeControls({ next: [], previous: [], auto: [], mute: [F9] })), true);
 });
 
 test('bindingWatch: fires when the last input goes down, the rest held; the longest wins', () => {
@@ -36,6 +37,24 @@ test('bindingWatch: fires when the last input goes down, the rest held; the long
   assert.equal(step(`${PAD}:pov-up`, `${PAD}:5`), 'auto'); // in any order
   assert.equal(step(), null);
   assert.equal(watch({ next: [], previous: [], auto: [] }, new Set([F9])), null);
+});
+
+test('bindingWatch: Volume Up and Down go on while held, after a delay; other actions fire once', () => {
+  const bindings = { next: [F9], previous: [], auto: [], volumeUp: [CTRL, W], volumeDown: [], mute: ['key:77'] };
+  const watch = bindingWatch();
+  const at = (now, ...held) => watch(bindings, new Set(held), now);
+  assert.equal(at(0, CTRL), null);
+  assert.equal(at(10, CTRL, W), 'volumeUp');
+  assert.equal(at(10 + REPEAT_DELAY_MS - 1, CTRL, W), null); // not yet
+  assert.equal(at(10 + REPEAT_DELAY_MS, CTRL, W), 'volumeUp');
+  assert.equal(at(10 + REPEAT_DELAY_MS + REPEAT_MS - 1, CTRL, W), null);
+  assert.equal(at(10 + REPEAT_DELAY_MS + REPEAT_MS, CTRL, W), 'volumeUp');
+  assert.equal(at(5000, CTRL), null); // let go: it stops
+  assert.equal(at(6000, CTRL, W), 'volumeUp'); // pressed again: once, then the delay
+  assert.equal(at(6001, CTRL, W, 'key:77'), 'mute'); // another binding: the repeat stops
+  assert.equal(at(9000, CTRL, W, 'key:77'), null);
+  assert.equal(at(9010, F9), 'next');
+  assert.equal(at(20000, F9), null); // the others never go on
 });
 
 test('captureWatch: what was held at the most, once all is let go; Escape cancels; stale keys wait', () => {

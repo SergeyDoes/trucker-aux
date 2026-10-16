@@ -1,6 +1,6 @@
 {
   "truckerAuxPreset": 1,
-  "name": "ETS2 › Renault › Renault E-Tech T › hook 1.5 m",
+  "name": "ETS2 › Renault › Renault E-Tech T",
   "vehicle": "vehicle.renault.etech_t@1.5",
   "vehicleName": "Renault E-Tech T",
   "game": "ets2",
@@ -17,7 +17,7 @@
       "max": [
         0.97,
         0.95,
-        0.6
+        0.92
       ]
     },
     "speakers": [

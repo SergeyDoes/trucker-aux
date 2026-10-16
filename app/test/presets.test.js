@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addAlternate, addVariant, copyVariant, deleteVariant, moveVariant, adoptVehicle, adoptPicked, cycleVariant, allPresetKey, alternatesOf, chooseVariant, dropAlternate, newAlternate, pickAlternate, variantChoice, scopePreset, applyScope, autoPreset, createPreset, currentScope, deletePreset, editLayout, exportFiles, dropImportedDefaults, importClashes, importPresets, seedAll,
-  foldChassis, levelOf, parseSelection, personalOf, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
+  foldChassis, isVariantOf, levelOf, parseSelection, personalOf, planAssign, planMove, planScope, plateKey, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel,
   scopeLadder, scopesOf, selectionValue, truckStatus, unassign, variantKey,
 } from '../src/shared/presets.js';
 import { defaultLayout, normalizeStore, setWidth } from '../src/shared/layout.js';
@@ -879,6 +879,14 @@ test('variants: a new one is a copy of the model\'s, named by it, labelled new; 
 
 // p.2 plays on the model, p.3 waits there, p.4 is on no key.
 const cabsAndLoose = () => addAlternate(storeWith({ [MODEL]: { name: 'Studio', label: 'studio' } }, [{ name: 'Sleeper' }, { name: 'Loose' }]), MODEL, 'p.3');
+
+test('isVariantOf: the model\'s variants (files too) and your vehicle\'s own preset, not another\'s', () => {
+  const store = withCollection(assign(cabsAndLoose(), plateKey(OWNED), 'p.4'), MODEL_FILE);
+  assert.deepEqual(['p.2', 'p.3', 'file:model.json', 'p.4', 'p.1'].map((k) => isVariantOf(store, OWNED, k)), [true, true, true, true, false]);
+  assert.equal(isVariantOf(store, SLEEPER, 'p.4'), false); // the plate's own, another vehicle of the model
+  assert.equal(isVariantOf(store, OTHER, 'p.2'), false);
+  assert.equal(isVariantOf(store, null, 'p.2'), false);
+});
 
 test('tree: a preset added to a key waits among its variants; a key with none plays it', () => {
   const store = cabsAndLoose();

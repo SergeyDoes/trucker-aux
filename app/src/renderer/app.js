@@ -12,7 +12,7 @@ import {
 } from '../shared/selection.js';
 import {
   addVariant, adoptPicked, adoptVehicle, allPresetKey, copyVariant, deleteVariant, moveVariant, alternatesOf, applyScope, chooseVariant, createPreset, currentScope, cycleVariant, deletePreset, dropAlternate, editLayout, exportFiles,
-  importClashes, importPresets,
+  importClashes, importPresets, isVariantOf,
   keyPath, newAlternate, parseSelection, pickAlternate, planAssign, planScope, presetOptions, presetTree, rememberVehicle, resolvePlaying, scopeLabel, scopeLadder,
   scopesOf, selectionValue, truckStatus, variantChoice, variantKey,
 } from '../shared/presets.js';
@@ -21,7 +21,7 @@ import { ask } from './dialog.js';
 import { createKeyTree } from './key-tree.js';
 import { branchIds, chooseExport, exportItems } from './export-dialog.js';
 import { cableOutputFor, channelsWarning, pickDevice, rateWarning } from '../shared/devices.js';
-import { normalizeSettings } from '../shared/settings.js';
+import { normalizeSettings, stepVolume } from '../shared/settings.js';
 import { isBound } from '../shared/controls.js';
 import { isSilenced } from '../shared/dsp.js';
 import { perceptualGain, trimFromLevels } from '../shared/loudness.js';
@@ -47,7 +47,8 @@ const state = {
   selection: { mode: 'auto' },
   truck: null,
   pose: null,
-  silenced: false, // music muted: the vehicle is parked or the game paused (settings.muteWhen, pauseBehavior)
+  silenced: false, // music muted: the vehicle is parked or the game paused (settings.muteWhen, pauseBehavior), or by hand
+  mutedByHand: false, // Mute (its binding, the button beside Volume): until pressed again or the volume changes; not kept
   inWorld: false,  // game frames are coming (not the main menu or loading)
   turn: 0,          // the game's look into turns and toward the blinker, added to the head, in turns
   view: { source: null }, // the game camera's view (shared/camera.js), when trucker_aux_camera.dll runs
@@ -145,7 +146,7 @@ function resetSession() {
 // The engine is told only when the state flips; each call starts a new fade.
 function applySilence() {
   const { muteWhen, pauseBehavior } = state.settings;
-  const on = musicSilenced(state.pose, muteWhen, state.inWorld, pauseBehavior);
+  const on = state.mutedByHand || musicSilenced(state.pose, muteWhen, state.inWorld, pauseBehavior);
   if (on === state.silenced) return;
   state.silenced = on;
   audio?.engine.setSilent(on);
@@ -153,6 +154,8 @@ function applySilence() {
 
 let saveTimer = null;
 let savePending = false;
+let volumeSaveTimer = null;
+const VOLUME_SAVE_MS = 600;
 let frozen = false;     // File › Import under way: nothing is saved over what it brings (the window reloads)
 let saveWarning = null; // a save that failed: the next one that works takes only it away
 // Saves the presets now, if a save is waiting.
@@ -335,8 +338,10 @@ function restartAudio() {
 // remembered while trying). Getting out keeps the one tried for the cab (see onPose). The voice
 // says what plays then.
 function controlAction(action) {
+  if (action === 'volumeUp' || action === 'volumeDown') return actions.nudgeVolume(action === 'volumeUp' ? 1 : -1);
+  if (action === 'mute') return actions.toggleMusicMute();
   if (action === 'auto') {
-    actions.selectPreset('auto');
+    actions.setAutoFollow(true);
     const what = spokenName(playing().key);
     say(what ? `Auto, ${what}` : 'Auto');
     return;
@@ -409,6 +414,16 @@ const deviceRef = (id) => {
 
 // Asks what the card's scope choice needs (see moveToScope) and carries it out. True when
 // something changed.
+// After a preset is set for the vehicle in the game by hand (the card's Use it in and Variant,
+// the tree's Play in this vehicle, Set the current preset here on one of its keys): back to Auto
+// when Auto now plays what the pick plays, so nothing changes to the ear. A pick of another
+// preset stays (it is being edited); one tried with the cab's buttons gives way.
+function autoAfterSet() {
+  if (state.selection.mode === 'auto' || !state.truck) return;
+  const auto = resolvePlaying(state.store, { mode: 'auto' }, state.truck);
+  if (state.selection.cycled || auto.key === playing().key) state.selection = { mode: 'auto' };
+}
+
 async function putAtScope(to) {
   const truck = state.truck;
   const plan = truck && planScope(state.store, state.selection, truck, to);
@@ -534,10 +549,27 @@ const actions = {
     render();
   },
   // fraction: the slider, 0..1. Saved when the slider is let go (save).
+  // A change of the volume takes a mute by hand off, as on a TV.
   setVolume(fraction, save = true) {
     state.settings = normalizeSettings({ ...state.settings, volume: fraction });
+    state.mutedByHand = false;
     applyVolume();
+    applySilence();
     if (save) saveSettings();
+    render();
+  },
+  // Volume Up / Down (the bindings): the slider's next 5 % step that way (stepVolume), saved once
+  // the presses stop.
+  nudgeVolume(direction) {
+    actions.setVolume(stepVolume(state.settings.volume, direction), false);
+    clearTimeout(volumeSaveTimer);
+    volumeSaveTimer = setTimeout(saveSettings, VOLUME_SAVE_MS);
+  },
+  // Mute (the binding, the button beside Volume): the music off with a fade, until pressed again
+  // or the volume changes; over Mute when and the pause, and not kept between runs.
+  toggleMusicMute() {
+    state.mutedByHand = !state.mutedByHand;
+    applySilence();
     render();
   },
   setMatchLoudness(on) {
@@ -616,6 +648,16 @@ const actions = {
     syncEngine();
     render();
   },
+  // Auto, the tree's toggle (settings.autoFollow): turned on, or by its binding, back to Auto at
+  // once; turned off, what plays now goes on when you change vehicles.
+  setAutoFollow(on) {
+    if (on !== state.settings.autoFollow) {
+      state.settings = { ...state.settings, autoFollow: on };
+      saveSettings();
+    }
+    if (on) actions.selectPreset('auto');
+    else render();
+  },
   // Copies what plays now into a new preset (not tied to a truck) and switches to it.
   newPreset() {
     remember();
@@ -638,18 +680,20 @@ const actions = {
   async moveToScope(to) {
     await putAtScope(to);
   },
-  // A preset picked in the list is put to use in this vehicle as well; back to Auto.
+  // A preset picked in the list is put to use in this vehicle as well; back to Auto when Auto
+  // plays it then (autoAfterSet).
   async useInScope(to) {
-    if (await putAtScope(to)) state.selection = { mode: 'auto' };
+    if (await putAtScope(to)) autoAfterSet();
     render();
   },
-  // A variant picked on the card plays at once, back in Auto; your own vehicle remembers it by
-  // its plate, another by its hook (presets.js chooseVariant).
+  // A variant picked on the card: your own vehicle remembers it by its plate, another by its
+  // hook (presets.js chooseVariant); it plays at once in Auto, or after a pick of another preset
+  // is let go (autoAfterSet).
   cardVariant(key) {
     const before = speakerIds();
     remember();
     state.store = chooseVariant(state.store, state.truck, key);
-    state.selection = { mode: 'auto' };
+    autoAfterSet();
     afterScopeChange(before);
   },
   // The tree's menu: one of a key's variants plays there (on the model of the vehicle in the
@@ -660,6 +704,7 @@ const actions = {
     remember();
     const inGame = state.truck?.key === scope;
     state.store = inGame ? chooseVariant(state.store, state.truck, key) : pickAlternate(state.store, scope, key);
+    if (inGame) autoAfterSet();
     afterScopeChange(before);
   },
   // Add current as variant: a copy of what plays now, labelled "new".
@@ -727,7 +772,13 @@ const actions = {
     const { key, layout } = playing();
     const plan = planAssign(state.store, key, scope);
     if (!plan) return render();
-    return carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), layout.name, false);
+    const done = await carryOut(plan, (s) => scopeLabel(state.store, s, state.truck), layout.name, false);
+    // On a key of the vehicle in the game: set for it by hand.
+    if (done && state.truck && scopeLadder(state.store, state.truck).some((r) => r.scope === scope)) {
+      autoAfterSet();
+      render();
+    }
+    return done;
   },
   async copyCurrent(scope) {
     const { key, layout } = playing();
@@ -1022,7 +1073,7 @@ function render() {
   }
   keyTree.update(
     { ...presetTree(state.store, state.truck, state.selection), currentKey: playing().key },
-    { undo: history.undo.length, redo: history.redo.length, auto: state.selection.mode === 'auto' },
+    { undo: history.undo.length, redo: history.redo.length, auto: state.selection.mode === 'auto', autoFollow: state.settings.autoFollow },
   );
   const current = playing();
   const { layout } = current;
@@ -1047,6 +1098,7 @@ function render() {
     axisLocks: state.settings.axisLocks[state.settings.headFrom],
     pauseBehavior: state.settings.pauseBehavior,
     volume: state.settings.volume,
+    mutedByHand: state.mutedByHand,
     controls: state.settings.controls,
     controlNames: state.controlNames,
     capturing: state.capturing,
@@ -1092,7 +1144,7 @@ function statusText() {
   const truck = state.truck;
   const name = truck ? `${truck.name}${truck.variant ? ` (hook ${truck.variant} m)` : ''}` : 'Unknown vehicle';
   let muted = '';
-  if (state.silenced && pose.paused && state.settings.pauseBehavior === 'muted') muted = ' · muted';
+  if (state.mutedByHand || (state.silenced && pose.paused && state.settings.pauseBehavior === 'muted')) muted = ' · muted';
   else if (state.silenced) muted = ` · muted, ${state.settings.muteWhen === 'engine' ? 'engine' : 'electrics'} off`;
   if (pose.paused) return [name, `paused${muted}`];
   const head = (state.heard ?? pose).head;
@@ -1137,20 +1189,30 @@ window.aux.onPose((pose) => {
   // Another chassis of the same model, or another truck with its own plate, counts too.
   const identity = (t) => (t ? `${variantKey(t)}#${t.plate ?? ''}` : null);
   const otherTruck = identity(truck) !== identity(state.truck);
+  // The same cab told again: its hook or plate arriving a frame after the model is no getting out.
+  const sameCab = (a, b) => Boolean(a && b) && a.key === b.key
+    && (!a.variant || !b.variant || a.variant === b.variant) && (!a.plate || !b.plate || a.plate === b.plate);
   if (otherTruck || (truck?.centerX ?? null) !== (state.truck?.centerX ?? null)) {
     const left = state.truck;
     state.truck = truck;
     if (otherTruck) resetSession();
-    // Getting out of a cab (another vehicle, or the game gone): the next vehicle plays in Auto,
-    // whatever was picked. After trying variants with the cab's buttons, the one tried stays the
-    // cab's, remembered as a pick on the card is (by the hook, or your vehicle's plate).
-    if (otherTruck && (left || state.selection.cycled)) {
-      if (left && state.selection.cycled) {
-        remember();
-        state.store = chooseVariant(state.store, left, state.selection.key);
-        scheduleSave();
+    // Getting out of a cab (another vehicle, or the game gone). With Auto on (the tree's toggle,
+    // settings.autoFollow) the next vehicle plays in Auto; a preset of the cab's own that played by
+    // hand (picked, or tried with the cab's buttons) stays the cab's, remembered as a pick on the
+    // card is (by the hook, or your vehicle's plate), and another leaves the memories as they are.
+    // With Auto off what played goes on, held as picked, and nothing is remembered.
+    if (otherTruck && left && !sameCab(left, truck)) {
+      const played = resolvePlaying(state.store, state.selection, left).key;
+      if (state.settings.autoFollow) {
+        if (state.selection.mode !== 'auto' && isVariantOf(state.store, left, played)) {
+          remember();
+          state.store = chooseVariant(state.store, left, played);
+          scheduleSave();
+        }
+        state.selection = { mode: 'auto' };
+      } else if (state.selection.mode === 'auto') {
+        state.selection = { mode: 'truck', key: played };
       }
-      state.selection = { mode: 'auto' };
     }
     // Its name, game and brand name the model's scopes while you drive something else; a model
     // new to the app gets its first variant, a hook new to you remembers what it plays.

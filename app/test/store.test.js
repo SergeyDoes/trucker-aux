@@ -40,7 +40,7 @@ test('writeJsonAtomic: an unwritable path gives a warning', () => {
 test('loadData: a fresh folder gives defaults without warnings', () => {
   const data = loadData(tempDir());
   assert.deepEqual(data.store.presets[data.store.assignments.all], defaultLayout());
-  assert.deepEqual(data.settings, { version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true, turnLook: { on: false, percent: 100, reverse: 'off', blinkers: false }, volume: 1, controls: { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] }, voice: 'system', voiceVolume: 1, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } } });
+  assert.deepEqual(data.settings, { version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true, turnLook: { on: false, percent: 100, reverse: 'off', blinkers: false }, volume: 1, controls: { next: ['key:190'], previous: ['key:188'], auto: ['key:191'], volumeUp: [], volumeDown: [], mute: [] }, voice: 'system', voiceVolume: 1, autoFollow: true, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } } });
   assert.deepEqual(data.warnings, []);
 });
 

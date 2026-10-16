@@ -1,7 +1,8 @@
-// SVG top and side views of the cab. Drag speakers and the walls of the bounds, wheel to zoom.
+// SVG top and side views of the cab. Drag speakers and the walls of the bounds, wheel to zoom,
+// a right or middle drag moves the view.
 // The static layer is redrawn from the layout; the head marker follows the pose separately.
 import {
-  boundsCenter, createView, drawOrder, fitScale, gridValues, projectAxes, screenAxes,
+  boundsCenter, createView, drawOrder, fitScale, gridValues, panCenter, projectAxes, screenAxes,
 } from '../shared/view.js';
 import { listenerVectors } from '../shared/pose.js';
 import { directionMarker, speakerGlyph, svg } from './marks.js';
@@ -71,6 +72,7 @@ export function createViews(root, actions) {
     canvas.append(staticLayer, headLayer, bandLayer);
     const header = document.createElement('header');
     header.textContent = TITLES[kind];
+    header.title = 'Drag a speaker or a wall; drag on empty space to select (Ctrl adds). Right or middle drag moves the view, the wheel zooms, Fit shows it all.';
     const pane = document.createElement('section');
     pane.className = 'view';
     pane.append(header, canvas);
@@ -232,10 +234,18 @@ export function createViews(root, actions) {
   }).observe(root);
 
   // Pointer: a speaker is grabbed with the rest of the selection (ctrl+click toggles it);
-  // a wall is dragged; on empty space a box selects (ctrl adds), a plain click clears.
+  // a wall is dragged; on empty space a box selects (ctrl adds), a plain click clears. A right
+  // or middle drag moves the view: both panes, as they share the centre (Fit puts it back).
   for (const pane of panes) {
     pane.canvas.addEventListener('pointerdown', (event) => {
-      if (!model || event.button !== 0) return;
+      if (!model || scale === null) return;
+      if (event.button === 1 || event.button === 2) {
+        event.preventDefault(); // no autoscroll for the middle button
+        drag = { kind: 'pan', pane, view: viewOf(pane), start: localPoint(pane, event) };
+        pane.canvas.setPointerCapture(event.pointerId);
+        return;
+      }
+      if (event.button !== 0) return;
       const view = viewOf(pane);
       const start = localPoint(pane, event);
       const toggle = event.ctrlKey || event.metaKey;
@@ -261,6 +271,11 @@ export function createViews(root, actions) {
     pane.canvas.addEventListener('pointermove', (event) => {
       if (!drag || drag.pane !== pane) return;
       const [x, y] = localPoint(pane, event);
+      if (drag.kind === 'pan') {
+        center = panCenter(drag.view, drag.start, [x, y]);
+        draw();
+        return;
+      }
       // A click that wobbles by a pixel or two is still a click.
       if (!drag.moved && Math.hypot(x - drag.start[0], y - drag.start[1]) < DRAG_START) return;
       drag.moved = true;
@@ -300,6 +315,9 @@ export function createViews(root, actions) {
       pane.bandLayer.replaceChildren();
       drag = null;
     });
+    // The right button moves the view: no menu at its release; the middle one opens nothing.
+    pane.canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+    pane.canvas.addEventListener('auxclick', (event) => event.preventDefault());
     pane.canvas.addEventListener('wheel', (event) => {
       if (scale === null) return;
       event.preventDefault();

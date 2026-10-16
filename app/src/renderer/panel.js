@@ -3,7 +3,7 @@
 import { LABEL_COLORS, LABEL_MAX, TYPES, TYPE_NAMES } from '../shared/layout.js';
 import { bandText } from '../shared/dsp.js';
 import { speakerIcon } from './marks.js';
-import { ACTIONS, ACTION_NAMES, bindingText } from '../shared/controls.js';
+import { ACTIONS, ACTION_NAMES, VARIANT_ACTIONS, VOLUME_ACTIONS, bindingText } from '../shared/controls.js';
 import { AXES } from '../shared/settings.js';
 
 const CHANNEL_OPTIONS = [
@@ -209,6 +209,8 @@ export function createPanel(root, actions, boundsRoot) {
   });
   const volume = el('input', { type: 'range', min: 0, max: 200, step: 1, title: 'The volume of Trucker AUX, over everything else; over 100 % up to +12 dB, a limiter keeps it from clipping' });
   const volumeValue = el('span', { className: 'value' });
+  const muteButton = el('button', { className: 'mute-button', textContent: 'Mute', title: 'Silence the music until pressed again or the volume changes (Volume Control Bindings: a key for it)' });
+  muteButton.onclick = () => actions.toggleMusicMute();
   // The game's camera options, set as in the game (pose.js turnLook).
   const turnLookOn = el('input', { type: 'checkbox', title: 'The game\'s "look into turns"' });
   const turnLookPercent = el('input', {
@@ -244,12 +246,21 @@ export function createPanel(root, actions, boundsRoot) {
   voiceVolume.oninput = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100, false);
   voiceVolume.onchange = () => actions.setVoiceVolume(Number(voiceVolume.value) / 100);
   voiceTest.onclick = () => actions.testVoice();
+  const rowsOf = (list) => controlRows.filter((r) => list.includes(r.action)).map((r) => r.line);
   const controlsForm = el('fieldset', {}, [
     el('legend', { textContent: 'Variant Control Bindings' }),
-    ...controlRows.map((r) => r.line),
+    ...rowsOf(VARIANT_ACTIONS),
     el('p', {
       className: 'hint',
       textContent: 'They work while the game has the focus. Next and Prev. try the variants of the vehicle\'s model; Auto goes back to the one that fitted when you got in. Getting out keeps the one tried for that cab. The game sees these keys and buttons too: pick ones it does not use. Audio › Control voice says which one plays.',
+    }),
+  ]);
+  const volumeControlsForm = el('fieldset', {}, [
+    el('legend', { textContent: 'Volume Control Bindings' }),
+    ...rowsOf(VOLUME_ACTIONS),
+    el('p', {
+      className: 'hint',
+      textContent: 'They work while the game has the focus. Volume Up and Down move Audio › Volume by 5 % (held, on and on); Mute silences the music until pressed again or the volume changes. The game sees these keys and buttons too: pick ones it does not use.',
     }),
   ]);
 
@@ -403,12 +414,13 @@ export function createPanel(root, actions, boundsRoot) {
       fileRow,
       row('Mute when', muteWhen),
       row('Pause behavior', pauseBehavior),
-      row('Volume', el('div', { className: 'inline' }, [volume, volumeValue])),
+      row('Volume', el('div', { className: 'inline' }, [volume, volumeValue, muteButton])),
       row('Control voice', voiceMode),
       row('Voice volume', el('div', { className: 'inline' }, [voiceVolume, voiceVolumeValue, voiceTest])),
     ]),
     cameraForm,
     controlsForm,
+    volumeControlsForm,
     el('fieldset', {}, [
       el('legend', { textContent: 'Layout' }),
       row('Preset', preset),
@@ -523,6 +535,7 @@ export function createPanel(root, actions, boundsRoot) {
     fillSelect(pauseBehavior, PAUSE_OPTIONS, view.pauseBehavior);
     setValue(volume, Math.round(view.volume * 100));
     volumeValue.textContent = `${Math.round(view.volume * 100)} %`;
+    muteButton.classList.toggle('on', view.mutedByHand);
     const look = view.turnLook;
     fillSelect(headFrom, HEAD_OPTIONS, view.headFrom);
     for (const axis of AXES) locks[axis].checked = view.axisLocks[axis];

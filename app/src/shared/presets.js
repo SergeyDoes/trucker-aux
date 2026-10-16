@@ -645,6 +645,15 @@ export function variantChoice(store, truck) {
   return { scope: truck.key, value: plays, options: options.map((v) => ({ value: v.key, label: variantLabel(v) })) };
 }
 
+// Whether a preset or a file is one of the vehicle's: a variant of its model, or your vehicle's
+// own (by its plate). Getting out with one that plays by hand remembers it for the cab (app.js).
+export function isVariantOf(store, truck, key) {
+  if (!truck || !key) return false;
+  const plate = ownPlate(truck);
+  return alternatesOf(store, truck.key).some((v) => v.key === key)
+    || personalOf(store, truck.key).some((p) => p.key === key && `${truck.key}#${p.plate}` === plate);
+}
+
 // A variant picked for the vehicle in the game (the card, the tree): your own vehicle remembers
 // it by its plate, any other its hook; a variant of the model becomes its current one, which a
 // hook new to you plays. The vehicle's own preset stays its own.

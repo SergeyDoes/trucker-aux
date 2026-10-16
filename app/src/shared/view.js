@@ -34,6 +34,17 @@ export function createView(kind, { width, height, scale, center }) {
   };
 }
 
+// The centre after a drag of the view (views.js) from one screen point to another: what was
+// under the pointer stays under it; the axis the view does not show stays as it was.
+export function panCenter(view, [x0, y0], [x1, y1]) {
+  const next = [...view.center];
+  for (const [role, from, to] of [['h', x0, x1], ['v', y0, y1]]) {
+    const axis = view.axisOf(role);
+    next[axis] = view.center[axis] + view.valueAt(role, from) - view.valueAt(role, to);
+  }
+  return next;
+}
+
 const unit = (axis, sign) => [0, 1, 2].map((i) => (i === axis ? sign : 0));
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + 0; // + 0 turns -0 into 0
 

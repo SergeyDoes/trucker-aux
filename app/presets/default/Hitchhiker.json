@@ -1,0 +1,36 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "Hitchhiker",
+  "layout": {
+    "label": "idea",
+    "labelColor": "orange",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -0.83,
+        -0.92,
+        -0.81
+      ],
+      "max": [
+        0.83,
+        0.95,
+        0.6
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Full range L",
+        "position": [
+          0.41,
+          0,
+          -0.07
+        ],
+        "channel": "M",
+        "gainDb": 0,
+        "type": "full",
+        "pair": null
+      }
+    ]
+  }
+}

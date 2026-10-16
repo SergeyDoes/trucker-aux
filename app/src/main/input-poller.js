@@ -130,7 +130,7 @@ export function createPoller({ onAction, onError = () => {} }) {
       if (combo !== undefined) finishCapture(combo);
       return;
     }
-    const action = watch(bindings, held(boundKeys, joys));
+    const action = watch(bindings, held(boundKeys, joys), performance.now());
     if (action) onAction(action);
   }
 

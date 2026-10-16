@@ -1,0 +1,105 @@
+{
+  "truckerAuxPreset": 1,
+  "name": "ATS › Kenworth › Kenworth W900",
+  "vehicle": "vehicle.kenworth.w900@1.8",
+  "vehicleName": "Kenworth W900",
+  "game": "ats",
+  "brand": "kenworth",
+  "brandName": "Kenworth",
+  "layout": {
+    "label": "day cab",
+    "width": 1,
+    "bounds": {
+      "min": [
+        -1.04,
+        -1.15,
+        -0.73
+      ],
+      "max": [
+        1.04,
+        0.95,
+        0.47
+      ]
+    },
+    "speakers": [
+      {
+        "id": "s1",
+        "name": "Midbass L",
+        "position": [
+          -0.76,
+          -0.38,
+          -0.1
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s2"
+      },
+      {
+        "id": "s2",
+        "name": "Midbass R",
+        "position": [
+          0.76,
+          -0.38,
+          -0.1
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "midbass",
+        "pair": "s1"
+      },
+      {
+        "id": "s3",
+        "name": "Small full range L",
+        "position": [
+          -0.55,
+          0.27,
+          -0.69
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s4"
+      },
+      {
+        "id": "s4",
+        "name": "Small full range R",
+        "position": [
+          0.55,
+          0.27,
+          -0.69
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "small",
+        "pair": "s3"
+      },
+      {
+        "id": "s6",
+        "name": "Tweeter L 2",
+        "position": [
+          -0.78,
+          0.33,
+          -0.34
+        ],
+        "channel": "L",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s7"
+      },
+      {
+        "id": "s7",
+        "name": "Tweeter R 2",
+        "position": [
+          0.78,
+          0.33,
+          -0.34
+        ],
+        "channel": "R",
+        "gainDb": 0,
+        "type": "tweeter",
+        "pair": "s6"
+      }
+    ]
+  }
+}

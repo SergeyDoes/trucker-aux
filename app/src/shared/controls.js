@@ -6,8 +6,17 @@
 //   "joy:<vid>:<pid>:pov-up|right|down|left"  its hat (a D-pad), as four buttons
 // A controller is known by its USB ids, so a binding outlives a replug; two alike are one.
 
-export const ACTIONS = ['next', 'previous', 'auto'];
-export const ACTION_NAMES = { next: 'Switch Next', previous: 'Switch Prev.', auto: 'Switch Auto' };
+// The variants' actions, and the music's volume (Audio › Volume) and mute.
+export const VARIANT_ACTIONS = ['next', 'previous', 'auto'];
+export const VOLUME_ACTIONS = ['volumeUp', 'volumeDown', 'mute'];
+export const ACTIONS = [...VARIANT_ACTIONS, ...VOLUME_ACTIONS];
+export const ACTION_NAMES = {
+  next: 'Switch Next', previous: 'Switch Prev.', auto: 'Switch Auto', volumeUp: 'Volume Up', volumeDown: 'Volume Down', mute: 'Mute',
+};
+// Held, these go on: once at the press, again after REPEAT_DELAY_MS, then every REPEAT_MS.
+const REPEATS = new Set(['volumeUp', 'volumeDown']);
+export const REPEAT_DELAY_MS = 400;
+export const REPEAT_MS = 100;
 export const MAX_COMBO = 3;
 export const ESCAPE = 'key:27'; // cancels a capture, so it is never bound
 
@@ -21,11 +30,12 @@ export function normalizeBinding(raw) {
 
 // The bindings a new setup starts with: keys no action of the games' keyboard layout takes (none
 // of four ATS and ETS2 profiles binds them, 2026-10-11), side by side under the right hand:
-// "." next, "," previous, "/" Auto: the same keys whatever the keyboard layout.
-export const DEFAULT_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] };
+// "." next, "," previous, "/" Auto: the same keys whatever the keyboard layout. The volume's are
+// left to you.
+export const DEFAULT_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'], volumeUp: [], volumeDown: [], mute: [] };
 
-// { next: [ids], previous: [ids], auto: [ids] }: a binding not saved yet is the default one, one
-// cleared (an empty list) stays unbound.
+// { [action]: [ids] }: a binding not saved yet is the default one, one cleared (an empty list)
+// stays unbound.
 export function normalizeControls(raw) {
   const src = raw && typeof raw === 'object' ? raw : {};
   return Object.fromEntries(ACTIONS.map((action) => [action, Array.isArray(src[action]) ? normalizeBinding(src[action]) : [...DEFAULT_CONTROLS[action]]]));
@@ -33,23 +43,31 @@ export function normalizeControls(raw) {
 
 export const isBound = (controls) => ACTIONS.some((action) => controls[action]?.length);
 
-// Watches the inputs held, poll by poll: (bindings, held: Set of ids) -> the action that fires
-// now, or null. A binding fires when its last input goes down while the rest are held; other
-// inputs held do not matter (a key held to drive). Of those firing at once the longest wins, so
-// Ctrl + F9 does not also fire F9.
+// Watches the inputs held, poll by poll: (bindings, held: Set of ids, now: ms) -> the action that
+// fires now, or null. A binding fires when its last input goes down while the rest are held;
+// other inputs held do not matter (a key held to drive). Of those firing at once the longest
+// wins, so Ctrl + F9 does not also fire F9. Volume Up and Down go on while held (REPEATS) until
+// let go or another binding fires.
 export function bindingWatch() {
   let before = new Set();
-  return (bindings, held) => {
+  let repeat = null; // { action, ids, at }: the one held going on, when it fires next
+  return (bindings, held, now = 0) => {
     const pressed = [...held].filter((id) => !before.has(id));
     before = new Set(held);
-    if (!pressed.length) return null;
+    if (repeat && !repeat.ids.every((id) => held.has(id))) repeat = null;
     let best = null;
-    for (const action of ACTIONS) {
+    for (const action of pressed.length ? ACTIONS : []) {
       const ids = bindings[action] ?? [];
       if (!ids.length || !ids.every((id) => held.has(id)) || !ids.some((id) => pressed.includes(id))) continue;
       if (!best || ids.length > best.ids.length) best = { action, ids };
     }
-    return best?.action ?? null;
+    if (best) {
+      repeat = REPEATS.has(best.action) ? { ...best, at: now + REPEAT_DELAY_MS } : null;
+      return best.action;
+    }
+    if (!repeat || now < repeat.at) return null;
+    repeat.at = now + REPEAT_MS;
+    return repeat.action;
   };
 }
 

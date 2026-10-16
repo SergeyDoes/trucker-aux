@@ -94,6 +94,7 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 .speakers li.selected { background: #8883; }
 .speakers button { min-width: 26px; }
 .speakers button.on { background: #e9b20b; color: #000; }
+.mute-button.on { background: #e9b20b; color: #000; }
 .badge { color: var(--dim); font-size: 11px; }
 #overview canvas { display: block; }
 .overview-hint { position: absolute; left: 8px; bottom: 4px; margin: 0; font-size: 11px; color: var(--dim); pointer-events: none; }
@@ -115,8 +116,11 @@ select, input[type=text] { width: 100%; box-sizing: border-box; }
 #tree header { display: flex; align-items: center; gap: 4px; }
 #tree header h2 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; margin: 0; font-size: 14px; }
 #tree header button { padding: 0 6px; font-size: 14px; flex: none; }
-#tree header .reg-auto { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--front); background: #d08c0033; font-weight: 600; }
-#tree header .reg-auto.on { border-color: #8886; background: none; font-weight: 400; color: var(--dim); }
+/* Auto, a switch: the knob right and green while on, amber while something picked plays until you get out. */
+#tree header .reg-auto { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 1px 8px 1px 4px; border-radius: 10px; border: 1px solid #8886; background: none; }
+#tree header .reg-auto::before { content: ''; width: 22px; height: 12px; border-radius: 6px; background: radial-gradient(circle at 6px 50%, #fff 4px, transparent 4.5px), #8888; }
+#tree header .reg-auto.on::before { background: radial-gradient(circle at 16px 50%, #fff 4px, transparent 4.5px), #2f9e5a; }
+#tree header .reg-auto.on.held::before { background: radial-gradient(circle at 16px 50%, #fff 4px, transparent 4.5px), #d08c00; }
 #tree .hint { margin: 4px 0 6px; }
 #tree h3 { margin: 12px 0 4px; font-size: 12px; }
 .reg-loose { padding: 2px 6px; cursor: pointer; border-radius: 3px; }

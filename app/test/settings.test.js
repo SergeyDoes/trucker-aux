@@ -1,14 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSettings } from '../src/shared/settings.js';
+import { normalizeSettings, stepVolume } from '../src/shared/settings.js';
 
 const TURN_LOOK_OFF = { on: false, percent: 100, reverse: 'off', blinkers: false };
-const NO_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'] }; // the default keys
+const NO_CONTROLS = { next: ['key:190'], previous: ['key:188'], auto: ['key:191'], volumeUp: [], volumeDown: [], mute: [] }; // the default keys
 
 test('normalizeSettings: defaults', () => {
   assert.deepEqual(normalizeSettings(undefined), {
     version: 1, source: 'input', input: null, output: null, muteWhen: 'electric', pauseBehavior: 'vehicle', matchLoudness: true,
-    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
+    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, autoFollow: true, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
   });
 });
 
@@ -32,7 +32,7 @@ test('normalizeSettings keeps valid devices and drops junk', () => {
   });
   assert.deepEqual(settings, {
     version: 1, source: 'file', input: { id: 'cable', label: 'CABLE Output' }, output: null, muteWhen: 'engine', pauseBehavior: 'muted', matchLoudness: false,
-    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
+    turnLook: TURN_LOOK_OFF, volume: 1, controls: NO_CONTROLS, voice: 'system', voiceVolume: 1, autoFollow: true, headFrom: 'game', axisLocks: { game: { yaw: false, pitch: false, roll: true }, vr: { yaw: false, pitch: false, roll: false }, telemetry: { yaw: false, pitch: false, roll: true } },
   });
   assert.equal(normalizeSettings({ source: 'radio' }).source, 'input');
   assert.equal(normalizeSettings({ muteWhen: 'electric' }).muteWhen, 'electric');
@@ -60,7 +60,7 @@ test('normalizeSettings: the first version saved the angle at full lock in degre
 
 test('normalizeSettings: the controls and the voice', () => {
   const settings = normalizeSettings({ controls: { next: ['key:120', 'nope'], auto: ['joy:045e:028e:5'] }, voice: false });
-  assert.deepEqual(settings.controls, { next: ['key:120'], previous: ['key:188'], auto: ['joy:045e:028e:5'] });
+  assert.deepEqual(settings.controls, { next: ['key:120'], previous: ['key:188'], auto: ['joy:045e:028e:5'], volumeUp: [], volumeDown: [], mute: [] });
   assert.equal(settings.voice, 'off'); // the first version's checkbox
   assert.equal(normalizeSettings({ voice: 'aux' }).voice, 'aux');
   assert.equal(normalizeSettings({ voice: 'yes' }).voice, 'system');
@@ -81,4 +81,13 @@ test('normalizeSettings: the camera modes and their locked axes', () => {
     vr: { yaw: false, pitch: false, roll: false },
     telemetry: { yaw: false, pitch: false, roll: true },
   });
+});
+
+test('normalizeSettings: Auto follows the vehicle unless turned off', () => {
+  assert.deepEqual([undefined, true, false, 'no', 0].map((v) => normalizeSettings({ autoFollow: v }).autoFollow), [true, true, false, true, true]);
+});
+
+test('stepVolume: Volume Up and Down go 5 % along the slider, on the 5 % steps, within 0..200 %', () => {
+  assert.deepEqual([0.83, 0.85, 1, 1.98, 2].map((v) => stepVolume(v, 1)), [0.85, 0.9, 1.05, 2, 2]);
+  assert.deepEqual([0.83, 0.85, 1, 0.03, 0].map((v) => stepVolume(v, -1)), [0.8, 0.8, 0.95, 0, 0]);
 });

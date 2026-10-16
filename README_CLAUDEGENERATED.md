@@ -55,6 +55,8 @@ Player ─► virtual cable                          Game audio ─────�
 - **Editor:**
   - a top view and a side view (SVG) and a 3D overview (three.js);
   - drag speakers and walls, select several with Ctrl+click or a box;
+  - a right or middle drag moves the views (both: they share the long axis), the wheel zooms,
+    Fit shows it all;
   - copy and paste, also between presets;
   - undo and redo for every change to your presets.
 - **Presets on keys:** a preset is set on a key, from narrow to wide:
@@ -87,8 +89,16 @@ Player ─► virtual cable                          Game audio ─────�
   - models are open at first (folded by hand they stay so); the vehicle in the game opens the
     keys down to its own and the row of what plays is scrolled into view, again whenever the
     vehicle, the pick or what plays changes;
-  - a key or a preset picked to edit holds until Auto is pressed or you get out of the vehicle:
-    the next one plays in Auto.
+  - Auto, the switch above the tree (kept in the settings), decides what getting out of a
+    vehicle does. On (green): the next vehicle plays in Auto; a key or a preset picked meanwhile
+    (amber) holds until then, and if it was one of that cab's own (a variant of its model, or
+    your vehicle's own) the cab remembers it, by its hook or your plate; another preset leaves
+    the memories as they are. Off (grey): what plays stays from vehicle to vehicle and nothing is
+    remembered. Turning it on, or the Auto binding, goes back to Auto at once; the card's Back to
+    Auto too;
+  - setting a preset for the vehicle in the game by hand (the card's Use it in and Variant, Play
+    in this vehicle, Set the current preset here on one of its keys) goes back to Auto only when
+    Auto then plays the preset picked; a pick of another one stays.
 - **Picking a variant:** the card's "Variant" picks one for the vehicle in the game (its hook,
   or your vehicle's plate, remembers it). The tree shows a model's variant that plays and "+N";
   unfolded, the variants are rows of their own, a model's even when it has one (◆, with their badge and where they play, ▶ on
@@ -100,9 +110,12 @@ Player ─► virtual cable                          Game audio ─────�
   are two variants.
 - **Controls:** a key, a controller button (a wheel's, a pad's) or a combination of up to three
   steps to the model's next or previous variant, to try it, and another goes back to what fitted
-  the cab when you got in; getting out keeps the one tried for that cab. They work while the
+  the cab when you got in; getting out (Auto on) keeps the one tried for that cab. They work while the
   game has the focus. An English Windows voice says what plays: over everything, or from the cab
-  speakers like the music (muted with it), at a volume of its own.
+  speakers like the music (muted with it), at a volume of its own. Volume Control Bindings (none
+  by default): Volume Up and Down move Audio › Volume 5 % a press, on and on while held; Mute
+  (also a button beside Volume) silences the music until pressed again or the volume changes,
+  over Mute when and the pause, and is not kept between runs.
 - **Labels:** a short coloured tag per preset (up to 32 characters, a longer one than 16
   runs like a ticker), shown beside its keys in the tree. "new" marks a preset the app
   made and goes at its first edit.
@@ -294,8 +307,12 @@ npm run dist         # Windows build: out/Trucker AUX-<version>-win-x64.zip
   `--dev-tools` to have them.
 - Updating the defaults: `node scripts/export-store.mjs <data folder> <out folder>` exports the
   tree of the presets played there; put its files in place of `app/presets/default/`, then
-  build. A default keeps its file name (as it is, or as your copy of it), and other presets get
-  names no default had, so a hook remembering a default finds the same cab after an update.
+  build. A default keeps its file name (as it is, as your copy of it, or as a preset of yours
+  sounding exactly as it) and where it applies (a model's file stays the model's), and other
+  presets get names no default had, so a hook remembering a default finds the same cab after an
+  update. `--loose "<preset name>"` adds a preset of yours on no key as a default for no vehicle
+  (under "Unused presets", for anyone to put on a key: the Hitchhiker, a passenger's seat for a
+  second copy of the app playing a voice chat).
 - `tools/fake_shm.py` fakes the telemetry for work without the game: a game, a truck, a
   fifth-wheel position, a plate, a blinker and, with `--camera cab|outside|free`, the
   camera plugin's block. Run it only while the game is closed.

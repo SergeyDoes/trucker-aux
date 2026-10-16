@@ -55,6 +55,14 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 // at the music's volume); 'aux', from the cab's speakers as the music is, muted with it.
 export const VOICE_MODES = ['off', 'system', 'aux'];
 
+// Volume Up / Down (controls.js): the slider's next 5 % step that way, within 0..200 %.
+const VOLUME_STEP = 0.05;
+export function stepVolume(volume, direction) {
+  const steps = volume / VOLUME_STEP;
+  const next = direction > 0 ? Math.floor(steps + 1e-6) + 1 : Math.ceil(steps - 1e-6) - 1;
+  return Math.round(Math.min(2, Math.max(0, next * VOLUME_STEP)) * 100) / 100;
+}
+
 function voiceMode(value) {
   if (value === false) return 'off'; // the first version had a checkbox
   return VOICE_MODES.includes(value) ? value : 'system';
@@ -92,5 +100,8 @@ export function normalizeSettings(raw) {
     controls: normalizeControls(src.controls),
     voice: voiceMode(src.voice),
     voiceVolume: finite(src.voiceVolume) ? Math.round(Math.min(2, Math.max(0, src.voiceVolume)) * 100) / 100 : 1,
+    // Auto, the tree's toggle: getting out of a vehicle plays the next one's preset in Auto; off,
+    // what plays stays (app.js onPose).
+    autoFollow: src.autoFollow !== false,
   };
 }

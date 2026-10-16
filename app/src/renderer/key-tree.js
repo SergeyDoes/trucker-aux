@@ -28,8 +28,10 @@ const FOLDER = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="tru
 const DRAG_TYPE = 'application/x-trucker-aux-preset';
 
 export function createKeyTree(root, actions) {
-  // Auto follows the vehicle in the game; picking a key or a preset stops that until pressed.
-  const auto = el('button', { className: 'reg-auto', textContent: 'Auto', onclick: () => actions.selectPreset('auto') });
+  // Auto, a switch (settings.autoFollow): on, what plays follows the vehicle in the game, and a
+  // key or preset picked plays until you get out of the vehicle; off, what plays stays.
+  let autoOn = true;
+  const auto = el('button', { className: 'reg-auto', textContent: 'Auto', role: 'switch', onclick: () => actions.setAutoFollow(!autoOn) });
   const undo = el('button', { textContent: '↶', title: 'Undo (Ctrl+Z)', onclick: () => actions.undo() });
   const redo = el('button', { textContent: '↷', title: 'Redo (Ctrl+Y)', onclick: () => actions.redo() });
   const share = el('button', { className: 'reg-file', textContent: 'Export…', title: 'Pick presets to save as files to share', onclick: () => actions.exportPresets() });
@@ -474,8 +476,13 @@ export function createKeyTree(root, actions) {
       lastPicked = picked;
       lastCurrent = current;
       lastPlaying = map.currentKey;
-      auto.classList.toggle('on', history.auto);
-      auto.title = history.auto ? 'Following the vehicle in the game' : 'Back to Auto: follow the vehicle in the game again';
+      autoOn = history.autoFollow;
+      auto.classList.toggle('on', autoOn);
+      auto.classList.toggle('held', autoOn && !history.auto);
+      auto.setAttribute('aria-checked', String(autoOn));
+      if (!autoOn) auto.title = 'Auto is off: what plays stays when you get in another vehicle. Click to follow the vehicle in the game again';
+      else if (history.auto) auto.title = 'Auto is on: what plays follows the vehicle in the game. Click to keep what plays when you change vehicles';
+      else auto.title = 'Auto is on: what you picked plays until you get out of this vehicle (the card\'s Back to Auto: at once). Click to turn Auto off';
       undo.disabled = !history.undo;
       redo.disabled = !history.redo;
       last = { map };
